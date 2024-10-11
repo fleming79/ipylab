@@ -482,22 +482,32 @@ export class IpylabModel extends WidgetModel {
    */
   static async newSessionContext({
     name,
-    path = '',
-    kernelId = '',
+    path,
+    kernelId,
     language = 'python',
     code = '',
     type = 'console',
     ensureFrontend = true
   }: {
-    name: string;
-    path: string;
+    name?: string;
+    path?: string;
     kernelId?: string;
     language?: string;
     code?: string;
     type?: string;
     ensureFrontend?: boolean | string;
   }): Promise<SessionContext> {
-    path = path || UUID.uuid4();
+    if (!path) {
+      path = path || UUID.uuid4();
+      if (kernelId) {
+        for (const session of this.sessionManager.running()) {
+          if (session.kernel.id === kernelId) {
+            path = session.path;
+            break;
+          }
+        }
+      }
+    }
 
     const sessionContext = new SessionContext({
       sessionManager: IpylabModel.sessionManager,
@@ -606,7 +616,13 @@ export class IpylabModel extends WidgetModel {
    * @param kernelId The kernel where to start looking for widget models.
    * @returns
    */
-  static async toLuminoWidget(id: string, kernelId = '') {
+  static async toLuminoWidget(
+    id: string,
+    kernelId = ''
+  ): Promise<{
+    luminoWidget: Widget;
+    kernelId: string;
+  }> {
     let luminoWidget: Widget;
     let manager;
     if (typeof id === 'string' && id) {
@@ -616,10 +632,10 @@ export class IpylabModel extends WidgetModel {
         const kernel = manager.kernel;
         const model = await manager.get_model(model_id);
         if ((model as any)?.isConnectionModel) {
-          ({ luminoWidget, kernelId } = await IpylabModel.toLuminoWidget(
+          return await IpylabModel.toLuminoWidget(
             model.get('cid'),
             manager.kernel.id
-          ));
+          );
         } else {
           luminoWidget = (await manager.create_view(model, {})).luminoWidget;
           IpylabModel.onKernelLost(kernel, luminoWidget.dispose, luminoWidget);

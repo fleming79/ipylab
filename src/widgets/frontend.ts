@@ -224,8 +224,11 @@ export class JupyterFrontEndModel extends IpylabModel {
       // Wrap the widget with a MainAreaWidget
       const w = (luminoWidget = new MainAreaWidget({ content: luminoWidget }));
       w.node.removeChild(w.toolbar.node);
-      (w as any).sessionContext =
-        await IpylabModel.newSessionContext(ipylabSettings);
+
+      // Attach a session context consistent with other widgets in the shell
+      const sc = await IpylabModel.newSessionContext(ipylabSettings);
+      ipylabSettings.path = sc.session.path;
+      (w as any).sessionContext = sc;
       w.disposed.connect(() => {
         (w as any).sessionContext.dispose();
         delete (w as any).sessionContext;

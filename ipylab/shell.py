@@ -75,27 +75,24 @@ class Shell(Ipylab):
         ```
         """
 
-        async def add_to_shell():
-            async with self.app as app:
-                if isinstance(obj, Widget) and "kernelId" not in kwgs and "path" not in kwgs and app.current_session:
-                    kwgs["path"] = app.current_session["path"]
-                    kwgs["kernelId"] = app.current_session["kernel"]["id"]
-
-                kwgs["options"] = {
-                    "activate": activate,
-                    "mode": InsertMode(mode),
-                    "rank": int(rank) if rank else None,
-                    "ref": ref.id if isinstance(ref, Connection) else None,
-                } | (options or {})
-                if isinstance(obj, Widget):
-                    kwgs["id"] = obj.id if isinstance(obj, Connection) else pack(obj)
-                else:
-                    kwgs["evaluate"] = pack(obj)
-                cid_ = ShellConnection.to_cid(cid) if cid else ShellConnection.to_cid()
-                kwgs["transform"] = {"transform": Transform.connection, "cid": cid_}
-            return await self.execute_command("ipylab:add-to-shell", cid=cid_, area=area, **kwgs)
-
-        return self.to_task(add_to_shell())
+        kwgs["options"] = {
+            "activate": activate,
+            "mode": InsertMode(mode),
+            "rank": int(rank) if rank else None,
+            "ref": ref.id if isinstance(ref, Connection) else None,
+        } | (options or {})
+        if isinstance(obj, Widget):
+            if isinstance(obj, Connection):
+                kwgs["id"] = obj.id
+                if not cid:
+                    cid = obj.cid
+            else:
+                kwgs["id"] = pack(obj)
+        else:
+            kwgs["evaluate"] = pack(obj)
+        cid_ = ShellConnection.to_cid(cid) if cid else ShellConnection.to_cid()
+        kwgs["transform"] = {"transform": Transform.connection, "cid": cid_}
+        return self.execute_command("ipylab:add-to-shell", cid=cid_, area=area, **kwgs)
 
     def expand_left(self):
         return self.execute_method("expandLeft")
