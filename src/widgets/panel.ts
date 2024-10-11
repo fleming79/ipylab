@@ -41,11 +41,7 @@ export class PanelModel extends BoxModel {
 export class PanelView extends BoxView {
   initialize(parameters: WidgetView.IInitializeParameters): void {
     super.initialize(parameters);
-    this.listenTo(this.model, 'change:class_name', this.update_class_name);
     this.listenTo(this.model.get('title'), 'change', this.update_title);
-    this.luminoWidget.removeClass('widget-box');
-    this.luminoWidget.removeClass('jupyter-widgets');
-    this.update_class_name();
     this.update_title();
   }
 
@@ -54,15 +50,6 @@ export class PanelView extends BoxView {
     title.update_title(this.luminoWidget.title);
   }
 
-  update_class_name() {
-    this.luminoWidget.removeClass(this.class_name);
-    this.class_name = this.model.get('class_name');
-    if (this.class_name) {
-      this.luminoWidget.addClass(this.class_name);
-    }
-  }
-
   model: PanelModel;
-  class_name: string = '';
   luminoWidget: JupyterLuminoPanelWidget;
 }

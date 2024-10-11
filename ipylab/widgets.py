@@ -44,16 +44,18 @@ class Title(WidgetBase):
 
 @register
 class Panel(Box):
+    _model_name = Unicode("PanelModel").tag(sync=True)
+    _view_name = Unicode("PanelView").tag(sync=True)
     _model_module = Unicode(_fe.module_name, read_only=True).tag(sync=True)
     _model_module_version = Unicode(_fe.module_version, read_only=True).tag(sync=True)
     _view_module = Unicode(_fe.module_name, read_only=True).tag(sync=True)
     _view_module_version = Unicode(_fe.module_version, read_only=True).tag(sync=True)
-
-    _model_name = Unicode("PanelModel").tag(sync=True)
-    _view_name = Unicode("PanelView").tag(sync=True)
     title: Instance[Title] = InstanceDict(Title, ()).tag(sync=True, **widget_serialization)
-    class_name = Unicode("ipylab-panel").tag(sync=True)
     _comm = None
+
+    def __init__(self, children=(), **kwargs):
+        super().__init__(children, **kwargs)
+        self.add_class("ipylab-" + self.__class__.__name__)
 
     @property
     def app(self):
@@ -95,7 +97,6 @@ class SplitPanel(Panel):
     _model_name = Unicode("SplitPanelModel").tag(sync=True)
     _view_name = Unicode("SplitPanelView").tag(sync=True)
     orientation = Unicode("vertical").tag(sync=True)
-    class_name = Unicode("ipylab-splitpanel").tag(sync=True)
     _force_update_in_progress = False
 
     # ============== Start temp fix =============

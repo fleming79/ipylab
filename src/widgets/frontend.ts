@@ -226,7 +226,10 @@ export class JupyterFrontEndModel extends IpylabModel {
       w.node.removeChild(w.toolbar.node);
       (w as any).sessionContext =
         await IpylabModel.newSessionContext(ipylabSettings);
-      w.disposed.connect(() => delete (w as any).sessionContext);
+      w.disposed.connect(() => {
+        (w as any).sessionContext.dispose();
+        delete (w as any).sessionContext;
+      });
       w.addClass('ipylab-MainArea');
     }
 

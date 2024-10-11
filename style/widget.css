@@ -3,26 +3,26 @@
 | Distributed under the terms of the Modified BSD License.
 |---------------------------------------------------------------------------- */
 
-.ipylab-panel {
+.ipylab-Panel {
   height: 100%;
   width: 100%;
+  flex-direction: column;
   overflow: auto;
 }
 
-.ipylab-splitpanel {
+.ipylab-SplitPanel {
   height: 100%;
   width: 100%;
   overflow: hidden;
 }
 
 /* Default Split Handle Color */
-.ipylab-splitpanel .lm-SplitPanel-handle {
+.ipylab-SplitPanel .lm-SplitPanel-handle {
   background-color: var(--jp-border-color2);
 }
 
 .ipylab-MainArea {
   box-sizing: border-box;
   display: flex;
-  width: 100%;
-  height: 100%;
+  margin: 0;
 }
