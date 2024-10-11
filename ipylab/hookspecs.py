@@ -32,7 +32,7 @@ class IpylabHookspec:
         ```
         """
 
-    @hookspec()
+    @hookspec(firstresult=True)
     def namespace_defaults(self, defaults: dict, namespace_name: str, app: JupyterFrontEnd) -> None:
         "Modify the namespace defaults by adding or removing entries."
 
