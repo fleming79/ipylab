@@ -577,7 +577,7 @@ export class IpylabModel extends WidgetModel {
         })();
       }
     }
-    search_for_manager;
+
     const result = await Promise.any(search_for_manager());
     if (result instanceof KernelWidgetManager) {
       return result;
@@ -607,16 +607,24 @@ export class IpylabModel extends WidgetModel {
    * @returns
    */
   static async toLuminoWidget(id: string, kernelId = '') {
-    let luminoWidget, manager;
+    let luminoWidget: Widget;
+    let manager;
     if (typeof id === 'string' && id) {
       if (id.slice(0, 10) === 'IPY_MODEL_') {
         const model_id = id.slice(10).split(':', 1)[0];
         manager = await IpylabModel.getWidgetManager(model_id, kernelId);
         const kernel = manager.kernel;
         const model = await manager.get_model(model_id);
-        luminoWidget = (await manager.create_view(model, {})).luminoWidget;
-        IpylabModel.onKernelLost(kernel, luminoWidget.dispose, luminoWidget);
-        kernelId = manager.kernel.id;
+        if ((model as any)?.isConnectionModel) {
+          ({ luminoWidget, kernelId } = await IpylabModel.toLuminoWidget(
+            model.get('cid'),
+            manager.kernel.id
+          ));
+        } else {
+          luminoWidget = (await manager.create_view(model, {})).luminoWidget;
+          IpylabModel.onKernelLost(kernel, luminoWidget.dispose, luminoWidget);
+          kernelId = manager.kernel.id;
+        }
       } else {
         luminoWidget = await IpylabModel.fromConnectionOrId(id);
       }
