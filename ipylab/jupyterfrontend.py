@@ -12,11 +12,11 @@ import ipywidgets
 import pluggy
 from IPython.core.getipython import get_ipython
 from ipywidgets import CallbackDispatcher, widget_serialization
-from traitlets import Container, Dict, Instance, Tuple, Unicode, observe
+from traitlets import Container, Dict, Instance, Tuple, Unicode
 
 import ipylab
 import ipylab.hookspecs
-from ipylab import ShellConnection, Transform
+from ipylab import Connection, ShellConnection, Transform
 from ipylab.commands import CommandRegistry
 from ipylab.common import InsertMode
 from ipylab.dialog import Dialog, FileDialog
@@ -83,10 +83,8 @@ class JupyterFrontEnd(Ipylab):
     current_widget_id = Unicode(read_only=True).tag(sync=True)
     current_session = Dict(read_only=True).tag(sync=True)
     all_sessions = Tuple(read_only=True).tag(sync=True)
-    all_shell_connections_info: Container[tuple[dict, ...]] = Tuple(read_only=True).tag(sync=True)
     namespaces: Container[tuple[str, ...]] = Tuple(read_only=True).tag(sync=True)
 
-    shell_connections: Container[tuple[ShellConnection, ...]] = Tuple(read_only=True)
     dialog = Instance(Dialog, (), read_only=True)
     file_dialog = Instance(FileDialog, (), read_only=True)
     shell = Instance(Shell, (), read_only=True)
@@ -100,6 +98,7 @@ class JupyterFrontEnd(Ipylab):
 
     _ipy_shell = get_ipython()
     _ipy_default_namespace: ClassVar = getattr(_ipy_shell, "user_ns", {})
+    _frontend_init_count = 0
 
     def __init_subclass__(cls, **kwargs) -> None:
         msg = "Subclassing the `JupyterFrontEnd` class is not allowed!"
@@ -123,49 +122,40 @@ class JupyterFrontEnd(Ipylab):
         return bool(getattr(self, "_is_ipylab_kernel", False))
 
     def _on_frontend_init(self):
-        # Only load entry points in a kernel with a frontend and once
-        # it is known if which kernel is the Ipylab kernel.
-
+        # This method is called just after the frontend model is initialized.
+        # This will occur on first creation of a kernel, but will also happen
+        # when a page is refreshed and when a workspace is loaded in Jupytelab.
         super()._on_frontend_init()
 
         async def autostart():
-            plugins = self.hook.autostart(app=self)
-
-            # Start loading plugins
-            loop = asyncio.as_completed(filter(inspect.isawaitable, plugins))
-            await self.schedule_operation("plugins_loading", ipylabKernelReady=self.is_ipylab_kernel)
-            # Check the results completed
-            for coro in loop:
+            results = self.hook.autostart(app=self)
+            for coro in asyncio.as_completed(filter(inspect.isawaitable, results)):
                 result = await coro
                 if isinstance(result, Exception):
                     await self.dialog.show_error_message("Plugin failed", str(result))
-            self.log.info("Finished running %d 'autostart' plugins.", len(plugins))
+            self.log.info("Finished running %d autostart hooks.", len(results))
+            await self.schedule_operation("autostart_complete")
+            if self.is_ipylab_kernel:
+                await self.schedule_operation("ipylab_kernel_ready", init_count=self._frontend_init_count)
+            self._frontend_init_count += 1
             self.restored()
 
-        self.to_task(autostart(), "Autostart plugins")
+        self.to_task(autostart(), "run autostart hooks")
 
     def _gen_repr_from_keys(self, keys: Iterable):  # noqa: ARG002
         return super()._gen_repr_from_keys(("kernelId",))
-
-    @observe("all_shell_connections_info")
-    def _observe_all_shell_connections_info(self, _):
-        connections = []
-        for info in self.all_shell_connections_info:
-            if info.get("kernelId") == self.kernelId:
-                conn = ShellConnection(cid=info["cid"], id=info["id"], info=info)
-                connections.append(conn)
-        self.set_trait("shell_connections", connections)
-
-    @property
-    def current_widget(self) -> ShellConnection:
-        """A connection to the current widget in the shell."""
-        id_ = self.current_widget_id
-        return ShellConnection(cid=ShellConnection.to_cid(id_), id=id_)
 
     async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list) -> Any:
         match operation:
             case "evaluate":
                 return await self._evaluate(payload, buffers)
+            case "evaluate_widget":
+                result = await self._evaluate(payload, buffers)
+                widget = result.get("payload")
+                if not isinstance(widget, ipywidgets.Widget) or isinstance(widget, Connection):
+                    msg = "'evaluate' must return a Widget and NOT a Connection!"
+                    raise TypeError(msg)
+                return result
             case "open console":
                 return await self.open_console(**payload)
         return await super()._do_operation_for_frontend(operation, payload, buffers)
@@ -305,7 +295,7 @@ class JupyterFrontEnd(Ipylab):
 
         return self.to_task(open_console())
 
-    async def _evaluate(self, options: dict, buffers: list) -> Any:
+    async def _evaluate(self, options: dict, buffers: list):
         """Evaluate code corresponding to a call from 'evaluate'.
 
         A call to this method should originate from either:

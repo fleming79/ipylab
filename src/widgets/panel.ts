@@ -42,6 +42,8 @@ export class PanelView extends BoxView {
   initialize(parameters: WidgetView.IInitializeParameters): void {
     super.initialize(parameters);
     this.listenTo(this.model.get('title'), 'change', this.update_title);
+    this.luminoWidget.removeClass('widget-box');
+    this.luminoWidget.removeClass('jupyter-widgets');
     this.update_title();
   }
 

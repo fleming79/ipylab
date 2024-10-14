@@ -56,9 +56,6 @@ export class CommandRegistryModel extends IpylabModel {
   ): Promise<IDisposable> {
     const { id, isToggleable, icon } = options;
 
-    if (IpylabModel.connections.has(id)) {
-      (await IpylabModel.fromConnectionOrId(id)).dispose();
-    }
     // Make a new object and define functions so we can dynamically update.
     const config = { ...options };
     delete config.icon;

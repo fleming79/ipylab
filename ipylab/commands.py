@@ -161,21 +161,27 @@ class Launcher(Ipylab):
 
         ref: https://jupyterlab.readthedocs.io/en/latest/api/interfaces/launcher.ILauncher.IItemOptions.html
         """
-        conn = LauncherConnection.get_existing_connection(command, category, quiet=True)
+        cmd = CommandConnection.get_existing_connection(CommandConnection.to_cid(command))
+        conn = LauncherConnection.get_existing_connection(str(cmd), category, quiet=True)
         if conn:
             conn.close(dispose=True)
-        info = {"command": str(command), "category": category, "rank": rank, "args": args}
-        task = self.execute_method(
-            "add",
-            info,
-            transform={
-                "transform": Transform.connection,
-                "cid": LauncherConnection.to_cid(str(command), category),
-                "info": info,
-                "auto_dispose": True,
-            },
-        )
-        return self.to_task(self._add_to_tuple_trait("items", task))
+
+        async def add_launcher():
+            info = {"command": str(command), "category": category, "rank": rank, "args": args}
+            lc: LauncherConnection = await self.execute_method(
+                "add",
+                info,
+                transform={
+                    "transform": Transform.connection,
+                    "cid": LauncherConnection.to_cid(str(command), category),
+                    "info": info,
+                    "auto_dispose": True,
+                },
+            )
+            cmd.observe(lambda _: lc.close(), "comm")
+            return lc
+
+        return self.to_task(self._add_to_tuple_trait("items", add_launcher()))
 
     def remove(self, command_id: str | CommandConnection, category: str):
         conn = LauncherConnection.get_existing_connection(str(command_id), category)

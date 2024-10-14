@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ipywidgets import Widget
+from ipywidgets import TypedTuple, Widget
+from traitlets import Container, Instance, Unicode
 
 from ipylab import Area, Connection, InsertMode, ShellConnection, Transform, pack
-from ipylab.ipylab import Ipylab, Unicode
+from ipylab.ipylab import Ipylab
 
 if TYPE_CHECKING:
     import inspect
@@ -30,6 +31,7 @@ class Shell(Ipylab):
 
     SINGLETON = True
     _basename = Unicode("shell").tag(sync=True)
+    items: Container[tuple[ShellConnection, ...]] = TypedTuple(trait=Instance(ShellConnection))
 
     def add(
         self,
@@ -54,6 +56,9 @@ class Shell(Ipylab):
             Additional **kwgs:
                 kernelId: leave blank to start a new kernel.
                 path: The path of the sessionContext to use when creating a new kernel.
+
+            Note:
+            The payload of evaluate must be a Widget with a view and NOT a ShellConnection.
 
 
         ref: https://jupyterlab.readthedocs.io/en/latest/api/interfaces/application.JupyterFrontEnd.IShell.html#add
@@ -92,7 +97,8 @@ class Shell(Ipylab):
             kwgs["evaluate"] = pack(obj)
         cid_ = ShellConnection.to_cid(cid) if cid else ShellConnection.to_cid()
         kwgs["transform"] = {"transform": Transform.connection, "cid": cid_}
-        return self.execute_command("ipylab:add-to-shell", cid=cid_, area=area, **kwgs)
+        task = self.execute_command("ipylab:add-to-shell", cid=cid_, area=area, **kwgs)
+        return self.to_task(self._add_to_tuple_trait("items", task))
 
     def expand_left(self):
         return self.execute_method("expandLeft")
