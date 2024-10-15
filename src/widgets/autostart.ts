@@ -2,7 +2,6 @@
 // Distributed under the terms of the Modified BSD License.
 
 import { ISessionContext } from '@jupyterlab/apputils';
-import { UUID } from '@lumino/coreutils';
 import { IDisposable, IpylabModel } from './ipylab';
 /**
  * The model to run in the Ipylab kernel.
@@ -19,13 +18,9 @@ export class IpylabAutostart {
       if (restart) {
         await IpylabAutostart.sessionContext?.session?.kernel?.shutdown();
       }
-      const model = await IpylabModel.sessionManager.findByPath(path);
       IpylabAutostart.sessionContext = await IpylabModel.newSessionContext({
         path: path,
-        name: path,
-        language: 'python',
-        kernelId: model ? null : UUID.uuid4(),
-        ensureFrontend: 'isIpylabKernel'
+        isIpylabKernel: true
       });
     }
     if (restart && IpylabAutostart._command) {

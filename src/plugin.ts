@@ -80,9 +80,6 @@ async function activate(
 
     registry.registerWidget(widgetExports.IpylabModel.exports);
   }
-  app.commands.addCommand('ipylab:add-to-shell', {
-    execute: JupyterFrontEndModel.addToShell
-  });
   app.commands.addCommand('ipylab:restore', {
     execute: JupyterFrontEndModel.restoreToShell
   });

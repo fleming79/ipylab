@@ -97,7 +97,7 @@ class Shell(Ipylab):
             kwgs["evaluate"] = pack(obj)
         cid_ = ShellConnection.to_cid(cid) if cid else ShellConnection.to_cid()
         kwgs["transform"] = {"transform": Transform.connection, "cid": cid_}
-        task = self.execute_command("ipylab:add-to-shell", cid=cid_, area=area, **kwgs)
+        task = self.app.schedule_operation("addToShell", cid=cid_, area=area, **kwgs)
         return self.to_task(self._add_to_tuple_trait("items", task))
 
     def expand_left(self):

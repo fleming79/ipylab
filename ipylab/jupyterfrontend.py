@@ -2,7 +2,6 @@
 # Distributed under the terms of the Modified BSD License.
 from __future__ import annotations
 
-import asyncio
 import functools
 import inspect
 from collections import OrderedDict
@@ -129,7 +128,8 @@ class JupyterFrontEnd(Ipylab):
 
         async def autostart():
             results = self.hook.autostart(app=self)
-            for coro in asyncio.as_completed(filter(inspect.isawaitable, results)):
+            # for coro in asyncio.as_completed(filter(inspect.isawaitable, results)):
+            for coro in filter(inspect.isawaitable, results):
                 result = await coro
                 if isinstance(result, Exception):
                     await self.dialog.show_error_message("Plugin failed", str(result))
