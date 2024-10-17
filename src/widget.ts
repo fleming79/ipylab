@@ -2,7 +2,7 @@
 // Distributed under the terms of the Modified BSD License.
 
 import { CommandRegistryModel } from './widgets/commands';
-import { ConnectionModel } from './widgets/connection';
+import { ConnectionModel, ShellConnectionModel } from './widgets/connection';
 import { JupyterFrontEndModel } from './widgets/frontend';
 import { IconModel, IconView } from './widgets/icon';
 import { IpylabModel } from './widgets/ipylab';
@@ -21,6 +21,7 @@ export {
   NotificationManagerModel,
   PanelModel,
   PanelView,
+  ShellConnectionModel,
   SplitPanelModel,
   SplitPanelView,
   TitleModel

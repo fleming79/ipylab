@@ -34,6 +34,7 @@ import { IDisposable, IObservableDisposable } from '@lumino/disposable';
 import { Signal } from '@lumino/signaling';
 import { Widget } from '@lumino/widgets';
 import { MODULE_NAME, MODULE_VERSION } from '../version';
+import type { ConnectionModel } from './connection';
 import type { JupyterFrontEndModel } from './frontend';
 import {
   getNestedObject,
@@ -63,6 +64,10 @@ export class IpylabModel extends WidgetModel {
     super.initialize(attributes, options);
     this.set('kernelId', this.kernelId);
     this.send({ init: 'ipylabInit' });
+    // TODO: fix in ipywidgets -> restored not triggering when re-starting kernel.
+    // this.widget_manager.restored.connect(this.ipylabInit, this);
+    // if (this.widget_manager.restoredStatus) {
+    // }
     this.ipylabInit();
   }
 
@@ -92,11 +97,16 @@ export class IpylabModel extends WidgetModel {
       }
     }
     this._base = base;
+    // this._jfem = await IpylabModel.ensureFrontend(this.kernel);
     this.on('msg:custom', this._onCustomMessage, this);
     IpylabModel.onKernelLost(this.kernel, this.close, this);
     this.save_changes();
     this.send({ init: 'ready' });
   }
+
+  // get jfem() {
+  //   return this._jfem;
+  // }
 
   get model_name() {
     return this.get('_model_name');
@@ -219,7 +229,7 @@ export class IpylabModel extends WidgetModel {
         'This payload is a simplified representation because it has circular references.';
       if (typeof value.dispose === 'function') {
         // Keep a reference to disposable objects in case it needs to be found again in the frontend.
-        const cid = (out['ipylab_cid'] = `ipylab-connection:${UUID.uuid4()}`);
+        const cid = (out['ipylab_cid'] = `ipylab-Connection:${UUID.uuid4()}`);
         IpylabModel.registerConnection(cid, value);
       }
       return out;
@@ -248,8 +258,8 @@ export class IpylabModel extends WidgetModel {
           nullIfMissing: false
         });
         if (value && typeof value === 'string') {
-          const luminoWidget = await IpylabModel.toLuminoWidget({ id: value });
-          setNestedProperty(content.kwgs, dottedname, luminoWidget);
+          const lw = (await IpylabModel.toLuminoWidget({ id: value })).widget;
+          setNestedProperty(content.kwgs, dottedname, lw);
         }
       }
     }
@@ -399,7 +409,7 @@ export class IpylabModel extends WidgetModel {
       case 'updateProperty':
         return this._updateProperty(payload);
       case 'newSessionContext':
-        return await IpylabModel.newSessionContext(payload);
+        return await IpylabModel.newSessionContext(payload.vpath);
       default:
         // Each failed operation should throw an error if it is un-handled
         throw new Error(
@@ -427,8 +437,8 @@ export class IpylabModel extends WidgetModel {
       case 'null':
         return null;
       case 'connection':
-        cid = args?.cid ?? `ipylab-connection:${UUID.uuid4()}`;
-        IpylabModel.registerConnection(cid, obj);
+        cid = args?.cid ?? `ipylab-Connection:${UUID.uuid4()}`;
+        obj = IpylabModel.registerConnection(cid, obj);
         if (args.auto_dispose) {
           IpylabModel.onKernelLost(this.kernel, obj.dispose, obj, true);
         }
@@ -483,36 +493,17 @@ export class IpylabModel extends WidgetModel {
    * Start a new session that support comms needed for iplab needs for comms.
    * @returns
    */
-  static async newSessionContext({
-    path,
-    kernelId,
-    isIpylabKernel = false
-  }: {
-    path: string;
-    kernelId?: string;
-    isIpylabKernel?: boolean;
-  }): Promise<SessionContext> {
-    if (!path) {
-      if (kernelId) {
-        for (const session of this.sessionManager.running()) {
-          if (session.kernel.id === kernelId) {
-            path = session.path;
-            break;
-          }
-        }
-      }
+  static async newSessionContext(vpath: string): Promise<SessionContext> {
+    if (!vpath) {
+      throw new Error('vpath not provided');
     }
-    const model = await IpylabModel.sessionManager.findByPath(path);
     const sessionContext = new SessionContext({
       sessionManager: IpylabModel.sessionManager,
       specsManager: IpylabModel.app.serviceManager.kernelspecs,
-      path: path,
-      name: path,
+      path: vpath,
+      name: vpath,
       type: 'console',
-      kernelPreference: {
-        id: model ? null : kernelId,
-        language: 'python'
-      }
+      kernelPreference: { language: 'python' }
     });
     await sessionContext.initialize();
     if (!sessionContext.isReady) {
@@ -525,7 +516,7 @@ export class IpylabModel extends WidgetModel {
       throw new Error('Cancelling because a kernel was not provided');
     }
     const kernel = sessionContext.session.kernel;
-    await IpylabModel.ensureFrontend(kernel, isIpylabKernel);
+    await IpylabModel.ensureFrontend(kernel, vpath);
     return sessionContext;
   }
 
@@ -539,7 +530,7 @@ export class IpylabModel extends WidgetModel {
   static async getWidgetManager(
     model_id: string
   ): Promise<KernelWidgetManager> {
-    return await(KernelWidgetManager as any).getManager(model_id);
+    return await (KernelWidgetManager as any).getManager(model_id, [100]);
   }
 
   /**
@@ -558,54 +549,49 @@ export class IpylabModel extends WidgetModel {
   /**
    * Get or create a lumino widget.
    *
-   * @param args: an object with 'id' and 'kernelId'
+   * @param args: an object with 'id' and 'vpath'
    * args is updated as the object is located
    * @returns
    */
-  static async toLuminoWidget(args: any): Promise<Widget> {
-    if (!(typeof args.id === 'string')) {
-      throw new Error(`'id' is not a string`);
+  static async toLuminoWidget({
+    cid = '',
+    id = '',
+    ipy_model = ''
+  }: { cid?: string; id?: string; ipy_model?: string } = {}): Promise<{
+    widget: Widget;
+    vpath: string;
+  }> {
+    let widget: Widget;
+    let vpath = '';
+
+    if (!ipy_model && id.slice(0, 10) === 'IPY_MODEL_') {
+      ipy_model = id.slice(10).split(':', 1)[0];
     }
-    if (args.id.slice(0, 10) === 'IPY_MODEL_') {
-      let luminoWidget;
-      const model_id = args.id.slice(10).split(':', 1)[0];
-      let model = await IpylabModel.getWidgetModel(model_id);
-      let m = model as any;
-      if (m.isConnectionModel) {
-        if (m.base instanceof Widget) {
-          args.id = m.base?.ipylabSettings?.id || m.get('cid');
-          args.area = args.area || m.base?.ipylabSettings?.area;
-          return m.base;
-        } else if (m.base instanceof WidgetModel) {
-          args.id = m.get('id');
-          model = m.base;
-        } else {
-          throw new Error(`Unable to create widget for id='${args.id}'`);
-        }
+
+    if (IpylabModel.connections.has(cid)) {
+      widget = IpylabModel.connections.get(cid) as Widget;
+    } else if (ipy_model) {
+      const model = await IpylabModel.getWidgetModel(ipy_model);
+      if ((model as ConnectionModel).isConnectionModel) {
+        // return await this.toLuminoWidget(model.get('cid'));
       }
       if (!model.get('_view_name')) {
-        throw new Error(
-          `This model does not have a view ${listProperties({ obj: model })}
-          kernelId='${args.kernelId}'`
-        );
+        const name = model.get('_model_name');
+        throw new Error(`Model '${name}' does not have a view!`);
       }
       const manager = model.widget_manager as KernelWidgetManager;
       const kernel = manager.kernel;
-      luminoWidget = (await manager.create_view(model, {})).luminoWidget;
-      args.isIpyWidget = true;
-      IpylabModel.onKernelLost(kernel, luminoWidget.dispose, luminoWidget);
-      args.kernelId = kernel.id;
-      luminoWidget.addClass('ipylab-shell');
-      return luminoWidget;
-    } else {
-      const obj = await IpylabModel.fromConnectionOrId(args.id);
-      if (!(obj instanceof Widget)) {
-        throw new Error(
-          `Unable to create a luminoWidget ${JSON.stringify(args)}`
-        );
-      }
-      return obj;
+      const jfem = await IpylabModel.ensureFrontend(kernel);
+      widget = (await manager.create_view(model, {})).luminoWidget;
+      IpylabModel.onKernelLost(kernel, widget.dispose, widget);
+      vpath = jfem.vpath;
     }
+    if (!(widget instanceof Widget)) {
+      throw new Error(
+        `Unable to create a luminoWidget cid='${cid}' id='${id}'`
+      );
+    }
+    return { widget, vpath };
   }
 
   /**
@@ -622,8 +608,7 @@ export class IpylabModel extends WidgetModel {
       'menu',
       'left',
       'right',
-      'bottom',
-      'down'
+      'bottom'
     ]) {
       for (const widget of IpylabModel.labShell.widgets(
         area as ILabShell.Area
@@ -640,20 +625,15 @@ export class IpylabModel extends WidgetModel {
    * @param kernel
    * @param isIpylabKernel Provided for the default ipylab kernel
    */
-  static async ensureFrontend(
-    kernel: Kernel.IKernelConnection,
-    isIpylabKernel = false
-  ) {
+  static async ensureFrontend(kernel: Kernel.IKernelConnection, vpath = '') {
     const manager = new KernelWidgetManager(kernel, IpylabModel.rendermime);
     if (!IpylabModel.jfemPromises.has(kernel.id)) {
       IpylabModel.jfemPromises.set(kernel.id, new PromiseDelegate());
       await kernel.requestExecute(
         {
-          code: isIpylabKernel
-            ? `
+          code: `
             import ipylab
-            ipylab.app._is_ipylab_kernel=True`
-            : `import ipylab`,
+            ipylab.App(vpath='${vpath}')`,
           store_history: false
         },
         true
@@ -663,59 +643,6 @@ export class IpylabModel extends WidgetModel {
       }
     }
     return await IpylabModel.jfemPromises.get(kernel.id).promise;
-  }
-
-  static async getFrontendModel(args: any) {
-    let kernelId = args.kernelId;
-    if (IpylabModel.jfemPromises.has(kernelId)) {
-      return await IpylabModel.jfemPromises.get(kernelId).promise;
-    }
-    if (kernelId) {
-      IpylabModel.jfemPromises.set(kernelId, new PromiseDelegate());
-    }
-    const sc = await IpylabModel.newSessionContext(args);
-    const jfem = await IpylabModel.ensureFrontend(sc.session.kernel);
-    if (kernelId && jfem.kernelId !== kernelId) {
-      IpylabModel.jfemPromises.get(kernelId).resolve(jfem);
-    }
-    return jfem;
-
-    // await IpylabModel.ipylabKernelReady.promise;
-    // if (!IpylabModel.jfemPromises.has(kernelId)) {
-    //   const model = await IpylabModel.kernelManager.findById(kernelId);
-    //   if (!model) {
-    //     throw new Error(`Kernel doesn't exist ${kernelId}`);
-    //   }
-    //   const kernel = IpylabModel.kernelManager.connectTo({ model });
-    //   await IpylabModel.ensureFrontend(kernel);
-    // }
-    // const delegate = IpylabModel.jfemPromises.get(kernelId);
-    // const t = setTimeout(() => {
-    //   IpylabModel.jfemPromises.delete(kernelId);
-    //   delegate.reject(
-    //     `Timed out waiting for JupyterFrontEndModel to load for kernelId ='${kernelId}'`
-    //   );
-    // }, timeout);
-    // const jfem = await delegate.promise;
-    // clearTimeout(t);
-    // return jfem;
-  }
-
-  /**
-   *
-   * @param cid Get an object that has been registered as a connection.
-   * @returns
-   */
-  static async fromConnectionOrId(cid: string, id = ''): Promise<any> {
-    if (IpylabModel.connections.has(cid)) {
-      return IpylabModel.connections.get(cid);
-    }
-    if (id.slice(0, 10) === 'IPY_MODEL_') {
-      const model_id = id.slice(10);
-      return await IpylabModel.getWidgetModel(model_id);
-    } else {
-      return IpylabModel.getLuminoWidgetFromShell(id || cid);
-    }
   }
 
   /**
@@ -729,8 +656,14 @@ export class IpylabModel extends WidgetModel {
     if (typeof obj !== 'object') {
       throw new Error(`An object is required but got a '${typeof obj}'`);
     }
+    while (obj?.isConnectionModel) {
+      obj = obj.base;
+    }
     if (obj?.isDisposed) {
       throw new Error(`object is disposed`);
+    }
+    if (Private.connections.has(cid) && Private.connections.get(cid) !== obj) {
+      throw new Error(`Another object is already registered for cid: ${cid}`);
     }
 
     if (!obj.dispose) {
@@ -753,10 +686,11 @@ export class IpylabModel extends WidgetModel {
     }
     obj.disposed.connect(() => Private.connections.delete(cid));
     Private.connections.set(cid, obj);
-    if (IpylabModel.pendingConnections.has(cid)) {
-      IpylabModel.pendingConnections.get(cid).resolve(null);
-      IpylabModel.pendingConnections.delete(cid);
+    if (IpylabModel.pendingShellConnections.has(cid)) {
+      IpylabModel.pendingShellConnections.get(cid).resolve(null);
+      IpylabModel.pendingShellConnections.delete(cid);
     }
+    return obj;
   }
 
   /**
@@ -793,7 +727,7 @@ export class IpylabModel extends WidgetModel {
       });
     }
     if (value?.OTHER_PROPERTIES?.cid) {
-      return await IpylabModel.fromConnectionOrId(value.OTHER_PROPERTIES.cid);
+      return IpylabModel.connections.get(value.OTHER_PROPERTIES.cid);
     }
     throw new Error(`Cannot convert this value to an object: ${value}`);
   }
@@ -852,7 +786,7 @@ export class IpylabModel extends WidgetModel {
     return IpylabModel.app.serviceManager.sessions;
   }
 
-  static get pendingConnections() {
+  static get pendingShellConnections() {
     return Private.pendingConnections;
   }
 
@@ -862,6 +796,7 @@ export class IpylabModel extends WidgetModel {
   widget_manager: KernelWidgetManager;
   private _pendingOperations = new Map<string, PromiseDelegate<any>>();
   private _base: object | null;
+  // private _jfem: JupyterFrontEndModel;
   static model_name: string = 'IpylabModel';
   static model_module = MODULE_NAME;
   static model_module_version = MODULE_VERSION;

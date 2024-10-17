@@ -8,7 +8,7 @@ import weakref
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from ipywidgets import Widget, register
-from traitlets import Bool, Dict, Unicode
+from traitlets import Bool, Dict, Instance, Unicode
 
 from ipylab.common import pack
 from ipylab.ipylab import Ipylab
@@ -38,8 +38,13 @@ class Connection(Ipylab):
     and `LauncherConnection` (a subclass of `CommandPalletConnection`) have dispose
     enabled by default.
 
-    It is possible to creat a connection to most objects in the frontend, non-disposable
-    objects are patched with a blank `dispose` method.
+    It is possible to create a connection to most objects in the frontend,
+    non-disposable objects are patched with a blank `dispose` method.
+
+    The `cid` will not change for the life of the object, the id may change
+    when the Page is reloaded which causes the Javascript to restart. The
+    intent of the object won't change. However, it is likely the connection
+    won't be re-established meaning the connection will close.
 
     see: https://lumino.readthedocs.io/en/latest/api/modules/disposable.html
 
@@ -52,7 +57,7 @@ class Connection(Ipylab):
     """
 
     _CLASS_DEFINITIONS: ClassVar[dict[str, type[Self]]] = {}
-    _cid_prefix: ClassVar = "ipylab-connection"
+    prefix: ClassVar = "ipylab-Connection"
     _connections: weakref.WeakValueDictionary[str, Self] = weakref.WeakValueDictionary()
     _model_name = Unicode("ConnectionModel").tag(sync=True)
     cid = Unicode(read_only=True, help="connection id").tag(sync=True)
@@ -62,8 +67,8 @@ class Connection(Ipylab):
     _basename = None
 
     def __init_subclass__(cls, **kwargs) -> None:
-        cls._cid_prefix = "ipylab" + "".join(f"-{c.lower()}" if c.isupper() else c for c in cls.__name__)
-        cls._CLASS_DEFINITIONS[cls._cid_prefix] = cls
+        cls.prefix = f"ipylab-{cls.__name__}"
+        cls._CLASS_DEFINITIONS[cls.prefix] = cls
         super().__init_subclass__(**kwargs)
 
     def __new__(cls, cid: str, id: str = "", info: dict | None = None, **kwgs):  # noqa: A002
@@ -86,16 +91,17 @@ class Connection(Ipylab):
     def to_cid(cls, *args) -> str:
         """Generate an id for the args"""
 
-        args_ = [str(arg.id) if isinstance(arg, Connection) else str(pack(arg)) for arg in args]
+        args_ = [str(arg.id) if isinstance(arg, Connection) else str(pack(arg)) for arg in args if arg]
         if not args_:
             args_.append(str(uuid.uuid4()))
-        arg0 = args_[0].removeprefix(cls._cid_prefix).strip(":")
-        return "|".join([f"{cls._cid_prefix}:{arg0}", *args_[1:]]).strip(": ")
+        arg0 = args_[0].removeprefix(cls.prefix).strip(":")
+        return "|".join([f"{cls.prefix}:{arg0}", *args_[1:]]).strip(": ")
 
     @classmethod
     def get_instances(cls) -> Generator[Self, Any, None]:
+        "Get all subclasses"
         for item in cls._connections.values():
-            if item.__class__ is cls:
+            if isinstance(item, cls):
                 yield item  # type: ignore
 
     def close(self, *, dispose=False):
@@ -137,20 +143,24 @@ class Connection(Ipylab):
         return conn
 
 
-Connection._CLASS_DEFINITIONS[Connection._cid_prefix] = Connection  # noqa: SLF001
+Connection._CLASS_DEFINITIONS[Connection.prefix] = Connection  # noqa: SLF001
 
 
 class ShellConnection(Connection):
     "Provides a connection to a widget loaded in the shell"
 
-    def close(self, *, dispose=None):
+    _model_name = Unicode("ShellConnectionModel").tag(sync=True)
+    # ipy_model = Unicode("", help="The model", read_only=True)
+    widget = Instance(Widget, allow_none=True, default_value=None, help="The widget that has the view")
+
+    def close(self, *, dispose: bool | None = None):
         """Permanently close the widget.
 
         dispose: bool
             Whether to dispose of the object at the frontend.
             If None, dispose will be True if the widget originated from ipylab.
         """
-        super().close(dispose=self.id.startswith("IPY_MODEL_") if dispose is None else dispose)
+        super().close(dispose=bool(self.widget or dispose))
 
     def activate(self):
         task = self.app.shell.execute_method("activateById", self.id)
@@ -164,6 +174,8 @@ class ShellConnection(Connection):
 
 class ModelConnection(Connection):
     """A connection to the model of an Ipywidget."""
+
+    ipy_model = Unicode("", help="The model", read_only=True)
 
     def __new__(cls, widget: Widget, **kwgs) -> Self:
         return super().__new__(cls, cid=cls.to_cid(widget), id=pack(widget), **kwgs)

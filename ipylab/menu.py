@@ -110,7 +110,7 @@ class RankedMenu(Ipylab):
             },
             toObject=as_object,
         )
-        return self.to_task(self._add_to_tuple_trait("items", task))
+        return self.to_task(self._add_to_tuple_trait(self, "items", task))
 
     def activate(self):
         async def activate():
@@ -158,7 +158,7 @@ class MainMenu(Ipylab):
             await self.execute_method("addMenu", menu, update, {"rank": rank}, toObject=["args.0"])
             return menu
 
-        return self.to_task(self._add_to_tuple_trait("menus", add_menu()))
+        return self.to_task(self._add_to_tuple_trait(self, "menus", add_menu()))
 
     def create_menu(self, label: str, *, rank: int = 500) -> Task[MenuConnection]:
         """Make a new unique menu, likely to be used as a submenu."""
@@ -175,7 +175,7 @@ class MainMenu(Ipylab):
             options=info,
             transform={"transform": Transform.connection, "cid": cid, "auto_dispose": True, "info": info},
         )
-        return self.to_task(self._add_to_tuple_trait("_all_menus", coro))
+        return self.to_task(self._add_to_tuple_trait(self, "_all_menus", coro))
 
 
 class ContextMenuConnection(RankedMenu, Connection):

@@ -136,7 +136,7 @@ class CommandPalette(Ipylab):
                 "info": info,
             },
         )
-        return self.to_task(self._add_to_tuple_trait("items", task))
+        return self.to_task(self._add_to_tuple_trait(self, "items", task))
 
     def remove(self, command: str | CommandConnection, category: str):
         conn = CommandPalletConnection.get_existing_connection(str(command), category, quiet=True)
@@ -181,7 +181,7 @@ class Launcher(Ipylab):
             cmd.observe(lambda _: lc.close(), "comm")
             return lc
 
-        return self.to_task(self._add_to_tuple_trait("items", add_launcher()))
+        return self.to_task(self._add_to_tuple_trait(self, "items", add_launcher()))
 
     def remove(self, command_id: str | CommandConnection, category: str):
         conn = LauncherConnection.get_existing_connection(str(command_id), category)
@@ -271,7 +271,7 @@ class CommandRegistry(Ipylab):
             conn.set_trait("python_command", execute)
             if args:
                 conn.set_trait("args", args)
-            await self._add_to_tuple_trait("items", conn)
+            await self._add_to_tuple_trait(self, "items", conn)
             return conn
 
         return self.to_task(add_command())

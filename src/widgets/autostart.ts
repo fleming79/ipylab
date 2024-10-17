@@ -13,15 +13,12 @@ export class IpylabAutostart {
       IpylabAutostart.sessionContext?.session === null ||
       restart
     ) {
-      const path = 'Ipylab';
       await IpylabModel.sessionManager.refreshRunning();
       if (restart) {
         await IpylabAutostart.sessionContext?.session?.kernel?.shutdown();
       }
-      IpylabAutostart.sessionContext = await IpylabModel.newSessionContext({
-        path: path,
-        isIpylabKernel: true
-      });
+      IpylabAutostart.sessionContext =
+        await IpylabModel.newSessionContext('ipylab');
     }
     if (restart && IpylabAutostart._command) {
       IpylabAutostart._command.dispose();

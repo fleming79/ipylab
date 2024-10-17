@@ -12,13 +12,12 @@ hookspec = pluggy.HookspecMarker("ipylab")
 if t.TYPE_CHECKING:
     from collections.abc import Awaitable
 
-    from ipylab import Ipylab
-    from ipylab.jupyterfrontend import JupyterFrontEnd
+    from ipylab import App, Ipylab
 
 
 class IpylabHookspec:
     @hookspec()
-    async def autostart(self, app: JupyterFrontEnd):
+    async def autostart(self, app: App):
         """
         Called inside each Python kernel when the frontend is 'ready'.
 
@@ -33,7 +32,7 @@ class IpylabHookspec:
         """
 
     @hookspec(firstresult=True)
-    def namespace_defaults(self, defaults: dict, namespace_name: str, app: JupyterFrontEnd) -> None:
+    def namespace_defaults(self, defaults: dict, namespace_name: str, app: App) -> None:
         "Modify the namespace defaults by adding or removing entries."
 
     @hookspec(firstresult=True)

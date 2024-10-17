@@ -2,7 +2,8 @@
 // Distributed under the terms of the Modified BSD License.
 
 import { PromiseDelegate } from '@lumino/coreutils';
-import { IpylabModel } from './ipylab';
+import { IpylabModel, Widget } from './ipylab';
+import { listProperties } from './utils';
 
 /**
  * Provides a connection from any object reachable here to one or more Python backends.
@@ -14,37 +15,22 @@ import { IpylabModel } from './ipylab';
  * also close when the object is disposed.
  */
 export class ConnectionModel extends IpylabModel {
-  async ipylabInit() {
+  async ipylabInit(base: any = null) {
     this.on('change:_dispose', this.disposeBase, this);
     const cid = this.get('cid');
     const id = this.get('id') ?? '';
+
     try {
-      let base;
-      try {
-        base = await ConnectionModel.fromConnectionOrId(cid, id);
-      } catch {
-        if (!IpylabModel.pendingConnections.has(cid)) {
-          IpylabModel.pendingConnections.set(cid, new PromiseDelegate());
-        }
-        await IpylabModel.pendingConnections.get(cid).promise;
-        base = await ConnectionModel.fromConnectionOrId(cid, id);
-      }
-      while (base?.isConnectionModel) {
-        base = base.base;
-      }
+      base = await this.fromConnectionOrId(cid, id);
       base.disposed.connect(() => this.close(null, true));
       await super.ipylabInit(base);
-      ConnectionModel.registerConnection(cid, base);
+      base = ConnectionModel.registerConnection(cid, base);
     } catch (e) {
       console.log(
         'Failed to establish connection for cid="%s" id="%s "',
         cid,
         id
       );
-      if (IpylabModel.pendingConnections.has(cid)) {
-        IpylabModel.pendingConnections.get(cid).reject(e);
-        IpylabModel.pendingConnections.delete(cid);
-      }
       this.close();
       throw e;
     }
@@ -59,10 +45,31 @@ export class ConnectionModel extends IpylabModel {
 
   async disposeBase() {
     const cid = this.get('cid');
-    if (IpylabModel.pendingConnections.has(cid)) {
-      await IpylabModel.pendingConnections.get(cid)?.promise;
+    if (this.pending.has(cid)) {
+      await this.pending.get(cid)?.promise;
     }
     this.base?.dispose();
+  }
+
+  get pending() {
+    return IpylabModel.pendingShellConnections;
+  }
+
+  /**
+   *
+   * @param cid Get an object that has been registered as a connection.
+   * @returns
+   */
+  async fromConnectionOrId(cid: string, id = ''): Promise<any> {
+    if (IpylabModel.connections.has(cid)) {
+      return IpylabModel.connections.get(cid);
+    }
+    if (id.slice(0, 10) === 'IPY_MODEL_') {
+      const model_id = id.slice(10);
+      return await IpylabModel.getWidgetModel(model_id);
+    } else {
+      return IpylabModel.getLuminoWidgetFromShell(id || cid);
+    }
   }
 
   /**
@@ -72,4 +79,41 @@ export class ConnectionModel extends IpylabModel {
     return { ...super.defaults(), _model_name: 'ConnectionModel' };
   }
   readonly isConnectionModel = true;
+}
+
+/**
+ * A connection for widgets in the Shell.
+ */
+export class ShellConnectionModel extends ConnectionModel {
+  async fromConnectionOrId(cid: string, id = ''): Promise<Widget> {
+    let base = await super.fromConnectionOrId(cid, id);
+    if (!base) {
+      if (!this.pending.has(cid)) {
+        this.pending.set(cid, new PromiseDelegate());
+
+        setTimeout(() => {
+          IpylabModel.tracker.restored.then(() => {
+            this.pending.get(cid)?.reject(`Shell connection not found ${cid}`);
+            this.pending.delete(cid);
+          });
+        }, 10000);
+      }
+
+      await this.pending.get(cid).promise;
+      base = await this.fromConnectionOrId(cid, id);
+    }
+    if (!(base instanceof Widget)) {
+      throw new Error(
+        `Failed to locate a widget. Got: ${JSON.stringify(listProperties(base))}`
+      );
+    }
+    return base;
+  }
+
+  /**
+   * The default attributes.
+   */
+  defaults(): Backbone.ObjectHash {
+    return { ...super.defaults(), _model_name: 'ShellConnectionModel' };
+  }
 }

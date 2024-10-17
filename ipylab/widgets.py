@@ -6,17 +6,19 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 
-from ipywidgets import Box, DOMWidget, register, widget_serialization
+from ipywidgets import Box, DOMWidget, TypedTuple, register, widget_serialization
 from ipywidgets.widgets.trait_types import InstanceDict
-from traitlets import Dict, Instance, Unicode, observe
+from traitlets import Container, Dict, Instance, Unicode, observe
 
-import ipylab
 import ipylab._frontend as _fe
 from ipylab.common import Area, InsertMode
+from ipylab.connection import ShellConnection
 from ipylab.ipylab import WidgetBase
 
 if TYPE_CHECKING:
-    from ipylab.connection import ShellConnection
+    from asyncio import Task
+
+    from ipylab import App
 
 
 @register
@@ -51,15 +53,12 @@ class Panel(Box):
     _view_module = Unicode(_fe.module_name, read_only=True).tag(sync=True)
     _view_module_version = Unicode(_fe.module_version, read_only=True).tag(sync=True)
     title: Instance[Title] = InstanceDict(Title, ()).tag(sync=True, **widget_serialization)
-    _comm = None
+    app: Instance[App] = Instance("ipylab.App", (), read_only=True)
+    connections: Container[tuple[ShellConnection, ...]] = TypedTuple(trait=Instance(ShellConnection))
 
     def __init__(self, children=(), **kwargs):
         super().__init__(children, **kwargs)
         self.add_class("ipylab-" + self.__class__.__name__)
-
-    @property
-    def app(self):
-        return ipylab.app
 
     def add_to_shell(
         self,
@@ -69,27 +68,20 @@ class Panel(Box):
         mode: InsertMode = InsertMode.tab_after,
         rank: int | None = None,
         ref: ShellConnection | None = None,
-        **options,
-    ):
+        options: dict | None = None,
+        **kwgs,
+    ) -> Task[ShellConnection]:
         """Add this panel to the shell."""
-
-        async def add_to_shell():
-            async with self.app as app, app.shell as shell:
-                result = await shell.add(
-                    self,
-                    area=area,
-                    mode=mode,
-                    activate=activate,
-                    rank=rank,
-                    ref=ref,
-                    **options,
-                )
-                rerender = getattr(self, "_rerender", None)
-                if callable(rerender):
-                    await rerender()
-                return result
-
-        return self.app.to_task(add_to_shell())
+        return self.app.shell.add(
+            self,
+            area=area,
+            mode=mode,
+            activate=activate,
+            rank=rank,
+            ref=ref,
+            options=options,
+            **kwgs,
+        )
 
 
 @register
@@ -109,7 +101,7 @@ class SplitPanel(Panel):
         super().close()
         self.app.restored.register_callback(self._rerender, True)
 
-    @observe("children")
+    @observe("children", "shell_connection")
     def _observe_children(self, _):
         self._rerender()
 

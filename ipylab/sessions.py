@@ -25,10 +25,10 @@ class SessionManager(Ipylab):
         """
         return self.execute_method("stopIfNeeded", path)
 
-    def new_sessioncontext(self, path: str) -> Task[Connection]:
+    def new_sessioncontext(self, vpath: str) -> Task[Connection]:
         """
         Create a new sessionContext.
 
-        path: The session path.
+        vpath: The session path.
         """
-        return self.app.schedule_operation("newSessionContext", path=path, transform=Transform.connection)
+        return self.app.schedule_operation("newSessionContext", vpath=vpath, transform=Transform.connection)

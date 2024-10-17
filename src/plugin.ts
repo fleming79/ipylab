@@ -89,7 +89,7 @@ async function activate(
   });
   app.contextMenu.addItem({
     command: 'ipylab:open-console',
-    selector: '.ipylab-MainArea',
+    selector: '.ipylab-shell',
     rank: 1
   });
 

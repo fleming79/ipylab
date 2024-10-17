@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 class Dialog:
     @property
     def app(self):
-        return ipylab.app
+        return ipylab.App()
 
     def get_boolean(self, title: str) -> Task[bool]:
         """Jupyter dialog to get a boolean value.
@@ -143,7 +143,7 @@ class FileDialog:
 
     @property
     def app(self):
-        return ipylab.app
+        return ipylab.App()
 
     def get_open_files(self, **kwgs) -> Task[list[str]]:
         """Get a list of files

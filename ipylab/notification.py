@@ -60,7 +60,7 @@ class NotificationConnection(Connection):
                 to_object = None
             result = await self.app.notification.execute_method("update", args, toObject=to_object)
             for action in actions_:
-                await self._add_to_tuple_trait("actions", action)
+                await self._add_to_tuple_trait(self, "actions", action)
             return result
 
         return self.to_task(update())
@@ -135,8 +135,8 @@ class NotificationManager(Ipylab):
                 toObject=[f"options.actions.{i}" for i in range(len(actions_))] if actions_ else None,
             )
             for action in actions_:
-                await notification._add_to_tuple_trait("actions", action)  # noqa: SLF001
-            await self._add_to_tuple_trait("notifications", notification)
+                await notification._add_to_tuple_trait(self, "actions", action)  # noqa: SLF001
+            await self._add_to_tuple_trait(self, "notifications", notification)
             return notification
 
         return self.to_task(notify())

@@ -7,6 +7,7 @@ import inspect
 import json
 import traceback
 import uuid
+import weakref
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from ipywidgets import Widget, register
@@ -23,6 +24,7 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Iterable
     from typing import ClassVar
 
+    from ipylab import App
     from ipylab.commands import CommandConnection
 
 
@@ -60,10 +62,7 @@ class WidgetBase(Widget):
     _view_module_version = Unicode(_fe.module_version, read_only=True).tag(sync=True)
     _comm = None
     add_traits = None  # type: ignore # Don't support the method HasTraits.add_traits as it creates a new type that isn't a subclass of its origin)
-
-    @property
-    def app(self):
-        return ipylab.app
+    app: Instance[App] = Instance("ipylab.App", (), read_only=True)
 
 
 @register
@@ -72,7 +71,6 @@ class Ipylab(WidgetBase):
 
     _model_name = Unicode("IpylabModel", help="Name of the model.", read_only=True).tag(sync=True)
     _basename = Unicode(allow_none=True).tag(sync=True)
-    kernelId = Unicode(read_only=True).tag(sync=True)  # noqa: N815
     _async_widget_base_init_complete = False
     _ipylab_model_register: ClassVar[dict[str, Any]] = {}
     _singleton_register: ClassVar[dict[str, str]] = {}
@@ -135,6 +133,25 @@ class Ipylab(WidgetBase):
             msg = f"This widget is closed {self!r}"
             raise RuntimeError(msg)
 
+    @staticmethod
+    async def _add_to_tuple_trait(obj: HasTraits, name: str, widget: Awaitable[T] | T) -> T:
+        """Add the widget to the tuple of obj. It will remove itself when closed."""
+        if inspect.isawaitable(widget):
+            value: T = await widget
+        else:
+            value: T = widget
+        items = getattr(obj, name)
+        if isinstance(value, Widget) and value.comm and value not in items:
+            obj.set_trait(name, (*items, value))
+            ref = weakref.ref(obj)
+
+            def on_comm_change(_):
+                if obj := ref():
+                    obj.set_trait(name, tuple(i for i in getattr(obj, name) if i.comm))
+
+            value.observe(on_comm_change, "comm")
+        return value
+
     @property
     def hook(self):
         return self.app.plugin_manager.hook
@@ -175,18 +192,6 @@ class Ipylab(WidgetBase):
             return IpylabFrontendError(msg)
         return IpylabFrontendError(f'{self.__class__.__name__} failed with message "{error}"')
         return None
-
-    async def _add_to_tuple_trait(self, name: str, item: Awaitable[T] | T) -> T:
-        """Add the item to the tuple and observe its comm."""
-        if inspect.isawaitable(item):
-            value: T = await item
-        else:
-            value: T = item
-        items = getattr(self, name)
-        if isinstance(value, HasTraits) and value not in items:
-            value.observe(lambda _: self.set_trait(name, tuple(i for i in getattr(self, name) if i.comm)), "comm")
-            self.set_trait(name, (*items, value))
-        return value
 
     def send(self, content, buffers=None):
         try:

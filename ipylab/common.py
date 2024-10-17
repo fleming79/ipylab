@@ -204,5 +204,5 @@ class JavascriptType(StrEnum):
 class ShellConnectionInfo(TypedDict):
     cid: str
     id: str
-    kernelId: NotRequired[str]  # noqa: N815
-    path: NotRequired[str]
+    vpath: NotRequired[str]
+    # path: NotRequired[str]

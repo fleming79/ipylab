@@ -10,16 +10,15 @@ from typing import TYPE_CHECKING, Any
 import ipywidgets
 import pluggy
 from IPython.core.getipython import get_ipython
-from ipywidgets import CallbackDispatcher, widget_serialization
-from traitlets import Container, Dict, Instance, Tuple, Unicode
+from ipywidgets import CallbackDispatcher, register, widget_serialization
+from traitlets import Bool, Container, Dict, Instance, Tuple, Unicode
 
 import ipylab
 import ipylab.hookspecs
-from ipylab import Connection, ShellConnection, Transform
+from ipylab import Ipylab, ShellConnection, Transform
 from ipylab.commands import CommandRegistry
 from ipylab.common import InsertMode
 from ipylab.dialog import Dialog, FileDialog
-from ipylab.ipylab import Ipylab, register
 from ipylab.menu import ContextMenu, MainMenu
 from ipylab.notification import NotificationManager
 from ipylab.sessions import SessionManager
@@ -36,17 +35,17 @@ class IpylabDefaultsPlugin:
     def on_frontend_error(self, obj: Ipylab, error: Exception, content: dict, buffers) -> None:  # noqa: ARG002
         obj.log.exception("%r on_frontend_error %s", error, exc_info=error)
 
-        ipylab.app.dialog.show_error_message("Frontend error", f"{error=} {obj=}")
+        obj.app.dialog.show_error_message("Frontend error", f"{error=} {obj=}")
 
     @ipylab.hookimpl
     def on_send_error(self, obj: Ipylab, error: Exception, content: dict, buffers) -> None:  # noqa: ARG002
         obj.log.exception("%r on_send_error %s", error, exc_info=error)
 
-        ipylab.app.dialog.show_error_message("Send error", f"{error=} {obj=}")
+        obj.app.dialog.show_error_message("Send error", f"{error=} {obj=}")
 
     @ipylab.hookimpl
     def unhandled_frontend_operation_message(self, obj: Ipylab, operation: str):
-        ipylab.app.dialog.show_error_message("Unhandled frontend message", f"The {operation=} is unhandled for {obj} ")
+        obj.app.dialog.show_error_message("Unhandled frontend message", f"The {operation=} is unhandled for {obj} ")
 
     @ipylab.hookimpl
     def on_task_error(self, obj: Ipylab, aw: str, error: Exception) -> None:
@@ -59,7 +58,7 @@ class IpylabDefaultsPlugin:
         """
         obj.log.exception("%r on_message_error %s", error, msg, exc_info=error)
 
-        ipylab.app.dialog.show_error_message("Message error", f"{error=}\n{obj=}\n{msg=}'")
+        obj.app.dialog.show_error_message("Message error", f"{error=}\n{obj=}\n{msg=}'")
 
 
 class LastUpdatedOrderedDict(OrderedDict):
@@ -73,7 +72,7 @@ class LastUpdatedOrderedDict(OrderedDict):
 
 
 @register
-class JupyterFrontEnd(Ipylab):
+class App(Ipylab):
     _model_name = Unicode("JupyterFrontEndModel").tag(sync=True)
     _basename = Unicode("app", read_only=True).tag(sync=True)
     SINGLETON = True
@@ -83,42 +82,47 @@ class JupyterFrontEnd(Ipylab):
     current_session = Dict(read_only=True).tag(sync=True)
     all_sessions = Tuple(read_only=True).tag(sync=True)
     namespaces: Container[tuple[str, ...]] = Tuple(read_only=True).tag(sync=True)
+    vpath = Unicode(read_only=True).tag(sync=True)
 
     dialog = Instance(Dialog, (), read_only=True)
     file_dialog = Instance(FileDialog, (), read_only=True)
     shell = Instance(Shell, (), read_only=True)
     session_manager = Instance(SessionManager, (), read_only=True)
+    is_ipylab_kernel = Bool()
+
     main_menu = Instance(MainMenu, ())
     context_menu = Instance(ContextMenu, ())
     notification = Instance(NotificationManager, ())
     active_namespace = Unicode("", read_only=True, help="name of the current namespace")
     _namespaces: Container[dict[str, LastUpdatedOrderedDict]] = Dict(read_only=True)  # type: ignore
     restored = Instance(CallbackDispatcher, (), read_only=True, help="Called when restored")
-
     _ipy_shell = get_ipython()
     _ipy_default_namespace: ClassVar = getattr(_ipy_shell, "user_ns", {})
     _frontend_init_count = 0
 
     def __init_subclass__(cls, **kwargs) -> None:
-        msg = "Subclassing the `JupyterFrontEnd` class is not allowed!"
+        msg = "Subclassing the `App` class is not allowed!"
         raise RuntimeError(msg)
+
+    def __init__(self, **kwgs):
+        if self._async_widget_base_init_complete:
+            return
+        if vpath := kwgs.pop("vpath", None):
+            self.set_trait("vpath", vpath)
+            self.set_trait("is_ipylab_kernel", vpath == "ipylab")
+        super().__init__(**kwgs)
+        if self.model_id:
+            self._plugin_manager = pm = pluggy.PluginManager("ipylab")
+            pm.add_hookspecs(ipylab.hookspecs.IpylabHookspec)
+            pm.register(IpylabDefaultsPlugin())
+            pm.load_setuptools_entrypoints("ipylab")
 
     def close(self):
         "Cannot close"
 
     @property
     def plugin_manager(self):
-        if not hasattr(self, "_plugin_manager"):
-            self._plugin_manager = pm = pluggy.PluginManager("ipylab")
-            pm.add_hookspecs(ipylab.hookspecs.IpylabHookspec)
-            pm.register(IpylabDefaultsPlugin())
-            pm.load_setuptools_entrypoints("ipylab")
         return self._plugin_manager
-
-    @property
-    def is_ipylab_kernel(self):
-        "Returns True when the kernel is the Ipylab kernel."
-        return bool(getattr(self, "_is_ipylab_kernel", False))
 
     def _on_frontend_init(self):
         # This method is called just after the frontend model is initialized.
@@ -143,26 +147,27 @@ class JupyterFrontEnd(Ipylab):
         self.to_task(autostart(), "run autostart hooks")
 
     def _gen_repr_from_keys(self, keys: Iterable):  # noqa: ARG002
-        return super()._gen_repr_from_keys(("kernelId",))
+        return super()._gen_repr_from_keys(("vpath",))
 
     async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list) -> Any:
         match operation:
             case "evaluate":
                 return await self._evaluate(payload, buffers)
-            case "evaluate_widget":
+            case "shell_eval":
                 result = await self._evaluate(payload, buffers)
-                widget = result.get("payload")
-                if not isinstance(widget, ipywidgets.Widget) or isinstance(widget, Connection):
-                    msg = "'evaluate' must return a Widget and NOT a Connection!"
+                panel = result.get("payload")
+                if not isinstance(panel, ipylab.Panel):
+                    msg = f"Expected an ipylab.Panel but got {type(panel)}"
                     raise TypeError(msg)
+                result["payload"] = await panel.add_to_shell(**payload)
                 return result
-            case "open console":
+            case "open_console":
                 return await self.open_console(**payload)
         return await super()._do_operation_for_frontend(operation, payload, buffers)
 
-    def shutdown_kernel(self, kernelId: str | None = None):
+    def shutdown_kernel(self, vpath: str | None = None):
         """Shutdown the kernel"""
-        return self.schedule_operation("shutdownKernel", kernelId=kernelId)
+        return self.schedule_operation("shutdownKernel", vpath=vpath)
 
     def checkstart_iyplab_python_backend(self, *, restart=False):
         """Checks backend is running and starts it if it isn't, returning the session model."""
@@ -172,18 +177,16 @@ class JupyterFrontEnd(Ipylab):
         self,
         evaluate: dict[str, str | inspect._SourceObjectType] | str,
         *,
-        kernelId="",
-        path="",
+        vpath="",
         name="",
         namespace_name="",
         **kwgs,
     ):
         """Evaluate code in a Python kernel.
 
-        If `kernelId` isn't provided a session matching the path will be used, possibly prompting for a kernel.
+        If `vpath` isn't provided a session matching the path will be used, possibly prompting for a kernel.
             **kwgs are used when creating a new session namespace.
                 name: name of the new session.
-                path: path of the session namespace.
 
         evaluate:
             An expression to evaluate or execute.
@@ -202,8 +205,8 @@ class JupyterFrontEnd(Ipylab):
             ref: https://docs.python.org/3/library/functions.html#eval
 
             Once evaluation is complete, the symbols named `payload` and `buffers` will be returned.
-        kernelId:
-            The Id allocated to the kernel in the frontend.
+        vpath:
+            The path used for the kernel session context.
         globals:
             The globals namespace includes the follow symbols:
             * ipylab
@@ -213,8 +216,7 @@ class JupyterFrontEnd(Ipylab):
         return self.app.schedule_operation(
             "evaluate",
             evaluate=evaluate,
-            kernelId=kernelId,
-            path=path,
+            vpath=vpath,
             name=name,
             namespace_name=namespace_name,
             **kwgs,
@@ -244,7 +246,7 @@ class JupyterFrontEnd(Ipylab):
             self.activate_namespace(name)
 
     def activate_namespace(self, name=""):
-        "Sets the ipython/console namespace to the one corresponding to path."
+        "Sets the ipython/console namespace."
         if not self._ipy_shell:
             msg = "Ipython shell is not loaded!"
             raise RuntimeError(msg)
@@ -264,33 +266,25 @@ class JupyterFrontEnd(Ipylab):
     def open_console(
         self,
         *,
-        path="",
         insertMode=InsertMode.split_bottom,
         namespace_name="",
         activate=True,
         **args,
     ) -> Task[ShellConnection]:
         """Open a console and activate the namespace.
-
-        path: str
-            The path of the session context.
-
         namespace_name: str
             An alternate namespace to activate.
         """
-        args["path"] = path
         args["insertMode"] = insertMode
 
         async def open_console():
-            async with self:
-                if not path:
-                    args["path"] = self.current_session["path"]
             self.activate_namespace(namespace_name)
             return await self.execute_command(
                 "console:open",
                 activate=activate,
+                path=self.vpath,
                 **args,
-                transform={"transform": Transform.connection, "cid": ShellConnection.to_cid("console", "path")},
+                transform={"transform": Transform.connection, "cid": ShellConnection.to_cid("console", self.vpath)},
             )
 
         return self.to_task(open_console())
