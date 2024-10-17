@@ -214,6 +214,9 @@ class CommandRegistry(Ipylab):
                         kwgs[n] = args[n]
                     elif n in glbls:
                         kwgs[n] = glbls[n]
+                    elif p.kind != p.VAR_KEYWORD:
+                        kwgs = args
+                        break
                     elif p.default is p.empty:
                         msg = f"Required parameter '{n}' missing for {cmd} of {conn}"
                         raise NameError(msg)

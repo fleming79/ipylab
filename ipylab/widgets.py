@@ -101,8 +101,8 @@ class SplitPanel(Panel):
         super().close()
         self.app.restored.register_callback(self._rerender, True)
 
-    @observe("children", "shell_connection")
-    def _observe_children(self, _):
+    @observe("children", "connections")
+    def _observer(self, _):
         self._rerender()
 
     def _rerender(self):
