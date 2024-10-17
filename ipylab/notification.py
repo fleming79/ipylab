@@ -2,6 +2,7 @@
 # Distributed under the terms of the Modified BSD License.
 from __future__ import annotations
 
+import inspect
 from typing import TYPE_CHECKING, Literal
 
 import traitlets
@@ -77,12 +78,17 @@ class NotificationManager(Ipylab):
     _basename = Unicode("notificationManager").tag(sync=True)
     SINGLETON = True
     notifications: Container[tuple[NotificationConnection, ...]] = TypedTuple(trait=Instance(NotificationConnection))
+    actions: Container[tuple[ActionConnection, ...]] = TypedTuple(trait=Instance(ActionConnection))
 
     async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list):
         """Overload this function as required."""
         match operation:
             case "action callback":
-                return ActionConnection.get_existing_connection(payload["cid"]).callback()
+                callback = ActionConnection.get_existing_connection(payload["cid"]).callback
+                result = callback()
+                while inspect.isawaitable(result):
+                    result = await result
+                return result
         return await super()._do_operation_for_frontend(operation, payload, buffers)
 
     async def _ensure_action(self, value: ActionConnection | NotifyAction) -> ActionConnection:
@@ -122,7 +128,7 @@ class NotificationManager(Ipylab):
             actions_ = [await self._ensure_action(v) for v in actions]
             if actions_:
                 options["actions"] = list(map(pack, actions_))  # type: ignore
-            notification: NotificationConnection = await self.schedule_operation(
+            notification: NotificationConnection = await self.operation(
                 "notification",
                 type=NotificationType(type),
                 message=message,
@@ -153,7 +159,7 @@ class NotificationManager(Ipylab):
         "Create an action to use in a notification."
         cid = ActionConnection.to_cid()
         info = {"label": label, "displayType": display_type, "keep_open": keep_open, "caption": caption}
-        task = self.schedule_operation(
+        task = self.operation(
             "createAction",
             **info,
             cid=cid,

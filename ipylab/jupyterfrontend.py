@@ -18,7 +18,7 @@ import ipylab.hookspecs
 from ipylab import Ipylab, ShellConnection, Transform
 from ipylab.commands import CommandRegistry
 from ipylab.common import InsertMode
-from ipylab.dialog import Dialog, FileDialog
+from ipylab.dialog import Dialog
 from ipylab.menu import ContextMenu, MainMenu
 from ipylab.notification import NotificationManager
 from ipylab.sessions import SessionManager
@@ -33,13 +33,13 @@ if TYPE_CHECKING:
 class IpylabDefaultsPlugin:
     @ipylab.hookimpl
     def on_frontend_error(self, obj: Ipylab, error: Exception, content: dict, buffers) -> None:  # noqa: ARG002
-        obj.log.exception("%r on_frontend_error %s", error, exc_info=error)
+        obj.log.exception("%r on_frontend_error %s", obj, error)
 
         obj.app.dialog.show_error_message("Frontend error", f"{error=} {obj=}")
 
     @ipylab.hookimpl
     def on_send_error(self, obj: Ipylab, error: Exception, content: dict, buffers) -> None:  # noqa: ARG002
-        obj.log.exception("%r on_send_error %s", error, exc_info=error)
+        obj.log.exception("%r on_send_error %s", obj, error)
 
         obj.app.dialog.show_error_message("Send error", f"{error=} {obj=}")
 
@@ -49,14 +49,14 @@ class IpylabDefaultsPlugin:
 
     @ipylab.hookimpl
     def on_task_error(self, obj: Ipylab, aw: str, error: Exception) -> None:
-        obj.log.exception("%r on_task_error %s aw=%s", error, aw, exc_info=error)
+        obj.log.exception("%r on_task_error %s aw=%s", obj, error, aw)
 
     @ipylab.hookimpl
     def on_message_error(self, obj: Ipylab, msg: str, error: Exception) -> None:
         """
         Called when an error occurs when processing a message from the Frontend.
         """
-        obj.log.exception("%r on_message_error %s", error, msg, exc_info=error)
+        obj.log.exception("%r on_message_error %s", error, msg)
 
         obj.app.dialog.show_error_message("Message error", f"{error=}\n{obj=}\n{msg=}'")
 
@@ -85,7 +85,6 @@ class JupyterFrontEnd(Ipylab):
     vpath = Unicode(read_only=True).tag(sync=True)
 
     dialog = Instance(Dialog, (), read_only=True)
-    file_dialog = Instance(FileDialog, (), read_only=True)
     shell = Instance(Shell, (), read_only=True)
     session_manager = Instance(SessionManager, (), read_only=True)
     is_ipylab_kernel = Bool()
@@ -138,9 +137,9 @@ class JupyterFrontEnd(Ipylab):
                 if isinstance(result, Exception):
                     await self.dialog.show_error_message("Plugin failed", str(result))
             self.log.info("Finished running %d autostart hooks.", len(results))
-            await self.schedule_operation("autostart_complete")
+            await self.operation("autostart_complete")
             if self.is_ipylab_kernel:
-                await self.schedule_operation("ipylab_kernel_ready", init_count=self._frontend_init_count)
+                await self.operation("ipylab_kernel_ready", init_count=self._frontend_init_count)
             self._frontend_init_count += 1
             self.restored()
 
@@ -167,11 +166,11 @@ class JupyterFrontEnd(Ipylab):
 
     def shutdown_kernel(self, vpath: str | None = None):
         """Shutdown the kernel"""
-        return self.schedule_operation("shutdownKernel", vpath=vpath)
+        return self.operation("shutdownKernel", vpath=vpath)
 
     def checkstart_iyplab_python_backend(self, *, restart=False):
         """Checks backend is running and starts it if it isn't, returning the session model."""
-        return self.schedule_operation("checkstartIyplabKernel", restart=restart, transform=Transform.raw)
+        return self.operation("checkstartIyplabKernel", restart=restart, transform=Transform.raw)
 
     def evaluate(
         self,
@@ -213,7 +212,7 @@ class JupyterFrontEnd(Ipylab):
             * ipywidgets
             * ipw (ipywidgets)
         """
-        return self.app.schedule_operation(
+        return self.app.operation(
             "evaluate",
             evaluate=evaluate,
             vpath=vpath,

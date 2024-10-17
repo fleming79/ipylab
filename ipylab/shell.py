@@ -122,7 +122,7 @@ class Shell(Ipylab):
                 else:
                     kwgs["vpath"] = vpath or self.app.vpath
 
-            conn_ = await self.schedule_operation(
+            conn_ = await self.operation(
                 "addToShell",
                 area=area,
                 transform={"transform": Transform.connection, "cid": cid},

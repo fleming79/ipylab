@@ -272,7 +272,7 @@ class Ipylab(WidgetBase):
         """Overload this function as required."""
         raise NotImplementedError(operation)
 
-    def schedule_operation(
+    def operation(
         self,
         operation: str,
         *,
@@ -360,7 +360,7 @@ class Ipylab(WidgetBase):
                     if id_ not in self.app.commands.all_commands:
                         msg = f"Command '{command_id}' not registered!"
                         raise ValueError(msg)
-            return await self.schedule_operation(
+            return await self.operation(
                 "executeCommand",
                 id=id_,
                 args=args,
@@ -396,7 +396,7 @@ class Ipylab(WidgetBase):
         ```
         """
         # This operation is sent to the frontend function _fe_execute in 'ipylab/src/widgets/ipylab.ts'
-        return self.schedule_operation(
+        return self.operation(
             operation="executeMethod",
             dottedname=dottedname,
             args=args,
@@ -414,9 +414,7 @@ class Ipylab(WidgetBase):
         Tip: This method will await the property in the Frontend prior to returning the result
         where the property is an awaitable.
         """
-        return self.schedule_operation(
-            "getProperty", dottedname=dottedname, nullIfMissing=nullIfMissing, transform=transform
-        )
+        return self.operation("getProperty", dottedname=dottedname, nullIfMissing=nullIfMissing, transform=transform)
 
     def set_property(
         self,
@@ -445,7 +443,7 @@ class Ipylab(WidgetBase):
         toObject: ['value'] | None
             Nested notation is also possible under `value`.
         """
-        return self.schedule_operation(
+        return self.operation(
             "setProperty",
             dottedname=dottedname,
             value=value,
@@ -477,7 +475,7 @@ class Ipylab(WidgetBase):
             Nested notation is also possible under `value`.
         """
 
-        return self.schedule_operation(
+        return self.operation(
             "updateProperty",
             dottedname=dottedname,
             value=value,
@@ -493,4 +491,4 @@ class Ipylab(WidgetBase):
         depth: int
             How deep to look inside the inheritance structure of the object.
         """
-        return self.schedule_operation("listProperties", dottedname=dottedname, depth=depth, omitHidden=skip_hidden)
+        return self.operation("listProperties", dottedname=dottedname, depth=depth, omitHidden=skip_hidden)

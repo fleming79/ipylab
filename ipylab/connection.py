@@ -28,7 +28,7 @@ class Connection(Ipylab):
     to provide a connection to an object in the frontend (Javascript).
     Instances of `Connection` are created automatically when the transform is
     set as `Transform.connection`. This option is available whenever a transform
-    argument is available in a method call that goes to `schedule_operation`.
+    argument is available in a method call that goes to `operation`.
 
     When the `cid` *prefix* matches a subclass `CID_PREFIX`, a new subclass
     instance will be created in place of `Connection` (on the python side).

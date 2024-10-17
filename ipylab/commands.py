@@ -256,7 +256,7 @@ class CommandRegistry(Ipylab):
         cid = CommandConnection.to_cid(name)
         self.remove_command(cid)
 
-        task = self.schedule_operation(
+        task = self.operation(
             "addCommand",
             id=cid,
             caption=caption,

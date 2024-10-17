@@ -31,4 +31,4 @@ class SessionManager(Ipylab):
 
         vpath: The session path.
         """
-        return self.app.schedule_operation("newSessionContext", vpath=vpath, transform=Transform.connection)
+        return self.app.operation("newSessionContext", vpath=vpath, transform=Transform.connection)

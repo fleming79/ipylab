@@ -170,7 +170,7 @@ class MainMenu(Ipylab):
         if existing := MenuConnection.get_existing_connection(cid, quiet=True):
             existing.close(dispose=True)
         info = {"id": id, "label": label, "rank": int(rank)}
-        coro = self.app.schedule_operation(
+        coro = self.app.operation(
             "generateMenu",
             options=info,
             transform={"transform": Transform.connection, "cid": cid, "auto_dispose": True, "info": info},

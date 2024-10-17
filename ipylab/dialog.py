@@ -4,24 +4,24 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import ipylab
-from ipylab.ipylab import Widget
+from ipywidgets import Widget
+from traitlets import Unicode
+
+from ipylab import Ipylab
 
 if TYPE_CHECKING:
     from asyncio import Task
     from typing import Any
 
 
-class Dialog:
-    @property
-    def app(self):
-        return ipylab.App()
+class Dialog(Ipylab):
+    _model_name = Unicode("DialogModel", help="Name of the model.", read_only=True).tag(sync=True)
 
     def get_boolean(self, title: str) -> Task[bool]:
         """Jupyter dialog to get a boolean value.
         see: https://jupyterlab.readthedocs.io/en/stable/extension/ui_helpers.html#input-dialogs
         """
-        return self.app.schedule_operation("getBoolean", title=title)
+        return self.operation("getBoolean", title=title)
 
     def get_item(self, title: str, items: tuple | list) -> Task[str]:
         """Jupyter dialog to get an item from a list value.
@@ -29,25 +29,25 @@ class Dialog:
         note: will always return a string representation of the selected item.
         see: https://jupyterlab.readthedocs.io/en/stable/extension/ui_helpers.html#input-dialogs
         """
-        return self.app.schedule_operation("getItem", title=title, items=tuple(items))
+        return self.operation("getItem", title=title, items=tuple(items))
 
     def get_number(self, title: str) -> Task[float]:
         """Jupyter dialog to get a number.
         see: https://jupyterlab.readthedocs.io/en/stable/extension/ui_helpers.html#input-dialogs
         """
-        return self.app.schedule_operation("getNumber", title=title)
+        return self.operation("getNumber", title=title)
 
     def get_text(self, title: str) -> Task[str]:
         """Jupyter dialog to get a string.
         see: https://jupyterlab.readthedocs.io/en/stable/extension/ui_helpers.html#input-dialogs
         """
-        return self.app.schedule_operation("getText", title=title)
+        return self.operation("getText", title=title)
 
     def get_password(self, title: str) -> Task[str]:
         """Jupyter dialog to get a number.
         see: https://jupyterlab.readthedocs.io/en/stable/extension/ui_helpers.html#input-dialogs
         """
-        return self.app.schedule_operation("getPassword", title=title)
+        return self.operation("getPassword", title=title)
 
     def show_dialog(
         self, title: str = "", body: str | Widget = "", host: None | Widget = None, **kwgs
@@ -103,7 +103,7 @@ class Dialog:
 
             source: https://jupyterlab.readthedocs.io/en/stable/extension/ui_helpers.html#generic-dialog
         """
-        return self.app.schedule_operation(
+        return self.operation(
             "showDialog",
             title=title,
             body=body,
@@ -133,27 +133,17 @@ class Dialog:
 
         https://jupyterlab.readthedocs.io/en/stable/api/functions/apputils.showErrorMessage.html#showErrorMessage
         """
-        return self.app.schedule_operation("showErrorMessage", title=title, error=error, buttons=buttons)
-
-
-class FileDialog:
-    """
-    https://jupyterlab.readthedocs.io/en/stable/extension/ui_helpers.html#file-dialogs
-    """
-
-    @property
-    def app(self):
-        return ipylab.App()
+        return self.operation("showErrorMessage", title=title, error=error, buttons=buttons)
 
     def get_open_files(self, **kwgs) -> Task[list[str]]:
         """Get a list of files
 
         https://jupyterlab.readthedocs.io/en/latest/api/functions/filebrowser.FileDialog.getOpenFiles.html#getOpenFiles
         """
-        return self.app.schedule_operation("getOpenFiles", **kwgs)
+        return self.operation("getOpenFiles", **kwgs)
 
     def get_existing_directory(self, **kwgs) -> Task[str]:
         """
         https://jupyterlab.readthedocs.io/en/latest/api/functions/filebrowser.FileDialog.getExistingDirectory.html#getExistingDirectory
         """
-        return self.app.schedule_operation("getExistingDirectory", **kwgs)
+        return self.operation("getExistingDirectory", **kwgs)

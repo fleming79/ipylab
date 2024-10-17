@@ -366,7 +366,7 @@ export class IpylabModel extends WidgetModel {
 
   /**
    * Schedule an operation to be performed in Python.
-   * This is a mirror of 'schedule_operation' in Python.
+   * This is a mirror of `Ipylab.operation` in Python.
    *
    * @param operation The name of the operation to perform in Python.
    * @param payload Payload to send to Python.
