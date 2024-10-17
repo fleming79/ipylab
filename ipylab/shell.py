@@ -31,6 +31,7 @@ class Shell(Ipylab):
     """
 
     SINGLETON = True
+    _model_name = Unicode("ShellModel", help="Name of the model.", read_only=True).tag(sync=True)
     _basename = Unicode("shell").tag(sync=True)
 
     connections: Container[tuple[ShellConnection, ...]] = TypedTuple(trait=Instance(ShellConnection))
@@ -121,7 +122,7 @@ class Shell(Ipylab):
                 else:
                     kwgs["vpath"] = vpath or self.app.vpath
 
-            conn_ = await self.app.schedule_operation(
+            conn_ = await self.schedule_operation(
                 "addToShell",
                 area=area,
                 transform={"transform": Transform.connection, "cid": cid},

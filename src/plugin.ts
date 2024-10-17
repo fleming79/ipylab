@@ -15,7 +15,7 @@ import { IMainMenu } from '@jupyterlab/mainmenu';
 import { IRenderMimeRegistry } from '@jupyterlab/rendermime';
 import { ITranslator } from '@jupyterlab/translation';
 import { MODULE_NAME, MODULE_VERSION } from './version';
-import { IpylabModel, JupyterFrontEndModel } from './widget';
+import { IpylabModel, JupyterFrontEndModel, ShellModel } from './widget';
 import { IpylabAutostart } from './widgets/autostart';
 const EXTENSION_ID = 'ipylab:plugin';
 
@@ -81,7 +81,7 @@ async function activate(
     registry.registerWidget(widgetExports.IpylabModel.exports);
   }
   app.commands.addCommand('ipylab:restore', {
-    execute: JupyterFrontEndModel.restoreToShell
+    execute: ShellModel.restoreToShell
   });
   app.commands.addCommand('ipylab:open-console', {
     execute: JupyterFrontEndModel.openConsole,

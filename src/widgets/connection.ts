@@ -26,13 +26,13 @@ export class ConnectionModel extends IpylabModel {
       await super.ipylabInit(base);
       base = ConnectionModel.registerConnection(cid, base);
     } catch (e) {
-      console.log(
-        'Failed to establish connection for cid="%s" id="%s "',
+      console.error(
+        'Failed to establish connection for cid="%s" id="%s with message %s"',
         cid,
-        id
+        id,
+        e
       );
       this.close();
-      throw e;
     }
   }
 

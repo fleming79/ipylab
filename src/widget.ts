@@ -8,6 +8,7 @@ import { IconModel, IconView } from './widgets/icon';
 import { IpylabModel } from './widgets/ipylab';
 import { NotificationManagerModel } from './widgets/notification';
 import { PanelModel, PanelView } from './widgets/panel';
+import { ShellModel } from './widgets/shell';
 import { SplitPanelModel, SplitPanelView } from './widgets/split_panel';
 import { TitleModel } from './widgets/title';
 
@@ -22,6 +23,7 @@ export {
   PanelModel,
   PanelView,
   ShellConnectionModel,
+  ShellModel,
   SplitPanelModel,
   SplitPanelView,
   TitleModel

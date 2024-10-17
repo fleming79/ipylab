@@ -72,7 +72,7 @@ class LastUpdatedOrderedDict(OrderedDict):
 
 
 @register
-class App(Ipylab):
+class JupyterFrontEnd(Ipylab):
     _model_name = Unicode("JupyterFrontEndModel").tag(sync=True)
     _basename = Unicode("app", read_only=True).tag(sync=True)
     SINGLETON = True
@@ -320,3 +320,6 @@ class App(Ipylab):
         buffers = glbls.pop("buffers", [])
         self.update_namespace(namespace_name, glbls)
         return {"payload": glbls.get("payload"), "buffers": buffers}
+
+
+App = JupyterFrontEnd
