@@ -248,6 +248,14 @@ export class JupyterFrontEndModel extends IpylabModel {
     }
     if (!Private.vpathTojfem.has(vpath)) {
       Private.vpathTojfem.set(vpath, new PromiseDelegate());
+      // const model = await IpylabModel.sessionManager.findByPath(vpath);
+      // if (model) {
+      //   const kernel = IpylabModel.kernelManager.connectTo({
+      //     model: model.kernel
+      //   });
+      //   IpylabModel.ensureFrontend(kernel);
+      // } else {
+      // }
       IpylabModel.newSessionContext(vpath);
     }
     return await Private.vpathTojfem.get(vpath).promise;
