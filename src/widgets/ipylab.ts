@@ -11,14 +11,13 @@ import { KernelWidgetManager } from '@jupyter-widgets/jupyterlab-manager';
 import { ILabShell, JupyterFrontEnd, LabShell } from '@jupyterlab/application';
 import {
   ICommandPalette,
-  Notification,
   SessionContext,
   SessionContextDialogs,
   WidgetTracker
 } from '@jupyterlab/apputils';
 import { IDefaultFileBrowser } from '@jupyterlab/filebrowser';
 import { ILauncher } from '@jupyterlab/launcher';
-import { IMainMenu } from '@jupyterlab/mainmenu';
+import { IMainMenu, MainMenu } from '@jupyterlab/mainmenu';
 import { ObservableMap } from '@jupyterlab/observables';
 import { IRenderMimeRegistry } from '@jupyterlab/rendermime';
 import type { Kernel, Session } from '@jupyterlab/services';
@@ -37,10 +36,13 @@ import { MODULE_NAME, MODULE_VERSION } from '../version';
 import type { ConnectionModel } from './connection';
 import type { JupyterFrontEndModel } from './frontend';
 import {
-  getNestedObject,
+  executeMethod,
+  getNestedProperty,
   listProperties,
   setNestedProperty,
-  toFunction
+  toFunction,
+  toJSONsubstituteCylic,
+  updateProperty
 } from './utils';
 export {
   CommandRegistry,
@@ -60,15 +62,25 @@ export {
  * Base model for common features
  */
 export class IpylabModel extends WidgetModel {
-  initialize(attributes: Backbone.ObjectHash, options: any): void {
+  /**
+   * The default attributes.
+   */
+  defaults(): Backbone.ObjectHash {
+    return {
+      ...super.defaults(),
+      _model_name: 'IpylabModel',
+      _model_module: IpylabModel.model_module,
+      _model_module_version: IpylabModel.model_module_version,
+      _view_name: null,
+      _view_module: IpylabModel.view_module,
+      _view_module_version: IpylabModel.view_module_version
+    };
+  }
+
+  initialize(attributes: any, options: any): void {
     super.initialize(attributes, options);
-    this.set('kernelId', this.kernelId);
     this.send({ init: 'ipylabInit' });
-    // TODO: fix in ipywidgets -> restored not triggering when re-starting kernel.
-    // this.widget_manager.restored.connect(this.ipylabInit, this);
-    // if (this.widget_manager.restoredStatus) {
-    // }
-    this.ipylabInit();
+    this.widget_manager.get_model(this.model_id).then(() => this.ipylabInit());
   }
 
   /**
@@ -82,119 +94,38 @@ export class IpylabModel extends WidgetModel {
    */
   async ipylabInit(base: any = null) {
     if (!base) {
-      const dottedname = this.get('_basename');
-      // eslint-disable-next-line @typescript-eslint/no-this-alias
-      base = this;
-      if (dottedname) {
-        try {
-          base = getNestedObject({ base, dottedname });
-        } catch {
-          this.close();
-          throw new Error(
-            `Failed locate _basename = '${dottedname}' so closing...`
-          );
-        }
+      let subpath;
+      [base, subpath] = this.toBaseAndSubpath(this.get('ipylab_base'), 'this');
+      base = getNestedProperty({ obj: base, subpath, nullIfMissing: true });
+      if (!base) {
+        this.close();
+        this.error(`Invalid ipylab_base '${this.get('ipylab_base')}'!`);
       }
     }
-    this._base = base;
-    // this._jfem = await IpylabModel.ensureFrontend(this.kernel);
-    this.on('msg:custom', this._onCustomMessage, this);
+    Object.defineProperty(this, 'base', {
+      value: base,
+      writable: false,
+      configurable: true
+    });
+    this.on('msg:custom', this.onCustomMessage, this);
     IpylabModel.onKernelLost(this.kernel, this.close, this);
     this.save_changes();
     this.send({ init: 'ready' });
   }
 
-  // get jfem() {
-  //   return this._jfem;
-  // }
-
-  get model_name() {
-    return this.get('_model_name');
-  }
-
-  get base(): any {
-    return this._base;
-  }
-
-  get app() {
-    return IpylabModel.app;
-  }
-
-  get rendermime() {
-    return IpylabModel.rendermime;
-  }
-
-  get labShell() {
-    return IpylabModel.labShell;
-  }
-
-  get defaultBrowser() {
-    return IpylabModel.defaultBrowser;
-  }
-
-  get pallet() {
-    return IpylabModel.palette;
-  }
-
-  get translator() {
-    return IpylabModel.translator;
-  }
-
-  get launcher() {
-    return IpylabModel.launcher;
-  }
-
-  get menu() {
-    return IpylabModel.menu;
-  }
-
-  get commands() {
-    return IpylabModel.app.commands;
-  }
-
-  get exports() {
-    return IpylabModel.exports;
-  }
-  get kernelId() {
-    return this.kernel.id;
-  }
-  get shell(): JupyterFrontEnd.IShell {
-    return IpylabModel.app.shell;
-  }
-
-  get sessionManager(): Session.IManager {
-    return IpylabModel.app.serviceManager.sessions;
-  }
-
-  get kernel(): Kernel.IKernelConnection {
-    return (this.widget_manager as any).kernel;
-  }
-
-  get notificationManager() {
-    return Notification.manager;
-  }
-
-  get _kernelLive() {
-    const status = this.kernel?.status;
-    return status ? !['dead', 'restarting'].includes(status) : false;
-  }
-
   close(comm_closed?: boolean): Promise<void> {
-    if (!this._base) {
-      return;
-    }
     this._pendingOperations.forEach(opDone => opDone.reject('Closed'));
     this._pendingOperations.clear();
-    comm_closed = comm_closed || !this._kernelLive;
+    comm_closed = comm_closed || this.commClosed;
     if (!comm_closed) {
       this.send({ closed: true });
     }
-    delete this._base;
+    Object.defineProperty(this, 'base', { value: null });
     return super.close(comm_closed);
   }
 
   save_changes(callbacks?: object): void {
-    if (this.comm_live && this._kernelLive) {
+    if (!this.commClosed) {
       super.save_changes(callbacks);
     }
   }
@@ -207,161 +138,21 @@ export class IpylabModel extends WidgetModel {
     callbacks?: ICallbacks,
     buffers?: ArrayBuffer[] | ArrayBufferView[]
   ) {
-    let content_: string;
     try {
-      content_ = JSON.stringify(content);
+      content = JSON.stringify(content);
     } catch {
-      // Assuming the error is due to circular reference
-      content_ = JSON.stringify(content, IpylabModel._replacer);
-    }
-    super.send(content_, callbacks, buffers);
-  }
-
-  static _replacer(key: string, value: any) {
-    // Filtering out properties
-    if (key === 'payload') {
-      const out = listProperties({
-        obj: value,
-        omitHidden: true,
-        depth: 3
-      });
-      out['WARNING'] =
-        'This payload is a simplified representation because it has circular references.';
-      if (typeof value.dispose === 'function') {
-        // Keep a reference to disposable objects in case it needs to be found again in the frontend.
-        const cid = (out['ipylab_cid'] = `ipylab-Connection:${UUID.uuid4()}`);
-        IpylabModel.registerConnection(cid, value);
+      if (content.transform === 'auto') {
+        content.payload = {
+          cid: IpylabModel.ConnectionModel.get_cid(content.payload, true)
+        };
       }
-      return out;
+      content = toJSONsubstituteCylic(content);
     }
-    return value;
+    super.send(content, callbacks, buffers);
   }
 
-  /**
-   * Convert custom messages into operations for action.
-   * There are two types:
-   * 1. Response to requested operation sent to Python (ipylab_FE).
-   * 2. Operation requests received from the Python (ipylab_PY).
-   * @param msg
-   */
-  private async _onCustomMessage(msg: any) {
-    if (typeof msg !== 'string') {
-      return;
-    }
-    const content = JSON.parse(msg);
-    if (content.toLuminoWidget instanceof Array) {
-      // Replace values in kwgs with widgets
-      for (const dottedname of content.toLuminoWidget) {
-        const value = getNestedObject({
-          base: content.kwgs,
-          dottedname,
-          nullIfMissing: false
-        });
-        if (value && typeof value === 'string') {
-          const lw = (await IpylabModel.toLuminoWidget({ id: value })).widget;
-          setNestedProperty(content.kwgs, dottedname, lw);
-        }
-      }
-    }
-    if (content.toObject instanceof Array) {
-      // Replace values in kwgs with attributes
-      for (const dottedname of content.toObject) {
-        const value = getNestedObject({
-          base: content.kwgs,
-          dottedname,
-          nullIfMissing: false
-        });
-        if (value && typeof value === 'string') {
-          const value_ = await IpylabModel.toObject(this.base, value);
-          setNestedProperty(content.kwgs, dottedname, value_);
-        }
-      }
-    }
-    if (content.ipylab_FE) {
-      // Result of an operation request sent to Python.
-      const op = this._pendingOperations.get(content.ipylab_FE);
-      this._pendingOperations.delete(content.ipylab_FE);
-      if (op) {
-        if (content.error) {
-          op.reject(new Error(content.error?.repr ?? content.error));
-        } else {
-          op.resolve(content.payload);
-        }
-      }
-    } else if (content.ipylab_PY) {
-      this._do_operation_for_python(content);
-    }
-  }
-
-  /**
-   * Perform an operation requested by Python returning the result if successful
-   * or an 'error' message if unsuccessful.
-   * @param content
-   */
-  private async _do_operation_for_python(content: any) {
-    const { operation, ipylab_PY, transform, kwgs } = content;
-    try {
-      let result, buffers;
-      result = await this.operation(operation, kwgs);
-      if ((result as any)?.buffers) {
-        buffers = (result as any).buffers;
-        delete (result as any).buffers;
-      }
-      if ((result as any)?.payload) {
-        result = (result as any).payload;
-      }
-      const response = {
-        ipylab_PY,
-        operation,
-        payload: (await this.transformObject(result, transform)) ?? null
-      };
-      this.send(response, null, buffers);
-    } catch (e) {
-      this.send({
-        operation: operation,
-        ipylab_PY: content.ipylab_PY,
-        error: `${(e as Error).message}`
-      });
-      console.error(e);
-    }
-  }
-
-  private async _executeMethod(payload: any): Promise<any> {
-    const { dottedname, args } = payload;
-    const obj = this.base;
-    const ownername = dottedname.split('.').slice(0, -1).join('.');
-    const owner = getNestedObject({ base: obj, dottedname: ownername });
-    let func = getNestedObject({ base: obj, dottedname });
-    func = func.bind(owner, ...args);
-    return await func();
-  }
-
-  private _listProperties(payload: any) {
-    const obj = getNestedObject({ ...payload, base: this.base });
-    return listProperties({ ...payload, obj });
-  }
-
-  private _getProperty(payload: any) {
-    return getNestedObject({ ...payload, base: this.base });
-  }
-
-  /**
-   * Update the property. Equivalent to python: `dict.update`.
-   */
-  private async _updateProperty(payload: any): Promise<null> {
-    const { value, valueTransform } = payload;
-    const obj = this._getProperty(payload);
-    const value_ = await this.transformObject(value, valueTransform);
-    return Object.assign(obj, value_);
-  }
-  /**
-   * Set a property. Equivalent to python `setattr`.
-   */
-  private async _setProperty(payload: any): Promise<any> {
-    const { dottedname, value, valueTransform } = payload;
-    const value_ = await this.transformObject(value, valueTransform);
-    setNestedProperty(this.base, dottedname, value_);
-    return value_;
+  error(msg: string): never {
+    throw new Error(`${msg}\nPython class = ${this.get('_python_class')}`);
   }
 
   /**
@@ -396,58 +187,209 @@ export class IpylabModel extends WidgetModel {
    */
   async operation(op: string, payload: any): Promise<any> {
     switch (op) {
-      case 'executeCommand':
-        return await this.commands.execute(payload.id, payload.args);
-      case 'executeMethod':
-        return await this._executeMethod(payload);
-      case 'getProperty':
-        return await this._getProperty(payload);
-      case 'listProperties':
-        return this._listProperties(payload);
-      case 'setProperty':
-        return this._setProperty(payload);
-      case 'updateProperty':
-        return this._updateProperty(payload);
-      case 'newSessionContext':
-        return await IpylabModel.newSessionContext(payload.vpath);
+      case 'genericOperation':
+        return await this.genericOperation(payload);
       default:
         // Each failed operation should throw an error if it is un-handled
-        throw new Error(
-          `operation='${op}' has not been implemented in ${
-            this.defaults().model_name
-          }!`
-        );
+        throw new Error(`genericOperation "${op}" not implemented!`);
+    }
+  }
+  /**
+   * Perform a generic operation locating the  and return the result.
+   *
+   * @param op Name of the operation.
+   * @param kwgs Options relevant to the operation.
+   * @returns Raw result of the operation.
+   */
+  async genericOperation(payload: any): Promise<any> {
+    payload.obj = this.getBase(payload.basename);
+    switch (payload.genericOperation) {
+      case 'executeMethod':
+        return await executeMethod(payload);
+      case 'getProperty':
+        return await getNestedProperty(payload);
+      case 'listProperties':
+        return listProperties(payload);
+      case 'setProperty':
+        return setNestedProperty(payload);
+      case 'updateProperty':
+        return updateProperty(payload);
+      default:
+        this.error(`'${payload.methodName}' has not been implemented`);
+    }
+  }
+
+  /**
+   * Handle messages
+   * There are two types:
+   * 1. Response to requested operation sent to Python (ipylab_FE).
+   * 2. Operation requests received from the Python (ipylab_PY).
+   *
+   * Both types specify ipylab_## = uuid (unique identifier)
+   *
+   * @param msg
+   */
+  private async onCustomMessage(msg: any) {
+    if (typeof msg !== 'string') {
+      return;
+    }
+    const content = JSON.parse(msg);
+
+    if (content.ipylab_FE) {
+      // Result of an operation request sent to Python.
+      const op = this._pendingOperations.get(content.ipylab_FE);
+      this._pendingOperations.delete(content.ipylab_FE);
+      try {
+        await this.transformContent(content);
+      } catch (e) {
+        content.error = e;
+      }
+      if (op) {
+        if (content.error) {
+          op.reject(new Error(content.error?.repr ?? content.error));
+        } else {
+          op.resolve(content.payload);
+        }
+      }
+    } else if (content.ipylab_PY) {
+      this.do_operation_for_python(content);
+    }
+  }
+
+  /**
+   * Perform an operation requested by Python returning the result if successful
+   * or an 'error' message if unsuccessful.
+   * @param content
+   */
+  private async do_operation_for_python(content: any) {
+    const { operation, ipylab_PY, transform } = content;
+    try {
+      await this.transformContent(content);
+      let result, buffers;
+      result = await this.operation(operation, content.kwgs);
+      if ((result as any)?.buffers) {
+        buffers = (result as any).buffers;
+        delete (result as any).buffers;
+      }
+      if ((result as any)?.payload) {
+        result = (result as any).payload;
+      }
+      const response = {
+        ipylab_PY,
+        operation,
+        payload: (await this.transformObject(result, transform)) ?? null
+      };
+      this.send(response, null, buffers);
+    } catch (e) {
+      this.send({
+        operation: operation,
+        ipylab_PY: content.ipylab_PY,
+        error: `${(e as Error).message}`
+      });
+      console.error(e);
+    }
+  }
+
+  async transformContent(content: any) {
+    if (content.toLuminoWidget instanceof Array) {
+      // Replace values in kwgs with widgets
+      for (const subpath of content.toLuminoWidget) {
+        const value = getNestedProperty({
+          obj: content.kwgs,
+          subpath,
+          nullIfMissing: false
+        });
+        if (value && typeof value === 'string') {
+          const lw = (await IpylabModel.toLuminoWidget({ id: value })).widget;
+          setNestedProperty({ obj: content.kwgs, subpath, value: lw });
+        }
+      }
+    }
+    if (content.toObject) {
+      for (const subpath of content.toObject) {
+        let value = getNestedProperty({
+          obj: content.kwgs,
+          subpath,
+          nullIfMissing: false
+        });
+        let base;
+        if (value) {
+          [base, value] = this.toBaseAndSubpath(value);
+          value = await IpylabModel.toObject(base, value);
+          setNestedProperty({ obj: content.kwgs, subpath, value });
+        }
+      }
+    }
+    delete content.toLuminoWidget;
+    delete content.toObject;
+  }
+
+  /**
+   * Get the base and subpath from value.
+   *
+   * When `default_basename` will be used when `value` is a string.
+   *
+   * @param value can be either [basename, subpath] or subpath.
+   * @returns [base, subpath]
+   */
+  private toBaseAndSubpath(
+    value: string | Array<string>,
+    default_basename = 'base'
+  ): [any, string] {
+    let basename = default_basename;
+    if (value instanceof Array) {
+      [basename, value] = value;
+    }
+    return [this.getBase(basename), value ?? ''];
+  }
+
+  private getBase(basename: string) {
+    switch (basename) {
+      case 'this':
+        return this;
+      case 'base':
+        return this.base;
+      case 'IpylabModel':
+        return IpylabModel;
+      case 'MainMenu':
+        return MainMenu;
+      default:
+        this.error(`Invalid basename: "${basename}"`);
     }
   }
 
   /**
    * Transform the object for sending.
-   * @param obj
+   * @param base
    * @param args The mode as a string or an object with mode and any other parameters.
    * @returns
    */
-  async transformObject(obj: any, args: string | any): Promise<any> {
+  private async transformObject(obj: any, args: string | any): Promise<any> {
     const transform = typeof args === 'string' ? args : args.transform;
     let result, func;
-    let cid;
 
     switch (transform) {
-      case 'raw':
-        return (await obj) as any;
+      case 'auto':
+        if ((result = IpylabModel.ConnectionModel.get_cid(obj))) {
+          return { cid: result };
+        }
+        return await obj;
       case 'null':
         return null;
       case 'connection':
-        cid = args?.cid ?? `ipylab-Connection:${UUID.uuid4()}`;
-        obj = IpylabModel.registerConnection(cid, obj);
+        if (args.cid) {
+          IpylabModel.ConnectionModel.registerConnection(args.cid, obj);
+          return { cid: args.cid };
+        }
         if (args.auto_dispose) {
           IpylabModel.onKernelLost(this.kernel, obj.dispose, obj, true);
         }
-        return { cid: cid, id: obj.id, info: args.info };
+        return { cid: IpylabModel.ConnectionModel.get_cid(obj, true) };
       case 'advanced':
         // expects args.mappings = {key:transform}
         result = new Object();
         for (const key of Object.keys(args.mappings)) {
-          const base = getNestedObject({ base: obj, dottedname: key });
+          const base = getNestedProperty({ obj, subpath: key });
           (result as any)[key] = await this.transformObject(
             base,
             args.mappings[key]
@@ -470,23 +412,8 @@ export class IpylabModel extends WidgetModel {
         }
         return obj;
       default:
-        throw new Error(`Invalid return mode: '${transform}'`);
+        this.error(`Invalid return mode: '${transform}'`);
     }
-  }
-
-  /**
-   * The default attributes.
-   */
-  defaults(): Backbone.ObjectHash {
-    return {
-      ...super.defaults(),
-      _model_name: 'IpylabModel',
-      _model_module: IpylabModel.model_module,
-      _model_module_version: IpylabModel.model_module_version,
-      _view_name: null,
-      _view_module: IpylabModel.view_module,
-      _view_module_version: IpylabModel.view_module_version
-    };
   }
 
   /**
@@ -523,14 +450,13 @@ export class IpylabModel extends WidgetModel {
   /**
    * Get the WidgetManger searching all known kernels.
    *
-   * This blocks until the frontend is ready in the kernel.
    * @param model_id The widget model id
    * @returns
    */
   static async getWidgetManager(
     model_id: string
   ): Promise<KernelWidgetManager> {
-    return await (KernelWidgetManager as any).getManager(model_id, [100]);
+    return await (KernelWidgetManager as any).getManager(model_id, [100, 5000]);
   }
 
   /**
@@ -568,12 +494,12 @@ export class IpylabModel extends WidgetModel {
       ipy_model = id.slice(10).split(':', 1)[0];
     }
 
-    if (IpylabModel.connections.has(cid)) {
-      widget = IpylabModel.connections.get(cid) as Widget;
+    if (IpylabModel.ConnectionModel.connections.has(cid)) {
+      widget = IpylabModel.ConnectionModel.connections.get(cid) as Widget;
     } else if (ipy_model) {
-      const model = await IpylabModel.getWidgetModel(ipy_model);
+      let model = await IpylabModel.getWidgetModel(ipy_model);
       if ((model as ConnectionModel).isConnectionModel) {
-        // return await this.toLuminoWidget(model.get('cid'));
+        model = (model as ConnectionModel).base;
       }
       if (!model.get('_view_name')) {
         const name = model.get('_model_name');
@@ -588,7 +514,7 @@ export class IpylabModel extends WidgetModel {
     }
     if (!(widget instanceof Widget)) {
       throw new Error(
-        `Unable to create a luminoWidget cid='${cid}' id='${id}'`
+        `Unable to create a luminoWidget cid='${cid}' id='${id}' ipy_model='${ipy_model}`
       );
     }
     return { widget, vpath };
@@ -623,7 +549,6 @@ export class IpylabModel extends WidgetModel {
   /**
    * Ensure the JupyterFrontendModel 'app' is running in the kernel.
    * @param kernel
-   * @param isIpylabKernel Provided for the default ipylab kernel
    */
   static async ensureFrontend(kernel: Kernel.IKernelConnection, vpath = '') {
     const manager = new KernelWidgetManager(kernel, IpylabModel.rendermime);
@@ -646,88 +571,34 @@ export class IpylabModel extends WidgetModel {
   }
 
   /**
-   *Keep a reference to an object so it can be found from the backend.
-   * @param obj
-   */
-  static registerConnection(cid: string, obj: any) {
-    if (!cid) {
-      throw new Error('`cid` not provided!');
-    }
-    if (typeof obj !== 'object') {
-      throw new Error(`An object is required but got a '${typeof obj}'`);
-    }
-    while (obj?.isConnectionModel) {
-      obj = obj.base;
-    }
-    if (obj?.isDisposed) {
-      throw new Error(`object is disposed`);
-    }
-    if (Private.connections.has(cid) && Private.connections.get(cid) !== obj) {
-      throw new Error(`Another object is already registered for cid: ${cid}`);
-    }
-
-    if (!obj.dispose) {
-      obj.dispose = () => '';
-      obj.ipylabDisposeOnClose = true;
-    }
-    if (!obj.disposed) {
-      // Make equivalent to an ObservableDisposable
-      obj.disposed = new Signal<any, null>(obj);
-      const dispose_ = obj.dispose.bind(obj);
-      const dispose = () => {
-        if (obj.isDisposed) {
-          return;
-        }
-        dispose_();
-        obj.disposed.emit(null);
-        Signal.clearData(obj);
-      };
-      obj['dispose'] = dispose.bind(obj);
-    }
-    obj.disposed.connect(() => Private.connections.delete(cid));
-    Private.connections.set(cid, obj);
-    if (IpylabModel.pendingShellConnections.has(cid)) {
-      IpylabModel.pendingShellConnections.get(cid).resolve(null);
-      IpylabModel.pendingShellConnections.delete(cid);
-    }
-    return obj;
-  }
-
-  /**
-   * Returns the object for the dottedname 'value'.
+   * Returns the object for the subpath 'value'.
    * 1. If value starts with IPY_MODEL_ it will ignore the base, instead
-   *    unpacking the model and return the object relative to dottedname after
+   *    unpacking the model and return the object relative to subpath after
    *    the model name. If there is no path after the model id it will be the model.
-   * 2. The object as specified by the dottedname relate to the base will be returned.
+   * 2. The object as specified by the subpath relate to the base will be returned.
    * 3. An error will be thrown if the value doesn't point an existing attribute.
    *
-   * @param base The object to locate the dotted value.
-   * @param value The dottedname on the base (except for IPY_MODEL_).
+   * @param obj The object to locate the dotted value.
+   * @param value The subpath on the base (except for IPY_MODEL_).
    * @param nullIfMissing Return a null instead of throwing an error if missing.
    */
   static async toObject(
-    base: any,
+    obj: any,
     value: any,
     nullIfMissing = false
   ): Promise<any> {
     if (typeof value === 'string') {
-      let dottedname = value;
+      let subpath = value;
       if (value.slice(0, 10) === 'IPY_MODEL_') {
         let model_id;
-        [model_id, dottedname] = value.slice(10).split('.', 2);
-        base = await IpylabModel.getWidgetModel(model_id);
-        if (base.isConnectionModel) {
-          base = base.base;
+        [model_id, subpath] = value.slice(10).split('.', 2);
+        obj = await IpylabModel.getWidgetModel(model_id);
+        if (obj.isConnectionModel) {
+          obj = obj.base;
         }
       }
-      return await getNestedObject({
-        base,
-        dottedname: dottedname ?? '',
-        nullIfMissing
-      });
-    }
-    if (value?.OTHER_PROPERTIES?.cid) {
-      return IpylabModel.connections.get(value.OTHER_PROPERTIES.cid);
+      subpath = subpath ?? '';
+      return await getNestedProperty({ obj, subpath, nullIfMissing });
     }
     throw new Error(`Cannot convert this value to an object: ${value}`);
   }
@@ -768,26 +639,28 @@ export class IpylabModel extends WidgetModel {
     Private.kernelLostSlot.get(id).connect(callback);
   }
 
+  get kernel(): Kernel.IKernelConnection {
+    return (this.widget_manager as any).kernel;
+  }
+
+  get commClosed() {
+    return (
+      this.kernel.isDisposed ||
+      !this.comm_live ||
+      !this.kernel?.status ||
+      ['dead', 'restarting'].includes(this.kernel?.status)
+    );
+  }
+
   /**
    * Promises to frontends that may be loading.
    */
-  static get jfemPromises() {
-    return Private.jfemPromises;
-  }
-  static get connections() {
-    return Private.connections;
-  }
-
-  static get kernelManager(): Kernel.IManager {
-    return IpylabModel.app.serviceManager.kernels;
-  }
-
+  static jfemPromises = new Map<
+    string,
+    PromiseDelegate<JupyterFrontEndModel>
+  >();
   static get sessionManager(): Session.IManager {
     return IpylabModel.app.serviceManager.sessions;
-  }
-
-  static get pendingShellConnections() {
-    return Private.pendingConnections;
   }
 
   static serializers: ISerializers = {
@@ -795,8 +668,7 @@ export class IpylabModel extends WidgetModel {
   };
   widget_manager: KernelWidgetManager;
   private _pendingOperations = new Map<string, PromiseDelegate<any>>();
-  private _base: object | null;
-  // private _jfem: JupyterFrontEndModel;
+  readonly base: any;
   static model_name: string = 'IpylabModel';
   static model_module = MODULE_NAME;
   static model_module_version = MODULE_VERSION;
@@ -810,11 +682,13 @@ export class IpylabModel extends WidgetModel {
   static defaultBrowser: IDefaultFileBrowser;
   static palette: ICommandPalette;
   static translator: ITranslator;
+  translator = IpylabModel.translator.load('jupyterlab');
   static launcher: ILauncher;
-  static menu: IMainMenu;
+  static mainMenu: IMainMenu;
   static exports: IWidgetRegistryData;
-  static connection_model_name = 'ConnectionModel';
   static tracker = new WidgetTracker<Widget>({ namespace: 'ipylab' });
+  static JFEM: typeof JupyterFrontEndModel;
+  static ConnectionModel: typeof ConnectionModel;
 }
 
 /**
@@ -830,12 +704,6 @@ function _onKernelStatusChanged(kernel: Kernel.IKernelConnection) {
  * A namespace for private data
  */
 namespace Private {
-  export const connections = new Map<string, IObservableDisposable>();
-  export const jfemPromises = new Map<
-    string,
-    PromiseDelegate<JupyterFrontEndModel>
-  >();
-  export const pendingConnections = new Map<string, PromiseDelegate<null>>();
   export const kernelLostSlot = new ObservableMap<
     Signal<Kernel.IKernelConnection, null>
   >();

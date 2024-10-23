@@ -4,14 +4,14 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Unpack
 
 from ipywidgets import Box, DOMWidget, TypedTuple, register, widget_serialization
 from ipywidgets.widgets.trait_types import InstanceDict
 from traitlets import Container, Dict, Instance, Unicode, observe
 
 import ipylab._frontend as _fe
-from ipylab.common import Area, InsertMode
+from ipylab.common import Area, InsertMode, IpylabKwgs
 from ipylab.connection import ShellConnection
 from ipylab.ipylab import WidgetBase
 
@@ -53,12 +53,10 @@ class Panel(Box):
     _view_module = Unicode(_fe.module_name, read_only=True).tag(sync=True)
     _view_module_version = Unicode(_fe.module_version, read_only=True).tag(sync=True)
     title: Instance[Title] = InstanceDict(Title, ()).tag(sync=True, **widget_serialization)
+
     app: Instance[App] = Instance("ipylab.App", (), read_only=True)
     connections: Container[tuple[ShellConnection, ...]] = TypedTuple(trait=Instance(ShellConnection))
-
-    def __init__(self, children=(), **kwargs):
-        super().__init__(children, **kwargs)
-        self.add_class("ipylab-" + self.__class__.__name__)
+    console = Instance(ShellConnection, (), allow_none=True, read_only=True)
 
     def add_to_shell(
         self,
@@ -83,6 +81,26 @@ class Panel(Box):
             **kwgs,
         )
 
+    def open_console(
+        self,
+        *,
+        insertMode=InsertMode.split_bottom,
+        namespace_name="",
+        activate=True,
+        **kwgs: Unpack[IpylabKwgs],
+    ) -> Task[ShellConnection]:
+        """Open a console and activate the namespace.
+        namespace_name: str
+            An alternate namespace to activate.
+        """
+        return self.app.open_console(
+            objects={"widget": self, "ref": self.connections[-1] if self.connections else None},
+            activate=activate,
+            namespace_name=namespace_name,
+            insertMode=InsertMode(insertMode),
+            **kwgs,
+        )
+
 
 @register
 class SplitPanel(Panel):
@@ -93,15 +111,8 @@ class SplitPanel(Panel):
 
     # ============== Start temp fix =============
     # Below here is added as a temporary fix to address issue https://github.com/jtpio/ipylab/issues/129
-    def __init__(self, children=(), **kwargs):
-        super().__init__(children, **kwargs)
-        self.app.restored.register_callback(self._rerender)
 
-    def close(self):
-        super().close()
-        self.app.restored.register_callback(self._rerender, True)
-
-    @observe("children", "connections")
+    @observe("children", "connections", "ready")
     def _observer(self, _):
         self._rerender()
 

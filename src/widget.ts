@@ -3,6 +3,7 @@
 
 import { CommandRegistryModel } from './widgets/commands';
 import { ConnectionModel, ShellConnectionModel } from './widgets/connection';
+import { DialogModel } from './widgets/dialog';
 import { JupyterFrontEndModel } from './widgets/frontend';
 import { IconModel, IconView } from './widgets/icon';
 import { IpylabModel } from './widgets/ipylab';
@@ -11,7 +12,6 @@ import { PanelModel, PanelView } from './widgets/panel';
 import { ShellModel } from './widgets/shell';
 import { SplitPanelModel, SplitPanelView } from './widgets/split_panel';
 import { TitleModel } from './widgets/title';
-import { DialogModel } from './widgets/dialog';
 
 export {
   CommandRegistryModel,

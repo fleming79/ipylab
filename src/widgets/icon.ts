@@ -31,6 +31,21 @@ export class IconView extends DOMWidgetView {
  */
 export class IconModel extends DOMWidgetModel {
   /**
+   * The default attributes.
+   */
+  defaults(): Backbone.ObjectHash {
+    return {
+      ...super.defaults(),
+      _model_name: 'IconModel',
+      _model_module: MODULE_NAME,
+      _model_module_version: MODULE_VERSION,
+      _view_name: 'IconView',
+      _view_module: MODULE_NAME,
+      _view_module_version: MODULE_VERSION
+    };
+  }
+
+  /**
    * Initialize a LabIcon instance.
    *
    * @param attributes The base attributes.
@@ -60,19 +75,4 @@ export class IconModel extends DOMWidgetModel {
   }
 
   protected _labIcon!: LabIcon;
-
-  /**
-   * The default attributes.
-   */
-  defaults(): Backbone.ObjectHash {
-    return {
-      ...super.defaults(),
-      _model_name: 'IconModel',
-      _model_module: MODULE_NAME,
-      _model_module_version: MODULE_VERSION,
-      _view_name: 'IconView',
-      _view_module: MODULE_NAME,
-      _view_module_version: MODULE_VERSION
-    };
-  }
 }

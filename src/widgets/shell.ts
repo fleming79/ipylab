@@ -2,14 +2,21 @@
 // Distributed under the terms of the Modified BSD License.
 
 import { MainAreaWidget } from '@jupyterlab/apputils';
-import { JupyterFrontEndModel } from './frontend';
+import { UUID } from '@lumino/coreutils';
 import { IpylabModel, Widget } from './ipylab';
 
 export class ShellModel extends IpylabModel {
+  /**
+   * The default attributes.
+   */
+  defaults(): Backbone.ObjectHash {
+    return { ...super.defaults(), _model_name: 'ShellModel' };
+  }
+
   async operation(op: string, payload: any): Promise<any> {
     switch (op) {
       case 'addToShell':
-        return await ShellModel.addToShell(payload);
+        return await ShellModel.addToShell(payload.args);
       default:
         return await super.operation(op, payload);
     }
@@ -44,23 +51,18 @@ export class ShellModel extends IpylabModel {
    * @param args An object with area, options, cid, id, vpath & evaluate.
    */
 
-  static async addToShell(args: any): Promise<Widget> {
+  private static async addToShell(args: any): Promise<Widget> {
     let widget: Widget | MainAreaWidget;
     let vpath: string;
 
-    if (!args.cid) {
-      throw new Error('cid not provided!');
-    }
-
     try {
       const info = await IpylabModel.toLuminoWidget(args);
-
       ({ widget, vpath } = info);
       // Create a new lumino widget
     } catch (e) {
       if (args.evaluate) {
         // Evaluate code in python to get a panel and then add it to the shell.
-        const jfem = await JupyterFrontEndModel.getModel(args.vpath);
+        const jfem = await IpylabModel.JFEM.getModel(args.vpath);
         return await jfem.scheduleOperation('shell_eval', args, 'object');
       } else {
         throw e;
@@ -75,14 +77,14 @@ export class ShellModel extends IpylabModel {
       w.node.removeChild(w.toolbar.node);
       w.addClass('ipylab-MainArea');
     }
-
-    widget.id = widget.id || args.cid;
-    IpylabModel.registerConnection(args.cid, widget);
+    widget.id = widget.id || args.cid || UUID.uuid4();
+    if (args.cid) {
+      IpylabModel.ConnectionModel.registerConnection(args.cid, widget);
+    }
     IpylabModel.app.shell.add(widget as any, args.area || 'main', args.options);
 
-    // Register widgets originating from IpyWidgets or evaluate
+    // Register widgets originating from IpyWidgets
     if (args.ipy_model) {
-      // The property `isIpyWidget`is added in `toLuminoWidget`
       args.vpath = vpath;
       widget.addClass('ipylab-shell');
       if (!IpylabModel.tracker.has(widget)) {
@@ -95,12 +97,5 @@ export class ShellModel extends IpylabModel {
       }
     }
     return widget;
-  }
-
-  /**
-   * The default attributes.
-   */
-  defaults(): Backbone.ObjectHash {
-    return { ...super.defaults(), _model_name: 'ShellModel' };
   }
 }

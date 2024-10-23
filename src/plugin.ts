@@ -59,7 +59,7 @@ async function activate(
   defaultBrowser: IDefaultFileBrowser | null,
   launcher: ILauncher | null,
   translator: ITranslator | null,
-  menu: IMainMenu | null
+  mainMenu: IMainMenu | null
 ): Promise<void> {
   const widgetExports = await import('./widget');
   if (!widgetExports.JupyterFrontEndModel.app) {
@@ -71,7 +71,7 @@ async function activate(
     widgetExports.IpylabModel.palette = palette;
     widgetExports.IpylabModel.translator = translator;
     widgetExports.IpylabModel.launcher = launcher;
-    widgetExports.IpylabModel.menu = menu;
+    widgetExports.IpylabModel.mainMenu = mainMenu;
     widgetExports.IpylabModel.exports = {
       name: MODULE_NAME,
       version: MODULE_VERSION,

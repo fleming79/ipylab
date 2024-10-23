@@ -8,12 +8,15 @@ from ipywidgets import TypedTuple, Widget
 from traitlets import Container, Instance, Unicode
 
 import ipylab
-from ipylab import Area, Connection, InsertMode, Ipylab, ShellConnection, Transform, pack
+from ipylab import Area, InsertMode, Ipylab, ShellConnection, Transform, pack
+from ipylab.ipylab import IpylabBase
 
 if TYPE_CHECKING:
     import inspect
     from asyncio import Task
     from typing import Literal
+
+    from ipylab.common import TaskHooks
 
 
 __all__ = ["Shell"]
@@ -30,14 +33,12 @@ class Shell(Ipylab):
     ref: https://jupyterlab.readthedocs.io/en/latest/api/interfaces/application.App.IShell.html#add
     """
 
-    SINGLETON = True
+    SINGLE = True
+
     _model_name = Unicode("ShellModel", help="Name of the model.", read_only=True).tag(sync=True)
-    _basename = Unicode("shell").tag(sync=True)
+    ipylab_base = IpylabBase(ipylab.Obj.IpylabModel, "app.shell").tag(sync=True)
 
     connections: Container[tuple[ShellConnection, ...]] = TypedTuple(trait=Instance(ShellConnection))
-
-    def _on_frontend_init(self):
-        return super()._on_frontend_init()
 
     def add(
         self,
@@ -49,9 +50,8 @@ class Shell(Ipylab):
         rank: int | None = None,
         ref: ShellConnection | None = None,
         options: dict | None = None,
-        cid: str = "",
         vpath: str | dict[Literal["title"], str] = "",
-        **kwgs,
+        **args,
     ) -> Task[ShellConnection]:
         """
         Add a widget or evaluation to the
@@ -84,59 +84,50 @@ class Shell(Ipylab):
         app.shell.add("ipylab.Panel([ipw.HTML('<h1>Test')])", vpath="test")
         ```
         """
-
-        kwgs["options"] = {
+        cid = args.pop("cid", "")
+        hooks: TaskHooks = {"tuple_add_rev": [("connections", self)]}
+        args["options"] = {
             "activate": activate,
             "mode": InsertMode(mode),
             "rank": int(rank) if rank else None,
-            "ref": ref.id if isinstance(ref, Connection) else None,
+            "ref": f"{pack(ref)}.id" if isinstance(ref, ShellConnection) else None,
         } | (options or {})
-
         if isinstance(obj, ShellConnection):
             if cid and cid != obj.cid:
                 msg = f"The provided {cid=} does not match {obj.cid=}"
                 raise RuntimeError(msg)
-            kwgs["id"] = obj.id
+            cid = obj.cid
         elif isinstance(obj, Widget):
             if not obj._view_name:  # noqa: SLF001
                 msg = f"This widget does not have a view {obj}"
                 raise RuntimeError(msg)
-            if not cid:
+            if not cid and self.connections:
                 for c in self.connections:
                     if c.widget is obj:
                         cid = c.cid
                         break
-            kwgs["ipy_model"] = obj.model_id
+            if isinstance(obj, ipylab.Panel):
+                hooks["tuple_add_rev"].append(("connections", obj))
+            args["ipy_model"] = obj.model_id
         else:
-            kwgs["evaluate"] = pack(obj)
-
+            args["evaluate"] = pack(obj)
         cid = ShellConnection.to_cid(cid)
-        conn = ShellConnection(cid)
         if isinstance(obj, Widget) and obj._view_name:  # noqa: SLF001
+            conn = ShellConnection(cid)
             conn.set_trait("widget", obj)
 
+        args["area"] = area
+        args["cid"] = cid
+
         async def add_to_shell():
-            if "evaluate" in kwgs:
+            if "evaluate" in args:
                 if isinstance(vpath, dict):
-                    kwgs["vpath"] = await self.app.dialog.get_text(vpath["title"])
+                    args["vpath"] = await self.app.dialog.get_text(vpath["title"])
                 else:
-                    kwgs["vpath"] = vpath or self.app.vpath
+                    args["vpath"] = vpath or self.app.vpath
+            return await self.operation("addToShell", args=args, transform=Transform.connection)
 
-            conn_ = await self.operation(
-                "addToShell",
-                area=area,
-                transform={"transform": Transform.connection, "cid": cid},
-                cid=cid,
-                **kwgs,
-            )
-            assert conn_ is conn  # noqa: S101
-            await self._add_to_tuple_trait(self, "connections", conn)
-            if isinstance(obj, ipylab.Panel):
-                await self._add_to_tuple_trait(obj, "connections", conn)
-
-            return conn
-
-        return self.app.to_task(add_to_shell())
+        return self.to_task(add_to_shell(), "Add to shell", hooks=hooks)
 
     def expand_left(self):
         return self.execute_method("expandLeft")

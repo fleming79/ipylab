@@ -2,9 +2,14 @@
 # Distributed under the terms of the Modified BSD License.
 
 from asyncio import Task
+from typing import TYPE_CHECKING
 
+import ipylab
 from ipylab.connection import Connection
-from ipylab.ipylab import Ipylab, Transform, Unicode
+from ipylab.ipylab import Ipylab, IpylabBase, Transform
+
+if TYPE_CHECKING:
+    from ipylab.common import TransformType
 
 
 class SessionManager(Ipylab):
@@ -12,8 +17,9 @@ class SessionManager(Ipylab):
     https://jupyterlab.readthedocs.io/en/latest/api/interfaces/services.Session.IManager.html
     """
 
-    SINGLETON = True
-    _basename = Unicode("app.serviceManager.sessions").tag(sync=True)
+    SINGLE = True
+
+    ipylab_base = IpylabBase(ipylab.Obj.IpylabModel, "app.serviceManager.sessions").tag(sync=True)
 
     def refresh_running(self):
         """Force a call to refresh running sessions."""
@@ -31,4 +37,5 @@ class SessionManager(Ipylab):
 
         vpath: The session path.
         """
-        return self.app.operation("newSessionContext", vpath=vpath, transform=Transform.connection)
+        transform: TransformType = {"transform": Transform.connection, "cid": Connection.to_cid(), "auto_dispose": True}
+        return self.execute_method("newSessionContext", vpath, obj=ipylab.Obj.IpylabModel, transform=transform)

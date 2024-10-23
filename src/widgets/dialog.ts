@@ -7,7 +7,6 @@ import {
   showErrorMessage
 } from '@jupyterlab/apputils';
 import { FileDialog } from '@jupyterlab/filebrowser';
-import { IMainMenu, MainMenu } from '@jupyterlab/mainmenu';
 import { IpylabModel } from './ipylab';
 
 export class DialogModel extends IpylabModel {
@@ -40,25 +39,14 @@ export class DialogModel extends IpylabModel {
           payload.buttons
         );
       case 'getOpenFiles':
-        payload.manager = this.defaultBrowser.model.manager;
+        payload.manager = IpylabModel.defaultBrowser.model.manager;
         return await FileDialog.getOpenFiles(payload).then(_get_result);
       case 'getExistingDirectory':
-        payload.manager = this.defaultBrowser.model.manager;
+        payload.manager = IpylabModel.defaultBrowser.model.manager;
         return await FileDialog.getExistingDirectory(payload).then(_get_result);
-      case 'generateMenu':
-        return this._generateMenu(payload.options);
       default:
         return await super.operation(op, payload);
     }
-  }
-
-  private _generateMenu(options: IMainMenu.IMenuOptions) {
-    const menu = MainMenu.generateMenu(
-      this.commands,
-      options,
-      this.translator.load('jupyterlab')
-    );
-    return menu;
   }
 
   /**

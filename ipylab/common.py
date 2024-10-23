@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import inspect
 import typing
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import pluggy
 from ipywidgets import Widget, widget_serialization
@@ -11,12 +11,16 @@ import ipylab
 from ipylab._compat.enum import StrEnum
 from ipylab._compat.typing import NotRequired, TypedDict
 
-__all__ = ["Area", "InsertMode", "Transform", "TransformType", "JavascriptType", "ShellConnectionInfo", "hookimpl"]
+__all__ = ["Area", "Obj", "InsertMode", "Transform", "TransformType", "hookimpl", "pack", "IpylabKwgs"]
 
 hookimpl = pluggy.HookimplMarker("ipylab")  # Used for plugins
 
 if TYPE_CHECKING:
     from typing import TypeVar, overload
+
+    from traitlets import HasTraits
+
+    from ipylab.ipylab import Ipylab
 
     T = TypeVar("T")
 
@@ -36,6 +40,16 @@ def pack(obj):
     if inspect.isfunction(obj) or inspect.ismodule(obj):
         return inspect.getsource(obj)
     return obj
+
+
+class Obj(StrEnum):
+    "The objects available to use as 'obj' in the Frontend."
+
+    this = "this"
+    base = "base"
+    # These provides static access to the class
+    IpylabModel = "IpylabModel"
+    MainMenu = "MainMenu"
 
 
 class Area(StrEnum):
@@ -76,7 +90,6 @@ class Transform(StrEnum):
     - raw: [default] No conversion. Note: data is serialized when sending, some object serialization will fail.
     - function: Use a function to calculate the return value. ['code'] = 'function...'
     - connection: Return a connection to a disposable object in the frontend.
-        Use `auto_dispose=True` to dispose of the object when the kernel is dead or restarted.
     - advanced: A mapping of keys to transformations to apply sequentially on the object.
 
     `function`
@@ -94,7 +107,6 @@ class Transform(StrEnum):
     transform = {
         "transform": Transform.connection,
         "cid": "ID TO USE FOR CONNECTION",
-        "auto_dispose": True,  # Optional Default is False.
         "info": {} # Optional Dict of info.
     }
 
@@ -108,7 +120,7 @@ class Transform(StrEnum):
     ```
     """
 
-    raw = "raw"
+    auto = "auto"
     done = "done"
     function = "function"
     connection = "connection"
@@ -131,8 +143,6 @@ class Transform(StrEnum):
                     transform_ = TransformDictConnection(transform=Transform.connection, cid=cid)
                     if info := transform.get("info"):
                         transform_["info"] = dict(info)
-                    if auto_dispose := transform.get("auto_dispose"):
-                        transform_["auto_dispose"] = bool(auto_dispose)
                     return transform_
                 case cls.advanced:
                     mappings = {}
@@ -152,7 +162,7 @@ class Transform(StrEnum):
         return transform_
 
     @classmethod
-    def transform_payload(cls, transform: TransformType, payload: dict):
+    def transform_payload(cls, transform: TransformType, payload):
         """Transform the payload according to the transform."""
         transform_ = transform["transform"] if isinstance(transform, dict) else transform
         match transform_:
@@ -161,6 +171,9 @@ class Transform(StrEnum):
                 return {key: cls.transform_payload(mappings[key], payload[key]) for key in mappings}
             case Transform.connection:
                 return ipylab.Connection(**payload)
+            case Transform.auto:
+                if isinstance(payload, dict) and payload.get("cid"):
+                    return ipylab.Connection(**payload)
         return payload
 
 
@@ -193,16 +206,30 @@ class TransformDictConnection(TypedDict):
 TransformType = Transform | TransformDictAdvanced | TransformDictFunction | TransformDictConnection
 
 
-class JavascriptType(StrEnum):
-    string = "string"
-    number = "number"
-    boolean = "boolean"
-    object = "object"
-    function = "function"
+class IpylabKwgs(TypedDict):
+    transform: NotRequired[TransformType]
+    toLuminoWidget: NotRequired[list[str]]  # noqa: N815
+    toObject: NotRequired[list[str]]  # noqa: N815
+    hooks: NotRequired[TaskHookType]
 
 
-class ShellConnectionInfo(TypedDict):
-    cid: str
-    id: str
-    vpath: NotRequired[str]
-    # path: NotRequired[str]
+class TaskHooks(TypedDict):
+    """Hooks to run after successful completion of 'aw' passed to the method "to_task"
+    and prior to returning.
+
+    This provides a convenient means to set traits of the returned result.
+
+    see: `Hookspec.task_result`
+    """
+
+    close_with_rev: NotRequired[list[Ipylab]]
+    close_with_fwd: NotRequired[list[Widget]]
+
+    trait_add_rev_: NotRequired[list[tuple[str, HasTraits]]]
+    trait_add_fwd: NotRequired[list[tuple[str, Any]]]
+
+    tuple_add_rev: NotRequired[list[tuple[str, Any]]]
+    tuple_add_fwd: NotRequired[list[tuple[str, Ipylab]]]
+
+
+TaskHookType = TaskHooks | None

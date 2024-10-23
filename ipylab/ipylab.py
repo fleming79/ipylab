@@ -3,34 +3,43 @@
 from __future__ import annotations
 
 import asyncio
-import inspect
 import json
 import traceback
 import uuid
 import weakref
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, Unpack
 
 from ipywidgets import Widget, register
-from traitlets import Bool, Container, Dict, HasTraits, Instance, Set, Unicode
+from traitlets import Bool, Container, Dict, HasTraits, Instance, Set, TraitType, Unicode, observe
 
 import ipylab
 import ipylab._frontend as _fe
-import ipylab.commands
-from ipylab.common import Transform, TransformType, pack
+from ipylab.common import IpylabKwgs, Obj, TaskHooks, TaskHookType, Transform, TransformType, hookimpl, pack
 
 if TYPE_CHECKING:
     import logging
     from asyncio import Task
-    from collections.abc import Awaitable, Iterable
+    from collections.abc import Awaitable, Hashable, Iterable
     from typing import ClassVar
 
     from ipylab import App
-    from ipylab.commands import CommandConnection
+    from ipylab._compat.typing import Self
 
 
 __all__ = ["Ipylab", "WidgetBase"]
 
 T = TypeVar("T")
+L = TypeVar("L", bound="Ipylab")
+
+
+class IpylabBase(TraitType[tuple[str, str], None]):
+    info_text = "A mapping to the base in the frontend."
+    read_only = True
+
+    def __init__(self, base: Obj, subpath: str):
+        "The 'mapping' to the 'base' in the frontend."
+        self._trait = Unicode()
+        super().__init__((base, subpath))
 
 
 class Response(asyncio.Event):
@@ -67,46 +76,70 @@ class WidgetBase(Widget):
 
 @register
 class Ipylab(WidgetBase):
-    """The base for all widgets that need async comms with the frontend model."""
+    """The base class for Ipylab which has a corresponding Frontend."""
+
+    SINGLE = False
 
     _model_name = Unicode("IpylabModel", help="Name of the model.", read_only=True).tag(sync=True)
-    _basename = Unicode(allow_none=True).tag(sync=True)
+    _python_class = Unicode().tag(sync=True)
+    ipylab_base = IpylabBase(ipylab.Obj.this, "").tag(sync=True)
+
     _async_widget_base_init_complete = False
-    _ipylab_model_register: ClassVar[dict[str, Any]] = {}
-    _singleton_register: ClassVar[dict[str, str]] = {}
-    SINGLETON = False
+    _single_map: ClassVar[dict[Hashable, str]] = {}  # single_key : model_id
+    _single_models: ClassVar[dict[str, Self]] = {}  #  model_id   : Widget
     _ready_event = Instance(asyncio.Event, ())
-    _pending_operations: Dict[str, Response] = Dict()
-    _tasks: Container[set[asyncio.Task]] = Set()
     _comm = None
 
+    _pending_operations: Dict[str, Response] = Dict()
+    _tasks: Container[set[asyncio.Task]] = Set()
+    _has_attrs_mappings: Container[set[tuple[HasTraits, str]]] = Set()
+    close_extras: Container[weakref.WeakSet[Widget]] = Instance(weakref.WeakSet, (), help="extra items to close")  # type: ignore
     ready = Bool(read_only=True, help="Set to True when `init` message received")
-    add_traits = None  # type: ignore # Don't support the method HasTraits.add_traits as it creates a new type that isn't a subclass of its origin)
     if TYPE_CHECKING:
         log: logging.Logger
 
-    def __new__(cls, *, model_id=None, **kwgs):
-        if not model_id and cls.SINGLETON:
-            model_id = cls._singleton_register.get(cls.__name__)
-        if model_id and model_id in cls._ipylab_model_register:
-            return cls._ipylab_model_register[model_id]
-        return super().__new__(cls, model_id=model_id, **kwgs)
+    @classmethod
+    def _single_key(cls, kwgs: dict) -> Hashable:  # noqa: ARG003
+        """The key used for finding instances when SINGLE is enabled."""
+        return cls
 
-    def __init__(self, *, model_id=None, **kwgs):
+    def __new__(cls, **kwgs) -> Self:
+        model_id = kwgs.get("model_id") or cls._single_map.get(cls._single_key(kwgs)) if cls.SINGLE else None
+        if model_id and model_id in cls._single_models:
+            return cls._single_models[model_id]
+        return super().__new__(cls)
+
+    def __init__(self, **kwgs):
         if self._async_widget_base_init_complete:
             return
-        super().__init__(model_id=model_id, **kwgs)
-        assert self.model_id  # noqa: S101
-        self._ipylab_model_register[self.model_id] = self
-        if self.SINGLETON:
-            self._singleton_register[self.__class__.__name__] = self.model_id
+        # set traits, including read only traits.
+        model_id = kwgs.pop("model_id", None)
+        for k in kwgs:
+            if self.has_trait(k):
+                self.set_trait(k, kwgs[k])
+        self.set_trait("_python_class", self.__class__.__name__)
+        super().__init__(model_id=model_id) if model_id else super().__init__()
+        model_id = self.model_id
+        if not model_id:
+            msg = "Failed to init comms"
+            raise RuntimeError(msg)
+        if key := self._single_key(kwgs) if self.SINGLE else None:
+            self._single_map[key] = model_id
+            self._single_models[model_id] = self
         self.on_msg(self._on_custom_msg)
         self._async_widget_base_init_complete = True
 
     def __repr__(self):
-        if (not self.ready) and self._repr_mimebundle_:
-            return f"<Not ready:{self.__class__.__name__}>"
-        return super().__repr__()
+        if not self._repr_mimebundle_:
+            status = "CLOSED"
+        elif (not self.ready) and self._repr_mimebundle_:
+            status = "Not ready"
+        else:
+            status = ""
+        info = ", ".join(f"{k}={v!r}" for k, v in self.rep_info.items())
+        if status:
+            return f"< {status}: {self.__class__.__name__}({info}) >"
+        return f"{status}{self.__class__.__name__}({info})"
 
     async def __aenter__(self):
         if not self.ready:
@@ -118,57 +151,84 @@ class Ipylab(WidgetBase):
     async def __aexit__(self, exc_type, exc, tb):
         pass
 
-    def close(self):
-        "Permanently close the widget."
-        for task in self._tasks:
-            task.cancel()
-        self._tasks.clear()
-        self.set_trait("ready", False)
-        if self._repr_mimebundle_ and self._model_id:
-            self._ipylab_model_register.pop(self._model_id, None)
-            super().close()
+    @observe("comm")
+    def _observe_comm(self, change: dict):
+        if not self.comm:
+            for task in self._tasks:
+                task.cancel()
+            self._tasks.clear()
+            for item in self.close_extras:
+                item.close()
+            for obj, name in self._has_attrs_mappings:
+                if val := getattr(obj, name, None):
+                    if val is self:
+                        obj.set_trait(name, None)
+                    elif isinstance(val, tuple):
+                        obj.set_trait(name, tuple(v for v in val if v.comm))
+            if self.SINGLE:
+                self._single_models.pop(change["old"].id)
 
     def _check_closed(self):
         if not self._repr_mimebundle_:
             msg = f"This widget is closed {self!r}"
             raise RuntimeError(msg)
 
-    @staticmethod
-    async def _add_to_tuple_trait(obj: HasTraits, name: str, widget: Awaitable[T] | T) -> T:
-        """Add the widget to the tuple of obj. It will remove itself when closed."""
-        if inspect.isawaitable(widget):
-            value: T = await widget
-        else:
-            value: T = widget
+    def add_to_tuple(self, name: str, obj: HasTraits):
+        """Add self to the tuple of obj."""
+
         items = getattr(obj, name)
-        if isinstance(value, Widget) and value.comm and value not in items:
-            obj.set_trait(name, (*items, value))
-            ref = weakref.ref(obj)
+        if self.comm and self not in items:
+            obj.set_trait(name, (*items, self))
+        # see: _observe_comm for removal
+        self._has_attrs_mappings.add((obj, name))
 
-            def on_comm_change(_):
-                if obj := ref():
-                    obj.set_trait(name, tuple(i for i in getattr(obj, name) if i.comm))
-
-            value.observe(on_comm_change, "comm")
-        return value
+    def add_as_trait(self, name: str, obj: HasTraits):
+        "Add self as a trait to obj."
+        self._check_closed()
+        obj.set_trait(name, self)
+        # see: _observe_comm for removal
+        self._has_attrs_mappings.add((obj, name))
 
     @property
     def hook(self):
         return self.app.plugin_manager.hook
 
-    def to_task(self, coro: Awaitable[T], name: str | None = None) -> Task[T]:
-        """Run the coro in a task."""
+    def rep_info(self) -> dict[str, Any]:
+        "Extra info to provide for __repr__."
+        return {}
+
+    def to_task(self, aw: Awaitable[T], name: str | None = None, *, hooks: TaskHookType = None) -> Task[T]:
+        """Run aw in a task.
+
+        If the task is running when this object is closed the task will be cancel.
+        Noting the corresponding promise in the frontend will run to completion.
+
+        aw: An awaitable to run in the task.
+
+        name: str
+            The name of the task.
+
+        hooks: TaskHookType
+
+        """
 
         self._check_closed()
-        task = asyncio.create_task(self._wrap_awaitable(coro), name=name)
+        task = asyncio.create_task(self._wrap_awaitable(aw, hooks), name=name)
         self._tasks.add(task)
         task.add_done_callback(self._task_done_callback)
         return task
 
-    async def _wrap_awaitable(self, aw: Awaitable[T]) -> T:
+    async def _wrap_awaitable(self, aw: Awaitable[T], hooks: TaskHookType) -> T:
         try:
             async with self:
-                return await aw
+                if not hooks:
+                    return await aw
+                result = await aw
+                try:
+                    self.hook.task_result(obj=self, aw=aw, result=result, hooks=hooks)
+                except Exception as e:
+                    self.hook.on_task_error(obj=self, aw=aw, error=e)
+                return result
         except Exception as e:
             try:
                 self.hook.on_task_error(obj=self, aw=aw, error=e)
@@ -191,7 +251,6 @@ class Ipylab(WidgetBase):
             )
             return IpylabFrontendError(msg)
         return IpylabFrontendError(f'{self.__class__.__name__} failed with message "{error}"')
-        return None
 
     def send(self, content, buffers=None):
         try:
@@ -234,7 +293,7 @@ class Ipylab(WidgetBase):
                     case "ready":
                         self._ready_event.set()
                         self.set_trait("ready", True)
-                        self._on_frontend_init()
+                        self.on_frontend_init()
             elif "closed" in content:
                 self.close()
             if error:
@@ -242,10 +301,12 @@ class Ipylab(WidgetBase):
         except Exception as e:
             self.hook.on_message_error(obj=self, error=e, msg=msg, buffers=buffers)
 
-    def _on_frontend_init(self):
+    def on_frontend_init(self):
         """Called when the frontend is initialized.
 
-        This will occur on initial connection and whenever the model is restored from the kernel."""
+        This will occur on initial connection and whenever the model is restored from the kernel.
+
+        The 'ready' trait offers a similar callback functionality using traits instead."""
 
     async def _do_operation_for_fe(self, *, ipylab_FE: str, operation: str, payload: dict, buffers: list):
         """Handle operation requests from the frontend and reply with a result."""
@@ -269,16 +330,17 @@ class Ipylab(WidgetBase):
             self.send(content, buffers)
 
     async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list):
-        """Overload this function as required."""
+        """Perform an operation for a custom message with an ipylab_FE uuid."""
         raise NotImplementedError(operation)
 
     def operation(
         self,
         operation: str,
         *,
-        transform: TransformType = Transform.raw,
+        transform: TransformType = Transform.auto,
         toLuminoWidget: Iterable[str] | None = None,
-        toObject: Iterable[str] | None = None,
+        toObject: Iterable[str] = (),
+        hooks: TaskHookType = None,
         **kwgs,
     ):
         """Create a new task requesting an operation to be performed in the frontend.
@@ -292,7 +354,7 @@ class Ipylab(WidgetBase):
 
         toLuminoWidget: Iterable[str] | None
             A list of item name mappings to convert to a Lumino widget in the frontend.
-            Each string should correspond to the dotted dottedname/index in kwgs that has
+            Each string should correspond to the dotted subpath/index in kwgs that has
             the packed (json version of the widget or id of a lumino widget)
 
         toObject:  Iterable[str] | None
@@ -314,8 +376,12 @@ class Ipylab(WidgetBase):
                     "IPY_MODEL_<UUID>.value",
                 ]
             }
-            toLuminoWidget = ["args.0", "kwgs.options.ref"]
-            toObject = ["args.2", "args.3"]"""
+            toLuminoWidget = ["args[0]", "kwgs.options.ref"]
+            toObject = ["args[2]", "args[3]"]
+        basename: Base | None
+            specify the 'obj' to use in the fronted.
+        """
+        hooks = kwgs.pop("hooks", None)
         # validation
         self._check_closed()
         if not operation or not isinstance(operation, str):
@@ -333,162 +399,94 @@ class Ipylab(WidgetBase):
         if toObject:
             content["toObject"] = list(map(str, toObject))
 
-        return self.to_task(self._send_receive(content), name=ipylab_PY)
+        return self.to_task(self._send_receive(content), name=ipylab_PY, hooks=hooks)
 
-    def execute_command(
-        self,
-        command_id: str | CommandConnection,
-        *,
-        transform: TransformType = Transform.raw,
-        toLuminoWidget: Iterable[str] | None = None,
-        toObject: Iterable[str] | None = None,
-        **args,
-    ):
-        """Execute any command registered in Jupyterlab.
-
-        `args` are passed to the command.
-
-        see: https://github.com/jtpio/ipylab/issues/128#issuecomment-1683097383 for hints
-        about what args can be used.
-        """
-
-        async def execute_command():
-            id_ = str(command_id)
-            async with self.app.commands:
-                if id_ not in self.app.commands.all_commands:
-                    id_ = ipylab.commands.CommandConnection.to_cid(id_)
-                    if id_ not in self.app.commands.all_commands:
-                        msg = f"Command '{command_id}' not registered!"
-                        raise ValueError(msg)
-            return await self.operation(
-                "executeCommand",
-                id=id_,
-                args=args,
-                transform=transform,
-                toLuminoWidget=toLuminoWidget,
-                toObject=toObject,
-            )
-
-        return self.to_task(execute_command())
-
-    def execute_method(
-        self,
-        dottedname: str,
-        *args,
-        transform: TransformType = Transform.raw,
-        toLuminoWidget: Iterable[str] | None = None,
-        toObject: Iterable[str] | None = None,
-        **kwgs,
-    ):
-        """Call a method relative to the `base` object in the Frontend.
-
-        dottedname: 'dotted.access.to.the.method' relative to base.
-
-        *args
-        `args` are passed in order so must correspond with the order in the JS method.
-        Specifying arguments by name is not currently supported.
-
-        **kwgs are only used for the transform.
-
-        example:
-        ```
-        app.execute_method(widget=app.current_widget_id, method="close")
-        ```
-        """
-        # This operation is sent to the frontend function _fe_execute in 'ipylab/src/widgets/ipylab.ts'
+    def _obj_operation(self, obj: Obj, subpath: str, operation: str, args: tuple, **kwgs: Unpack[IpylabKwgs]):
         return self.operation(
-            operation="executeMethod",
-            dottedname=dottedname,
-            args=args,
-            transform=transform,
-            toLuminoWidget=toLuminoWidget,
-            toObject=toObject,
-            **kwgs,
+            "genericOperation", genericOperation=operation, basename=obj, subpath=subpath, args=args, **kwgs
         )
 
-    def get_property(self, dottedname: str, *, transform: TransformType = Transform.raw, nullIfMissing=False):
-        """Obtain a serialized version of the property of the `base` object in the frontend.
+    def execute_method(self, subpath: str, *args, obj=Obj.base, **kwgs: Unpack[IpylabKwgs]):
+        return self._obj_operation(obj, subpath, "executeMethod", args, **kwgs)
 
-        dottedname: 'dotted.access.to.the.method' relative to base.
+    def get_property(self, subpath: str, *, obj=Obj.base, null_if_missing=False, **kwgs: Unpack[IpylabKwgs]):
+        return self._obj_operation(obj, subpath, "getProperty", (null_if_missing,), **kwgs)
 
-        Tip: This method will await the property in the Frontend prior to returning the result
-        where the property is an awaitable.
-        """
-        return self.operation("getProperty", dottedname=dottedname, nullIfMissing=nullIfMissing, transform=transform)
+    def set_property(self, subpath: str, value, *, obj=Obj.base, **kwgs: Unpack[IpylabKwgs]):
+        return self._obj_operation(obj, subpath, "setProperty", value, **kwgs)
 
-    def set_property(
-        self,
-        dottedname: str,
-        value,
-        *,
-        value_transform: TransformType = Transform.raw,
-        toLuminoWidget: Iterable[str] | None = None,
-        toObject: Iterable[str] | None = None,
-        transform=Transform.raw,
-    ):
-        """Set the property on the `dottedname` of the `base` object in the Frontend.
+    def update_property(self, subpath: str, value: dict, *, obj=Obj.base, **kwgs: Unpack[IpylabKwgs]):
+        return self._obj_operation(obj, subpath, "updateProperty", (value,), **kwgs)
 
-        The value will be transformed according to `value_transform` & `value_transform_kwgs`
-        as specified prior to setting the property.
+    def list_properties(
+        self, subpath="", *, obj=Obj.base, depth=3, skip_hidden=True, **kwgs: Unpack[IpylabKwgs]
+    ) -> Task[dict]:
+        args = ({"depth": depth, "omitHidden": skip_hidden},)
+        return self._obj_operation(obj, subpath, "listProperties", args, **kwgs)
 
-        dottedname: str
-            "the.dottedname.to.the.property" to be set.
-        value: jsonable
-            The value to set, or instructions for the transform to do in the Frontend.
-        valueTransform: TransformType
-            valueTransform is applied to the value prior to setting the property.
-            It may be specified as a dict with the mapping: transform:TransformType.<value>
-        toLuminoWidget: ['value'] | None
-            Nested notation is also possible under `value`.
-        toObject: ['value'] | None
-            Nested notation is also possible under `value`.
-        """
-        return self.operation(
-            "setProperty",
-            dottedname=dottedname,
-            value=value,
-            valueTransform=Transform.validate(value_transform),
-            toLuminoWidget=toLuminoWidget,
-            toObject=toObject,
-            transform=transform,
-        )
 
-    def update_property(
-        self,
-        dottedname: str,
-        value: dict,
-        *,
-        value_transform: TransformType = Transform.raw,
-        toLuminoWidget: Iterable[str] | None = None,
-        toObject: Iterable[str] | None = None,
-        transform=Transform.raw,
-    ):
-        """Update the value of the object at the dottedname in the frontend.
+class IpylabPlugin:
+    def handle_error(self, obj: Ipylab, title, msg):
+        obj.log.error(msg)
+        obj.app.dialog.show_error_message(title, msg)
 
-        This is equivalent to `dict.update` in Python.
+    @hookimpl
+    def on_frontend_error(self, obj: Ipylab, error: Exception, content: dict, buffers) -> None:  # noqa: ARG002
+        self.handle_error(obj, "Frontend error", f"{error=} {obj=}")
 
-        dottedname: str
-            "the.dottedname.to.the.property" to be set.
-        toLuminoWidget: ['value'] | None
-            Nested notation is also possible under `value`.
-        toObject: ['value'] | None
-            Nested notation is also possible under `value`.
-        """
+    @hookimpl
+    def on_send_error(self, obj: Ipylab, error: Exception, content: dict, buffers) -> None:  # noqa: ARG002
+        self.handle_error(obj, "Send error", f"{error=} {obj=}")
 
-        return self.operation(
-            "updateProperty",
-            dottedname=dottedname,
-            value=value,
-            transform=transform,
-            valueTransform=Transform.validate(value_transform),
-            toLuminoWidget=toLuminoWidget,
-            toObject=toObject,
-        )
+    @hookimpl
+    def unhandled_frontend_operation_message(self, obj: Ipylab, operation: str):
+        self.handle_error(obj, "Unhandled frontend message", f"The {operation=} is unhandled for {obj} ")
 
-    def list_properties(self, dottedname="", depth=3, *, skip_hidden=True) -> Task[dict]:
-        """Get a dict listing of properties at `dottedname` relative to the `base` on the frontend object.
+    @hookimpl
+    def on_do_operation_for_fe_error(self, obj: Ipylab, error: Exception, content: dict, buffers):  # noqa: ARG002
+        self.handle_error(obj, "Error performing operation for frontend", str(error))
 
-        depth: int
-            How deep to look inside the inheritance structure of the object.
-        """
-        return self.operation("listProperties", dottedname=dottedname, depth=depth, omitHidden=skip_hidden)
+    @hookimpl
+    def on_task_error(self, obj: Ipylab, aw: str, error: Exception) -> None:  # noqa: ARG002
+        self.handle_error(obj, "Task error", str(error))
+
+    @hookimpl
+    def on_message_error(self, obj: Ipylab, msg: str, error: Exception) -> None:
+        self.handle_error(obj, "Message error", f"{error=}\n{obj=}\n{msg=}'")
+
+    @hookimpl
+    def task_result(self, obj: Ipylab, result: HasTraits, hooks: TaskHooks):  # noqa: ARG002
+        # close with
+        for item in hooks.pop("close_with_fwd", ()):
+            if isinstance(result, Ipylab):
+                result.close_extras.add(item)
+        for item in hooks.pop("close_with_rev", ()):
+            if isinstance(result, Widget):
+                item.close_extras.add(result)
+
+        # tuple add
+        for name, value in hooks.pop("tuple_add_fwd", ()):
+            value.add_to_tuple(name, result)
+        for name, value in hooks.pop("tuple_add_rev", ()):
+            if isinstance(result, Ipylab):
+                result.add_to_tuple(name, value)
+
+        # trait add
+        for name, value in hooks.pop("trait_add_fwd", ()):
+            if isinstance(value, Ipylab):
+                value.add_as_trait(name, result)
+            else:
+                result.set_trait(name, value)
+        for name, value in hooks.pop("trait_add_rev_", ()):
+            if isinstance(result, Ipylab):
+                result.add_as_trait(name, value)
+            else:
+                value.set_trait(name, result)
+
+        if hooks:
+            msg = f"Invalid hooks detected: {hooks}"
+            raise ValueError(msg)
+
+    @hookimpl
+    def opening_console(self, app: App, args: dict, objects: dict, kwgs: IpylabKwgs):
+        "no-op"

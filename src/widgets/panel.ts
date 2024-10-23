@@ -1,11 +1,7 @@
 // Copyright (c) ipylab contributors
 // Distributed under the terms of the Modified BSD License.
 
-import {
-  JupyterLuminoPanelWidget,
-  WidgetView,
-  unpack_models
-} from '@jupyter-widgets/base';
+import { JupyterLuminoPanelWidget, unpack_models } from '@jupyter-widgets/base';
 import { BoxModel, BoxView } from '@jupyter-widgets/controls';
 import { MODULE_NAME, MODULE_VERSION } from '../version';
 import { TitleModel } from '../widgets/title';
@@ -39,11 +35,12 @@ export class PanelModel extends BoxModel {
  * The view for a Panel.
  */
 export class PanelView extends BoxView {
-  initialize(parameters: WidgetView.IInitializeParameters): void {
+  initialize(parameters: any): void {
     super.initialize(parameters);
     this.listenTo(this.model.get('title'), 'change', this.update_title);
-    this.luminoWidget.removeClass('widget-box');
-    this.luminoWidget.removeClass('jupyter-widgets');
+    // this.luminoWidget.removeClass('widget-box');
+    // this.luminoWidget.removeClass('jupyter-widgets');
+    this.luminoWidget.addClass('ipylab-Panel');
     this.update_title();
   }
 

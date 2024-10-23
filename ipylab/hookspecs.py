@@ -13,6 +13,7 @@ if t.TYPE_CHECKING:
     from collections.abc import Awaitable
 
     from ipylab import App, Ipylab
+    from ipylab.common import IpylabKwgs
 
 
 class IpylabHookspec:
@@ -32,8 +33,8 @@ class IpylabHookspec:
         """
 
     @hookspec(firstresult=True)
-    def namespace_defaults(self, defaults: dict, namespace_name: str, app: App) -> None:
-        "Modify the namespace defaults by adding or removing entries."
+    def namespace_objects(self, objects: dict, namespace_name: str, app: App) -> None:
+        "Set objects that are available by default in the namespace."
 
     @hookspec(firstresult=True)
     def on_frontend_error(self, obj: Ipylab, error: Exception, content: dict, buffers) -> None:
@@ -126,3 +127,34 @@ class IpylabHookspec:
         error: Exception
             The exception.
         """
+
+    @hookspec
+    def opening_console(self, app: App, args: dict, objects: dict, kwgs: IpylabKwgs):
+        """Called when the console is opening.
+
+        Add or remove items from the dicts to alter loading of console.
+
+        Args
+        ----
+
+        app: App
+
+        The Ipylab widget that owns the shell connection if there is one.
+
+        args: dict
+            options used with `open_console`.
+            keys: [activate, ref (as id), insertMode, type]
+
+        objects: dict
+            objects for loading into the namespace.
+            'ref:(as ShellConnection) is used as the ref for options. This must be a ShellConnection or None.
+
+        kwgs:IpylabKwgs
+            Added keys 'namesapace_name' the name of the name space to load.
+        """
+
+    @hookspec
+    def task_result(self, obj: Ipylab, result, aw: Awaitable, hooks: dict):
+        """Called with the result of a task.
+
+        Async functions are permitted which are called and awaited inside the task prior to completions."""

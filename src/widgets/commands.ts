@@ -3,14 +3,30 @@
 
 import { CommandRegistry } from '@lumino/commands';
 import { IDisposable, IpylabModel } from './ipylab';
+
 /**
  * The model for a command registry.
  */
 export class CommandRegistryModel extends IpylabModel {
+  /**
+   * The default attributes.
+   */
+  defaults(): Backbone.ObjectHash {
+    return {
+      ...super.defaults(),
+      _model_name: 'CommandRegistryModel'
+    };
+  }
   async ipylabInit(base: any = null) {
-    this.commands.commandChanged.connect(this._sendCommandList, this);
-    this._sendCommandList();
+    if (!base) {
+      base =
+        this.get('name') === 'Jupyterlab'
+          ? IpylabModel.app.commands
+          : new CommandRegistry();
+    }
     await super.ipylabInit(base);
+    this.base.commandChanged.connect(this.sendCommandList, this);
+    this.sendCommandList();
   }
 
   /**
@@ -21,15 +37,16 @@ export class CommandRegistryModel extends IpylabModel {
    * @returns - a promise that is fulfilled when all the associated views have been removed.
    */
   close(comm_closed = false): Promise<void> {
-    this.commands.commandChanged.disconnect(this._sendCommandList, this);
+    this.base.commandChanged.disconnect(this.sendCommandList, this);
     return super.close(comm_closed);
   }
 
   async operation(op: string, payload: any): Promise<any> {
     switch (op) {
-      case 'addCommand': {
-        return await this._addCommand(payload);
-      }
+      case 'execute':
+        return await this.base.execute(payload.id, payload.args);
+      case 'addCommand':
+        return await this.addCommand(payload);
       default:
         return await super.operation(op, payload);
     }
@@ -38,11 +55,11 @@ export class CommandRegistryModel extends IpylabModel {
   /**
    * Send the list of commands to the backend.
    */
-  private _sendCommandList(sender?: object, args?: any): void {
+  private sendCommandList(sender?: object, args?: any): void {
     if (args && args.type !== 'added' && args.type !== 'removed') {
       return;
     }
-    this.set('all_commands', this.commands.listCommands());
+    this.set('all_commands', this.base.listCommands());
     this.save_changes();
   }
 
@@ -51,48 +68,37 @@ export class CommandRegistryModel extends IpylabModel {
    *
    * @param payload The command options.
    */
-  private async _addCommand(
+  private async addCommand(
     options: CommandRegistry.ICommandOptions & { id: string }
   ): Promise<IDisposable> {
     const { id, isToggleable, icon } = options;
 
     // Make a new object and define functions so we can dynamically update.
-    const config = { ...options };
-    delete config.icon;
-    const isToggled = isToggleable ? () => config.isToggled ?? true : null;
+    delete options.icon;
+    const isToggled = isToggleable ? () => options.isToggled ?? true : null;
     const options_ = {
-      caption: () => config.caption ?? '',
-      className: () => config.className ?? '',
-      dataset: () => config.dataset ?? {},
-      describedBy: () => config.describedBy ?? '',
+      caption: () => options.caption ?? '',
+      className: () => options.className ?? '',
+      dataset: () => options.dataset ?? {},
+      describedBy: () => options.describedBy ?? '',
       execute: async (args: any) => {
         return await this.scheduleOperation('execute', { id, args }, 'object');
       },
       icon: icon,
-      iconClass: () => config.iconClass ?? '',
-      iconLabel: () => config.iconLabel ?? '',
-      isEnabled: () => config.isEnabled ?? true,
+      iconClass: () => options.iconClass ?? '',
+      iconLabel: () => options.iconLabel ?? '',
+      isEnabled: () => options.isEnabled ?? true,
       isToggleable,
       isToggled,
-      isVisible: () => config.isVisible ?? true,
-      label: () => config.label,
-      mnemonic: () => Number(config.mnemonic ?? -1),
-      usage: () => config.usage ?? ''
+      isVisible: () => options.isVisible ?? true,
+      label: () => options.label,
+      mnemonic: () => Number(options.mnemonic ?? -1),
+      usage: () => options.usage ?? ''
     };
-    const command = this.commands.addCommand(id, options_ as any);
+    const command = this.base.addCommand(id, options_ as any);
     (command as any).id = id;
-    (command as any).config = config;
+    (command as any).config = options;
     return command;
   }
-
-  /**
-   * The default attributes.
-   */
-  defaults(): Backbone.ObjectHash {
-    return {
-      ...super.defaults(),
-      _model_name: CommandRegistryModel.model_name
-    };
-  }
-  static model_name = 'CommandRegistryModel';
+  public readonly base: CommandRegistry;
 }

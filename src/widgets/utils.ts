@@ -3,59 +3,101 @@
 import { Signal } from '@lumino/signaling';
 
 /**
- *Returns a nested object relative to `base`.
- * @param base The starting object.
- * @param dottedname The dotted path to the object.
+ * Clean a dotted name prior to passing to one of these functions.
+ *
+ * @param subpath A dotted name
  * @returns
  */
+function cleanSubpath(subpath: string) {
+  return (subpath || '').replace('[', '.').replace(']', '');
+}
 
-export function getNestedObject({
-  base,
-  dottedname,
-  nullIfMissing = false
+/**
+ * Get a nested property relative to `obj` using the `subpath` notation.
+ * @param obj The starting object.
+ * @param subpath The subpath to the property.
+ */
+export function getNestedProperty({
+  obj,
+  subpath,
+  nullIfMissing = false,
+  basename = ''
 }: {
-  base: object;
-  dottedname: string;
+  obj: object;
+  subpath: string;
   nullIfMissing?: boolean;
+  basename?: string;
 }): any {
-  let obj: object = base;
-  let dottedname_ = '';
-  const parts = dottedname.split('.');
-  let attr = '';
+  subpath = cleanSubpath(subpath);
+  let subpath_ = '';
+  const parts = subpath.split('.');
+  let pname = '';
   for (let i = 0; i < parts.length; i++) {
-    attr = parts[i];
-    if (attr in obj) {
-      obj = obj[attr as keyof typeof obj];
-      dottedname_ = !dottedname_ ? attr : `${dottedname_}.${attr}`;
+    pname = parts[i];
+    if (pname in obj) {
+      obj = obj[pname as keyof typeof obj];
+      subpath_ = !subpath_ ? pname : `${subpath_}.${pname}`;
     } else {
       break;
     }
   }
-  if (dottedname_ !== dottedname) {
+  if (subpath_ !== subpath || typeof obj === 'undefined') {
     if (nullIfMissing) {
       return null;
     }
-    throw new Error(`Failed to get the object for dottedname='${dottedname}'`);
+    if (obj instanceof Array && !isNaN(+pname)) {
+      throw new Error(
+        `Index ${subpath_}[${pname}] out of range for ` +
+          `Array (${obj.length}) {${toJSONsubstituteCylic(obj)}}`
+      );
+    }
+    basename = basename ? basename + '.' : basename;
+    throw new Error(`Property "${basename}${pname}" not found!`);
   }
   return obj;
 }
 
 /**
- * Set a nested property relative to the base
- * @param base The object
- * @param dottedname The dotted path of the property to set
+ * Set a nested property at `subpath` relative to the obj on `obj`.
+ *
+ * @param obj The object
+ * @param subpath The dotted path of the property to set
  * @param value The value to set as the property
  */
-export function setNestedProperty(
-  base: object,
-  dottedname: string,
-  value: any
-) {
-  const obj = getNestedObject({
-    base: base,
-    dottedname: dottedname.split('.').slice(0, -1).join('.')
-  });
-  obj[dottedname.split('.').slice(-1)[0]] = value;
+export function setNestedProperty({
+  obj,
+  subpath,
+  value,
+  basename = ''
+}: {
+  obj: object;
+  subpath: string;
+  value: any;
+  basename?: string;
+}) {
+  subpath = cleanSubpath(subpath);
+  const objname = subpath.split('.').slice(0, -1).join('.');
+  const key = subpath.split('.').slice(-1)[0];
+  obj = getNestedProperty({ obj, subpath: objname, basename });
+  (obj as any)[key] = value;
+}
+
+/**
+ * Update the property. Equivalent to python: `dict.update`.
+ */
+export async function updateProperty({
+  obj,
+  subpath,
+  value,
+  basename = ''
+}: {
+  obj: object;
+  subpath: string;
+  value: any;
+  basename?: string;
+}): Promise<null> {
+  obj = getNestedProperty({ obj, subpath, basename });
+  return Object.assign(obj, value);
 }
 
 /**
@@ -75,8 +117,8 @@ export function toFunction(code: string) {
  * @param obj Any object.
  * @returns
  */
-export function findAllProperties({
-  obj,
+function findAllProperties({
+  obj: obj,
   items = [],
   type = '',
   depth = 1,
@@ -106,8 +148,9 @@ export function findAllProperties({
 
 /**
  * Returns a mapping of types and names for obj.
+ *
+ * This function is cyclic ref safe so is suitable for converting to json.
  * @param obj Any object
- * @returns
  */
 export function listProperties({
   obj,
@@ -151,7 +194,12 @@ export function listProperties({
         }
         if (depth > 1) {
           val = {};
-          val[name] = listProperties({ obj: obj_, type, depth: 1, omitHidden });
+          val[name] = listProperties({
+            obj: obj_,
+            type,
+            depth: 1,
+            omitHidden
+          });
         }
       // caution: break is omitted intentionally
       default:
@@ -165,4 +213,113 @@ export function listProperties({
   }
   // Sort alphabetically
   return Object.fromEntries(Object.entries(out).sort());
+}
+
+/**
+ * Execute a method at subpath of obj.
+ *
+ * Args are used in the method.
+ */
+export async function executeMethod({
+  obj,
+  subpath,
+  args,
+  basename = ''
+}: {
+  obj: object;
+  subpath: string;
+  args: any[];
+  basename?: string;
+}): Promise<any> {
+  if (!subpath) {
+    throw new Error('subpath required!');
+  }
+  subpath = cleanSubpath(subpath);
+  const ownername = subpath.split('.').slice(0, -1).join('.');
+  const owner = getNestedProperty({ obj, subpath: ownername, basename });
+  let func = getNestedProperty({ obj, subpath, basename });
+  func = func.bind(owner, ...args);
+  return await func();
+}
+
+/**
+ * Modify the object to make it usable as an IObservableDisposable.
+ * @param obj The object to modify.
+ * @returns
+ */
+export function ensureObservableDisposable(obj: any) {
+  if (typeof obj !== 'object') {
+    throw new Error(`An object is required but got ${typeof obj} `);
+  }
+  if (obj.disposed) {
+    // The presence of obj.disposed likely means obj provides
+    // an IObservableDisposable interface.
+    return;
+  }
+  if (!obj.dispose) {
+    Object.defineProperties(obj, {
+      dispose: { value: () => null as any, enumerable: false },
+      ipylabDisposeOnClose: { value: true, enumerable: false }
+    });
+  }
+  const disposed = new Signal<any, null>(obj);
+  const dispose_ = obj.dispose.bind(obj);
+  const dispose = () => {
+    if (obj.isDisposed) {
+      return;
+    }
+    dispose_();
+    disposed.emit(null);
+    Signal.clearData(obj);
+    if (!obj.isDisposed) {
+      obj.isDisposed = true;
+    }
+  };
+  Object.defineProperties(obj, {
+    dispose: {
+      value: dispose.bind(obj),
+      enumerable: false,
+      configurable: true,
+      writable: false
+    },
+    disposed: {
+      value: disposed,
+      writable: true,
+      enumerable: false
+    }
+  });
+}
+
+/**
+ * Convert content replacing cyclic objects with a list of its properties.
+ * @param value Content represent JSON
+ * @returns
+ */
+export function toJSONsubstituteCylic(value: any) {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    // Assuming the error is due to circular reference
+    return JSON.stringify(value, _replacer);
+  }
+}
+
+function _replacer(key: string, value: any) {
+  // Filtering out properties
+  if (typeof value !== 'object') {
+    return value;
+  }
+  try {
+    JSON.stringify(value);
+    return value;
+  } catch {
+    const out = listProperties({
+      obj: value,
+      omitHidden: true,
+      depth: 3
+    });
+    out['WARNING'] =
+      'This is a simplified representation because it contains circular references.';
+    return out;
+  }
 }

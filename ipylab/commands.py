@@ -4,16 +4,17 @@ from __future__ import annotations
 
 import functools
 import inspect
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, get_args, override
 
 from ipywidgets import TypedTuple
+from traitlets import Bool, Container, Dict, ForwardDeclaredInstance, Instance, Tuple, Unicode
 from traitlets import Callable as CallableTrait
-from traitlets import Container, Dict, Instance, Tuple, Unicode
 
+import ipylab
 from ipylab._compat.typing import Any, NotRequired, TypedDict, Unpack
-from ipylab.common import pack
+from ipylab.common import IpylabKwgs, TaskHooks, pack
 from ipylab.connection import Connection
-from ipylab.ipylab import Ipylab, Transform, register
+from ipylab.ipylab import Ipylab, IpylabBase, Transform, register
 from ipylab.widgets import Icon
 
 if TYPE_CHECKING:
@@ -21,7 +22,10 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Coroutine
 
 
-__all__ = ["CommandConnection", "CommandPalletConnection", "LauncherConnection"]
+__all__ = ["CommandConnection", "CommandPalletItemConnection", "CommandRegistry"]
+
+
+APP_COMMANDS_NAME = "Jupyterlab"
 
 
 class CommandOptions(TypedDict):
@@ -40,15 +44,28 @@ class CommandOptions(TypedDict):
 
 
 class CommandConnection(Connection):
-    """A Disposable Ipylab command registered in the command pallet."""
+    """An Ipylab command registered in a command registry."""
+
+    auto_dispose = Bool(True).tag(sync=True)
 
     args = Dict()
     python_command = CallableTrait(allow_none=False)
     namespace_name = Unicode("")
-    _config_options: ClassVar = set(CommandOptions.__annotations__)
+    _config_options: ClassVar = get_args(CommandOptions)
+    commands_name = Unicode(read_only=True)
 
-    def close(self, *, dispose=True):
-        super().close(dispose=dispose)
+    @override
+    @classmethod
+    def to_cid(cls, commands_name: str, name: str):
+        return super().to_cid(commands_name, name)
+
+    @override
+    def __init__(self, *, cid: str, commands_name=APP_COMMANDS_NAME):
+        super().__init__(cid=cid, _commands_name=commands_name)
+
+    @property
+    def commands(self):
+        return CommandRegistry(name=self.commands_name)
 
     def configure(self, *, emit=True, **kwgs: Unpack[CommandOptions]) -> Task[CommandOptions]:
         if diff := set(kwgs).difference(self._config_options):
@@ -58,7 +75,7 @@ class CommandConnection(Connection):
         async def configure():
             config = await self.update_property("config", kwgs)  # type: ignore
             if emit:
-                await self.app.commands.execute_method("commandChanged.emit", {"id": self.cid})
+                await self.execute_method("commandChanged.emit", {"id": self.cid})
             return config
 
         return self.to_task(configure())
@@ -71,12 +88,7 @@ class CommandConnection(Connection):
         When this link is closed the launcher will be disposed.
         """
 
-        async def add_launcher():
-            launcher = await self.app.commands.launcher.add(self, category, rank=rank, **args)
-            self.observe(lambda _: launcher.close(dispose=True), names="comm")
-            return launcher
-
-        return self.to_task(add_launcher())
+        return self.to_task(self.app.launcher.add(self, category, rank=rank, **args), hooks={"close_with_rev": [self]})
 
     def add_to_command_pallet(self, category: str, rank=None, **args):
         """Add a pallet item for this command.
@@ -85,146 +97,79 @@ class CommandConnection(Connection):
 
         When this link is closed the pallet item will be disposed.
         """
-
-        async def add_to_command_pallet():
-            pallet_item = await self.app.commands.pallet.add(self, category, rank=rank, **args)
-            self.observe(lambda _: pallet_item.close(dispose=True), names="comm")
-            return pallet_item
-
-        return self.to_task(add_to_command_pallet())
+        return self.to_task(
+            self.app.command_pallet.add(self, category, rank=rank, **args), hooks={"close_with_rev": [self]}
+        )
 
 
-class CommandPalletConnection(Connection):
-    """A connection to an ipylab command in the Jupyter command pallet."""
+class CommandPalletItemConnection(Connection):
+    """An Ipylab command palette item."""
 
+    auto_dispose = Bool(True).tag(sync=True)
+
+    @override
     @classmethod
     def to_cid(cls, command: str | CommandConnection, category: str):
         return super().to_cid(str(command), category)
 
-    @classmethod
-    def get_existing_connection(cls, command: str | CommandConnection, category: str, *, quiet=False):
-        return super().get_existing_connection(str(command), category, quiet=quiet)
-
-    def close(self, *, dispose=True):
-        super().close(dispose=dispose)
-
 
 class CommandPalette(Ipylab):
-    # https://jupyterlab.readthedocs.io/en/latest/api/interfaces/apputils.ICommandPalette.html
-    _basename = Unicode("pallet").tag(sync=True)
-    SINGLETON = True
-    items: Container[tuple[CommandPalletConnection, ...]] = TypedTuple(trait=Instance(CommandPalletConnection))
+    """
+
+    https://jupyterlab.readthedocs.io/en/latest/api/interfaces/apputils.ICommandPalette.html
+    """
+
+    SINGLE = True
+
+    ipylab_base = IpylabBase(ipylab.Obj.IpylabModel, "palette").tag(sync=True)
+
+    info = Dict(help="info about the item")
+    connections: Container[tuple[CommandPalletItemConnection, ...]] = TypedTuple(
+        trait=ForwardDeclaredInstance("CommandPalletItemConnection")
+    )
 
     def add(
         self, command: str | CommandConnection, category: str, *, rank=None, args: dict | None = None
-    ) -> Task[CommandPalletConnection]:
+    ) -> Task[CommandPalletItemConnection]:
         """Add a command to the command pallet (must be registered in this kernel).
 
         **args are used when calling the command.
         """
-        conn = CommandPalletConnection.get_existing_connection(command, category, quiet=True)
-        if conn:
-            conn.close(dispose=True)
-        info = {"args": args, "category": category, "command": str(command), "rank": rank}
-        task = self.execute_method(
+        cid = self.remove(command, category)
+        info = {"args": args, "category": category, "command": command, "rank": rank}
+        return self.execute_method(
             "addItem",
             info,
-            transform={
-                "transform": Transform.connection,
-                "cid": CommandPalletConnection.to_cid(str(command), category),
-                "auto_dispose": True,
-                "info": info,
-            },
+            transform={"transform": Transform.connection, "cid": cid, "auto_dispose": True},
+            hooks={"tuple_add_rev": [("connections", self)], "trait_add_fwd": [("info", info)]},
         )
-        return self.to_task(self._add_to_tuple_trait(self, "items", task))
 
     def remove(self, command: str | CommandConnection, category: str):
-        conn = CommandPalletConnection.get_existing_connection(str(command), category, quiet=True)
-        if conn:
-            conn.close(dispose=True)
-
-
-class LauncherConnection(CommandPalletConnection):
-    """A connection to an disposable launcher item."""
-
-
-class Launcher(Ipylab):
-    """
-    ref: https://jupyterlab.readthedocs.io/en/latest/api/interfaces/launcher.ILauncher-1.html"""
-
-    _basename = Unicode("launcher").tag(sync=True)
-    SINGLETON = True
-    items: Container[tuple[LauncherConnection, ...]] = TypedTuple(trait=Instance(LauncherConnection))
-
-    def add(self, command: str | CommandConnection, category: str, *, rank=None, **args) -> Task[LauncherConnection]:
-        """Add a launcher for the command (must be registered in this kernel).
-
-        ref: https://jupyterlab.readthedocs.io/en/latest/api/interfaces/launcher.ILauncher.IItemOptions.html
-        """
-        cmd = CommandConnection.get_existing_connection(CommandConnection.to_cid(command))
-        conn = LauncherConnection.get_existing_connection(str(cmd), category, quiet=True)
-        if conn:
-            conn.close(dispose=True)
-
-        async def add_launcher():
-            info = {"command": str(command), "category": category, "rank": rank, "args": args}
-            lc: LauncherConnection = await self.execute_method(
-                "add",
-                info,
-                transform={
-                    "transform": Transform.connection,
-                    "cid": LauncherConnection.to_cid(str(command), category),
-                    "info": info,
-                    "auto_dispose": True,
-                },
-            )
-            cmd.observe(lambda _: lc.close(), "comm")
-            return lc
-
-        return self.to_task(self._add_to_tuple_trait(self, "items", add_launcher()))
-
-    def remove(self, command_id: str | CommandConnection, category: str):
-        conn = LauncherConnection.get_existing_connection(str(command_id), category)
-        if conn:
-            conn.close(dispose=True)
+        cid = CommandPalletItemConnection.to_cid(command, category)
+        if conn := CommandPalletItemConnection.get_existing_connection(cid, quiet=True):
+            conn.close()
+        return cid
 
 
 @register
 class CommandRegistry(Ipylab):
     _model_name = Unicode("CommandRegistryModel").tag(sync=True)
-    _basename = Unicode("commands").tag(sync=True)
+    ipylab_base = IpylabBase(ipylab.Obj.IpylabModel, "").tag(sync=True)
+    name = Unicode(APP_COMMANDS_NAME, read_only=True, help="Use the default registry").tag(sync=True)
     all_commands = Tuple(read_only=True).tag(sync=True)
-    pallet = Instance(CommandPalette, (), read_only=True)
-    launcher = Instance(Launcher, (), read_only=True)
-    items: Container[tuple[CommandConnection, ...]] = TypedTuple(trait=Instance(CommandConnection))
+    connections: Container[tuple[CommandConnection, ...]] = TypedTuple(trait=Instance(CommandConnection))
+
+    @classmethod
+    def _single_key(cls, kwgs: dict):
+        return cls, kwgs["name"]
+
+    def __init__(self, *, name=APP_COMMANDS_NAME, **kwgs):
+        super().__init__(name=name, **kwgs)
 
     async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list) -> Any:
         match operation:
             case "execute":
-                conn = self.get_existing_command_connection(payload["id"])
-                if not conn:
-                    msg = f'Command not found: "{payload["id"]}"'
-                    raise RuntimeError(msg)
-                cmd = conn.python_command
-                args = conn.args | (payload.get("args") or {}) | {"buffers": buffers}
-                glbls = self.app.get_namespace(conn.namespace_name)
-                kwgs = {}
-                for n, p in inspect.signature(cmd).parameters.items():
-                    if n in args:
-                        kwgs[n] = args[n]
-                    elif n in glbls:
-                        kwgs[n] = glbls[n]
-                    elif p.kind != p.VAR_KEYWORD:
-                        kwgs = args
-                        break
-                    elif p.default is p.empty:
-                        msg = f"Required parameter '{n}' missing for {cmd} of {conn}"
-                        raise NameError(msg)
-                glbls["_to_eval"] = functools.partial(cmd, **kwgs)
-                result = eval("_to_eval()", glbls)  # noqa: S307
-                if inspect.isawaitable(result):
-                    result = await result
-                return result
+                return await self._execute_for_frontend(payload, buffers)
         return await super()._do_operation_for_frontend(operation, payload, buffers)
 
     def add(
@@ -253,10 +198,12 @@ class CommandRegistry(Ipylab):
 
         ref: https://lumino.readthedocs.io/en/latest/api/interfaces/commands.CommandRegistry.ICommandOptions.html
         """
-        cid = CommandConnection.to_cid(name)
-        self.remove_command(cid)
-
-        task = self.operation(
+        cid = self.remove(name)
+        hooks: TaskHooks = {
+            "tuple_add_rev": [("connections", self)],
+            "trait_add_fwd": [("namespace_name", namespace_name), ("python_command", execute), ("args", args or {})],
+        }
+        return self.operation(
             "addCommand",
             id=cid,
             caption=caption,
@@ -264,26 +211,60 @@ class CommandRegistry(Ipylab):
             iconClass=icon_class,
             transform={"transform": Transform.connection, "cid": cid, "auto_dispose": True},
             icon=f"{pack(icon)}.labIcon" if isinstance(icon, Icon) else None,
-            toObject=["icon"] if isinstance(icon, Icon) else None,
+            toObject=["icon"] if isinstance(icon, Icon) else (),
+            hooks=hooks,
             **kwgs,
         )
 
-        async def add_command():
-            conn: CommandConnection = await task
-            conn.set_trait("namespace_name", namespace_name)
-            conn.set_trait("python_command", execute)
-            if args:
-                conn.set_trait("args", args)
-            await self._add_to_tuple_trait(self, "items", conn)
-            return conn
+    def remove(self, command: str | CommandConnection):
+        cid = command.cid if isinstance(command, CommandConnection) else CommandConnection.to_cid(self.name, command)
+        if conn := Connection.get_existing_connection(cid, quiet=True):
+            conn.close()
+        return cid
 
-        return self.to_task(add_command())
+    async def _execute_for_frontend(self, payload: dict, buffers: list):
+        conn = Connection.get_existing_connection(payload["id"], quiet=True)
+        if not isinstance(conn, CommandConnection):
+            msg = f'Invalid command "{payload["id"]} {conn=}"'
+            raise TypeError(msg)
+        cmd = conn.python_command
+        args = conn.args | (payload.get("args") or {}) | {"buffers": buffers}
+        glbls = self.app.get_namespace(conn.namespace_name)
+        kwgs = {}
+        for n, p in inspect.signature(cmd).parameters.items():
+            if n in args:
+                kwgs[n] = args[n]
+            elif n in glbls:
+                kwgs[n] = glbls[n]
+            elif p.kind != p.VAR_KEYWORD:
+                kwgs = args
+                break
+            elif p.default is p.empty:
+                msg = f"Required parameter '{n}' missing for {cmd} of {conn}"
+                raise NameError(msg)
+        glbls["_to_eval"] = functools.partial(cmd, **kwgs)
+        result = eval("_to_eval()", glbls)  # noqa: S307
+        if inspect.isawaitable(result):
+            result = await result
+        return result
 
-    def remove_command(self, name_or_id: str):
-        conn = self.get_existing_command_connection(name_or_id)
-        if conn:
-            conn.close(dispose=True)
+    def execute(self, command_id: str | CommandConnection, args: dict | None = None, **kwgs: Unpack[IpylabKwgs]):
+        """Execute a command in the registry.
 
-    def get_existing_command_connection(self, name_or_id: str):
-        "Will return a CommandConnection if it was added in this kernel."
-        return CommandConnection.get_existing_connection(name_or_id, quiet=True)
+        `args` are passed to the command.
+
+        see: https://github.com/jtpio/ipylab/issues/128#issuecomment-1683097383 for hints
+        about what args can be used.
+        """
+
+        async def execute_command():
+            id_ = str(command_id)
+            async with self as cmd:
+                if id_ not in cmd.all_commands:
+                    id_ = CommandConnection.to_cid(cmd.name, id_)
+                    if id_ not in cmd.all_commands:
+                        msg = f"Command '{command_id}' not registered!"
+                        raise ValueError(msg)
+                return await cmd.operation("execute", id=id_, args=args, **kwgs)
+
+        return self.to_task(execute_command())

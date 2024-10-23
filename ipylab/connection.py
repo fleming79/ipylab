@@ -5,12 +5,11 @@ from __future__ import annotations
 
 import uuid
 import weakref
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, override
 
 from ipywidgets import Widget, register
-from traitlets import Bool, Dict, Instance, Unicode
+from traitlets import Bool, Instance, Unicode, observe
 
-from ipylab.common import pack
 from ipylab.ipylab import Ipylab
 
 if TYPE_CHECKING:
@@ -34,8 +33,8 @@ class Connection(Ipylab):
     instance will be created in place of `Connection` (on the python side).
 
     When closing the connection the object in the frontend can be directed to
-    to dispose. Some subclasses such as `CommandConnection`,`CommandPalletConnection`
-    and `LauncherConnection` (a subclass of `CommandPalletConnection`) have dispose
+    to dispose. Some subclasses such as `CommandConnection`,`CommandPalletItemConnection`
+    and `LauncherConnection` (a subclass of `CommandPalletItemConnection`) have dispose
     enabled by default.
 
     It is possible to create a connection to most objects in the frontend,
@@ -53,92 +52,102 @@ class Connection(Ipylab):
     ensure the subclass instance is returned. The class methods `to_cid` will
     generate an appropriate id.
 
+    Once an object is registered in the frontend against a cid, it cannot be replaced
+    until it has been removed. Keep in mind that cid's are specified in the frontend
+    and can be shared between kernels. Currently each kerenel will have its own model
+    per 'cid' and the 'id' may not stay in sync should it be 'changed', therefore it
+    is recommended to not change the 'id' manually.
+
     See also `Transform.connection` for further detail about transforms.
     """
 
     _CLASS_DEFINITIONS: ClassVar[dict[str, type[Self]]] = {}
-    prefix: ClassVar = "ipylab-Connection"
+    _PREFIX = "ipylab-"
+    _SEP = "|"
     _connections: weakref.WeakValueDictionary[str, Self] = weakref.WeakValueDictionary()
     _model_name = Unicode("ConnectionModel").tag(sync=True)
     cid = Unicode(read_only=True, help="connection id").tag(sync=True)
-    id = Unicode("", read_only=True, help="id of the object if it has one").tag(sync=True)
-    info = Dict(help="Info to store in the connection")
+    prefix: ClassVar = f"{_PREFIX}Connection"
+    auto_dispose = Bool(False, read_only=True, help="Dispose of the object in frontend when closed.").tag(sync=True)
     _dispose = Bool(read_only=True).tag(sync=True)
-    _basename = None
+    ipylab_base = None
 
     def __init_subclass__(cls, **kwargs) -> None:
-        cls.prefix = f"ipylab-{cls.__name__}"
+        cls.prefix = f"{cls._PREFIX}{cls.__name__}"
         cls._CLASS_DEFINITIONS[cls.prefix] = cls
         super().__init_subclass__(**kwargs)
 
-    def __new__(cls, cid: str, id: str = "", info: dict | None = None, **kwgs):  # noqa: A002
+    def __new__(cls, cid: str, **kwgs):
         inst = cls._connections.get(cid)
         if not inst:
-            cls = cls._CLASS_DEFINITIONS[cid.split(":", maxsplit=1)[0]]
+            cls = cls._CLASS_DEFINITIONS[cid.split(cls._SEP, maxsplit=1)[0]]
             cls._connections[cid] = inst = super().__new__(cls, **kwgs)
-            inst.set_trait("cid", cid)
-        inst.set_trait("id", id or inst.id)
-        inst.set_trait("info", info or inst.info)
         return inst
 
-    def __init__(self, *args, cid="", id="", info: dict | None = None, **kwgs):  # noqa: A002, ARG002
-        super().__init__(**kwgs)
+    def __init__(self, cid: str, **kwgs):
+        super().__init__(cid=cid, **kwgs)
 
     def __str__(self):
         return self.cid
 
-    @classmethod
-    def to_cid(cls, *args) -> str:
-        """Generate an id for the args"""
+    @property
+    @override
+    def rep_info(self):
+        return {"cid": self.cid}
 
-        args_ = [str(arg.id) if isinstance(arg, Connection) else str(pack(arg)) for arg in args if arg]
-        if not args_:
-            args_.append(str(uuid.uuid4()))
-        arg0 = args_[0].removeprefix(cls.prefix).strip(":")
-        return "|".join([f"{cls.prefix}:{arg0}", *args_[1:]]).strip(": ")
+    @classmethod
+    def to_cid(cls, *args: str) -> str:
+        """Generate a cid."""
+        args = tuple(a.removeprefix(cls.prefix).removeprefix(cls._PREFIX).strip() for a in args if a)
+        if not args:
+            args = (str(uuid.uuid4()),)
+        return f"{cls.prefix}{cls._SEP}{'>'.join(args)}"
 
     @classmethod
     def get_instances(cls) -> Generator[Self, Any, None]:
-        "Get all subclasses"
+        "Get all instances of this class (including subclasses)."
         for item in cls._connections.values():
             if isinstance(item, cls):
                 yield item  # type: ignore
 
-    def close(self, *, dispose=False):
+    @observe("comm")
+    def _observe_comm(self, change: dict):
+        if not self.comm:
+            self._connections.pop(self.cid, None)
+        super()._observe_comm(change)
+
+    def close(self, *, dispose: None | bool = None):
         """Permanently close the widget.
 
         dispose: bool
             Whether to dispose of the object at the frontend."""
         if dispose:
-            self.set_trait("_dispose", True)
-        self._connections.pop(self.cid, None)
+            self.set_trait("auto_dispose", True)
         super().close()
 
     if TYPE_CHECKING:
 
         @overload
         @classmethod
-        def get_existing_connection(cls, *name_or_id: str, quiet: Literal[False]) -> Self: ...
+        def get_existing_connection(cls, cid: str, *, quiet: Literal[False]) -> Self: ...
         @overload
         @classmethod
-        def get_existing_connection(cls, *name_or_id: str, quiet: bool) -> Self | None: ...
+        def get_existing_connection(cls, cid: str, *, quiet: Literal[True]) -> Self | None: ...
         @overload
         @classmethod
-        def get_existing_connection(cls, *name_or_id: str) -> Self: ...
+        def get_existing_connection(cls, cid: str) -> Self: ...
 
     @classmethod
-    def get_existing_connection(cls, *name_or_id: str, quiet=False):
+    def get_existing_connection(cls, cid: str, *, quiet=False):
         """Get an existing connection.
 
         quiet: bool
-            If the connection does exist:
-                * False -> Will raise an error.
-                * True -> Will return None.
+            True: Raise a value error if the connection does not exist.
+            False: Return None.
         """
-        cid = cls.to_cid(*name_or_id)
         conn = cls._connections.get(cid)
         if not conn and not quiet:
-            msg = f"A connection does not exist with id='{cid}'"
+            msg = f"A connection does not exist with '{cid=}'"
             raise ValueError(msg)
         return conn
 
@@ -150,32 +159,18 @@ class ShellConnection(Connection):
     "Provides a connection to a widget loaded in the shell"
 
     _model_name = Unicode("ShellConnectionModel").tag(sync=True)
-    # ipy_model = Unicode("", help="The model", read_only=True)
+
     widget = Instance(Widget, allow_none=True, default_value=None, help="The widget that has the view")
 
-    def close(self, *, dispose: bool | None = None):
-        """Permanently close the widget.
-
-        dispose: bool
-            Whether to dispose of the object at the frontend.
-            If None, dispose will be True if the widget originated from ipylab.
-        """
-        super().close(dispose=bool(self.widget or dispose))
+    @observe("widget")
+    def _observe_widget(self, _):
+        self.set_trait("auto_dispose", bool(self.widget))
 
     def activate(self):
-        task = self.app.shell.execute_method("activateById", self.id)
+        "Activate the connected widget in the shell."
 
         async def activate():
-            await task
+            await self.operation("activate")
             return self
 
         return self.to_task(activate())
-
-
-class ModelConnection(Connection):
-    """A connection to the model of an Ipywidget."""
-
-    ipy_model = Unicode("", help="The model", read_only=True)
-
-    def __new__(cls, widget: Widget, **kwgs) -> Self:
-        return super().__new__(cls, cid=cls.to_cid(widget), id=pack(widget), **kwgs)

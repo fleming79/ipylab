@@ -77,6 +77,12 @@ export class SplitPanelModel extends PanelModel {
  * The view for a split panel.
  */
 export class SplitPanelView extends PanelView {
+  initialize(parameters: any): void {
+    super.initialize(parameters);
+    this.luminoWidget.removeClass('ipylab-Panel');
+    this.luminoWidget.addClass('ipylab-SplitPanel');
+  }
+
   /**
    * Create the widget and return the DOM element.
    *
