@@ -67,7 +67,7 @@ class Connection(Ipylab):
     _connections: weakref.WeakValueDictionary[str, Self] = weakref.WeakValueDictionary()
     _model_name = Unicode("ConnectionModel").tag(sync=True)
     cid = Unicode(read_only=True, help="connection id").tag(sync=True)
-    prefix: ClassVar = f"{_PREFIX}Connection{_SEP}"
+    prefix: ClassVar = f"{_PREFIX}Connection"
     auto_dispose = Bool(False, read_only=True, help="Dispose of the object in frontend when closed.").tag(sync=True)
     _dispose = Bool(read_only=True).tag(sync=True)
     ipylab_base = None
@@ -121,13 +121,12 @@ class Connection(Ipylab):
             self._connections.pop(self.cid, None)
         super()._observe_comm(change)
 
-    def close(self, *, dispose: None | bool = None):
+    def close(self, *, dispose=True):
         """Permanently close the widget.
 
         dispose: bool
             Whether to dispose of the object at the frontend."""
-        if dispose:
-            self.set_trait("auto_dispose", True)
+        self.set_trait("auto_dispose", dispose)
         super().close()
 
     if TYPE_CHECKING:
