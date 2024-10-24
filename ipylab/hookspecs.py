@@ -154,7 +154,11 @@ class IpylabHookspec:
         """
 
     @hookspec
-    def task_result(self, obj: Ipylab, result, aw: Awaitable, hooks: dict):
+    def task_result(self, obj: Ipylab, result, aw: Awaitable, hooks: dict) -> Awaitable[None] | None:
         """Called with the result of a task.
 
         Async functions are permitted which are called and awaited inside the task prior to completions."""
+
+    @hookspec(firstresult=True)
+    def vpath_getter(self, app: App, kwgs: dict) -> Awaitable[str] | str:  # type: ignore
+        "Resolve with a request for a vpath."

@@ -5,10 +5,6 @@ import { PromiseDelegate, UUID } from '@lumino/coreutils';
 import { IObservableDisposable, IpylabModel, Widget } from './ipylab';
 import { ensureObservableDisposable } from './utils';
 
-// Constants used for cid
-const _PREFIX = 'ipylab-';
-const _SEP = '|';
-
 /**
  * Provides a connection to an object using a unique 'cid'.
  *
@@ -31,50 +27,45 @@ export class ConnectionModel extends IpylabModel {
   }
 
   async ipylabInit(base: any = null) {
-    this.on('change:_dispose', this.disposeBase, this);
-    const cid = this.get('cid');
-
+    this.cid_ = this.get('cid');
     try {
-      base = await this.getObject(cid);
-      base.disposed.connect(() => {
-        this.set('auto_dispose', false);
-        this.close(null);
-      });
+      base = await this.getObject();
+      base.disposed.connect(this._base_disposed, this);
       await super.ipylabInit(base);
     } catch (e) {
-      ConnectionModel.pendingConnections.delete(cid);
       this.close();
-      this.error(`Failed to establish connection for cid=${cid}!\n${e}`);
+      this.error(`Failed to establish connection for cid=${this.cid_} ${e}`);
     }
   }
 
+  _base_disposed() {
+    this.set('auto_dispose', false);
+    this.close(false);
+  }
+
   close(comm_closed = false): Promise<void> {
-    if ((this.base as any)?.ipylabDisposeOnClose || this.get('auto_dispose')) {
-      this.disposeBase();
+    Private.pending.get(this.cid_)?.reject('closing');
+    Private.pending.delete(this.cid_);
+    this.base?.disposed?.disconnect(this._base_disposed, this);
+    if ((this.base as any)?.ipylabDisposeOnClose ?? this.get('auto_dispose')) {
+      this.set('auto_dispose', false);
+      this.base?.dispose();
     }
     return super.close(comm_closed);
   }
 
-  private async disposeBase() {
-    await this.pendingObj?.promise;
-    this.set('auto_dispose', false);
-    this.base?.dispose();
-  }
-
-  async getObject(cid: string): Promise<any> {
-    return ConnectionModel.connections.get(cid);
-  }
-  get pendingObj() {
-    return ConnectionModel.pendingConnections.get(this.get('cid'));
+  async getObject(): Promise<IObservableDisposable> {
+    // This is async for overloading
+    return Private.connections.get(this.cid_);
   }
 
   ensurePending() {
     const cid = this.get('cid');
-    if (!ConnectionModel.pendingConnections.has(cid)) {
-      ConnectionModel.pendingConnections.set(cid, new PromiseDelegate());
+    if (!Private.pending.has(cid)) {
+      Private.pending.set(cid, new PromiseDelegate());
     }
-    const pc = ConnectionModel.pendingConnections.get(cid);
-    if (ConnectionModel.connections.has(cid)) {
+    const pc = Private.pending.get(cid);
+    if (Private.connections.has(cid)) {
       pc.resolve(null);
     }
     return pc;
@@ -100,45 +91,50 @@ export class ConnectionModel extends IpylabModel {
     if (obj?.isDisposed) {
       throw new Error(`object is disposed`);
     }
-    if (
-      ConnectionModel.connections.has(cid) &&
-      ConnectionModel.connections.get(cid) !== obj
-    ) {
+    if (Private.connections.has(cid) && Private.connections.get(cid) !== obj) {
       throw new Error(`Another object is already registered for cid: ${cid}`);
     }
     ensureObservableDisposable(obj);
     obj.disposed.connect(() => {
-      ConnectionModel.connections.delete(cid);
-      ConnectionModel.connections_rev.delete(obj);
+      Private.connections.delete(cid);
+      Private.connections_rev.delete(obj);
     });
-    ConnectionModel.connections.set(cid, obj);
-    ConnectionModel.connections_rev.set(obj, cid);
-    if (ConnectionModel.pendingConnections.has(cid)) {
-      ConnectionModel.pendingConnections.get(cid).resolve(null);
-      ConnectionModel.pendingConnections.delete(cid);
+    Private.connections.set(cid, obj);
+    Private.connections_rev.set(obj, cid);
+    if (Private.pending.has(cid)) {
+      Private.pending.get(cid).resolve(null);
+      Private.pending.delete(cid);
     }
     return obj;
   }
 
   static get_cid(obj: any, register = false): string | null {
-    if (register && !ConnectionModel.connections_rev.has(obj)) {
+    if (register && !Private.connections_rev.has(obj)) {
       const cls =
         obj instanceof Widget &&
         obj.id &&
         ConnectionModel.getLuminoWidgetFromShell(obj.id)
           ? 'ShellConnection'
           : 'Connection';
-      const cid = `${_PREFIX}${cls}${_SEP}${UUID.uuid4()}`;
+      const cid = ConnectionModel.new_cid(cls);
       ConnectionModel.registerConnection(cid, obj);
     }
-    return ConnectionModel.connections_rev.get(obj);
+    return Private.connections_rev.get(obj);
   }
 
-  readonly isConnectionModel = true;
+  static getConnection(cid: string): IObservableDisposable | undefined {
+    return Private.connections.get(cid);
+  }
 
-  public static connections = new Map<string, IObservableDisposable>();
-  public static connections_rev = new Map<IObservableDisposable, string>();
-  public static pendingConnections = new Map<string, PromiseDelegate<null>>();
+  static new_cid(cls: string): string {
+    const _PREFIX = 'ipylab-';
+    const _SEP = '|';
+
+    return `${_PREFIX}${cls}${_SEP}${UUID.uuid4()}`;
+  }
+  // 'cid' is used by BackboneJS so we use cid_ here.
+  cid_: string;
+  readonly isConnectionModel = true;
 }
 
 /**
@@ -152,23 +148,23 @@ export class ShellConnectionModel extends ConnectionModel {
     return { ...super.defaults(), _model_name: 'ShellConnectionModel' };
   }
 
-  async getObject(cid: string): Promise<Widget> {
-    let base = ConnectionModel.connections.get(cid);
-    if (!base && !this.pendingObj) {
+  async getObject(): Promise<Widget> {
+    let base = Private.connections.get(this.cid_);
+    if (!base && !Private.pending.has(this.cid_)) {
       const pending = this.ensurePending();
       IpylabModel.tracker.restored.then(() => {
-        if (!ConnectionModel.connections.has(cid)) {
+        if (!Private.connections.has(this.cid_)) {
           setTimeout(
-            () => pending.reject(`Shell connection not found ${cid}`),
+            () => pending.reject(`Shell connection not found ${this.cid_}`),
             10000
           );
         }
       });
     }
-    await this.pendingObj?.promise;
-    base = ConnectionModel.connections.get(cid);
+    await Private.pending.get(this.cid_)?.promise;
+    base = Private.connections.get(this.cid_);
     if (!(base instanceof Widget)) {
-      this.error(`Failed to locate a widget cid=${cid}`);
+      this.error(`Failed to locate a widget cid=${this.cid_}`);
     }
     return base;
   }
@@ -184,3 +180,12 @@ export class ShellConnectionModel extends ConnectionModel {
 }
 
 IpylabModel.ConnectionModel = ConnectionModel;
+
+/**
+ * A namespace for private data
+ */
+namespace Private {
+  export const pending = new Map<string, PromiseDelegate<null>>();
+  export const connections = new Map<string, IObservableDisposable>();
+  export const connections_rev = new Map<IObservableDisposable, string>();
+}

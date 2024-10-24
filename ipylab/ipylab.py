@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING, Any, TypeVar, Unpack
 from ipywidgets import Widget, register
 from traitlets import Bool, Container, Dict, HasTraits, Instance, Set, TraitType, Unicode, observe
 
-import ipylab
 import ipylab._frontend as _fe
 from ipylab.common import IpylabKwgs, Obj, TaskHooks, TaskHookType, Transform, TransformType, hookimpl, pack
 
@@ -82,7 +81,7 @@ class Ipylab(WidgetBase):
 
     _model_name = Unicode("IpylabModel", help="Name of the model.", read_only=True).tag(sync=True)
     _python_class = Unicode().tag(sync=True)
-    ipylab_base = IpylabBase(ipylab.Obj.this, "").tag(sync=True)
+    ipylab_base = IpylabBase(Obj.this, "").tag(sync=True)
 
     _async_widget_base_init_complete = False
     _single_map: ClassVar[dict[Hashable, str]] = {}  # single_key : model_id
@@ -168,6 +167,10 @@ class Ipylab(WidgetBase):
             if self.SINGLE:
                 self._single_models.pop(change["old"].id)
 
+    def close(self):
+        self.send({"close": True})
+        super().close()
+
     def _check_closed(self):
         if not self._repr_mimebundle_:
             msg = f"This widget is closed {self!r}"
@@ -193,6 +196,7 @@ class Ipylab(WidgetBase):
     def hook(self):
         return self.app.plugin_manager.hook
 
+    @property
     def rep_info(self) -> dict[str, Any]:
         "Extra info to provide for __repr__."
         return {}
@@ -272,7 +276,7 @@ class Ipylab(WidgetBase):
 
     async def _wait_response_check_error(self, response: Response, content: dict) -> Any:
         payload = await response.wait()
-        return Transform.transform_payload(content["transform"], payload)
+        return await Transform.transform_payload(content["transform"], payload)
 
     def _on_custom_msg(self, _, msg: str, buffers: list):
         if not isinstance(msg, str):
@@ -490,3 +494,7 @@ class IpylabPlugin:
     @hookimpl
     def opening_console(self, app: App, args: dict, objects: dict, kwgs: IpylabKwgs):
         "no-op"
+
+    @hookimpl
+    def vpath_getter(self, app: App, kwgs: dict) -> Awaitable[str] | str:
+        return app.dialog.get_text(**kwgs)

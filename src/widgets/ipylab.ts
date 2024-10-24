@@ -11,6 +11,7 @@ import { KernelWidgetManager } from '@jupyter-widgets/jupyterlab-manager';
 import { ILabShell, JupyterFrontEnd, LabShell } from '@jupyterlab/application';
 import {
   ICommandPalette,
+  Notification,
   SessionContext,
   SessionContextDialogs,
   WidgetTracker
@@ -80,6 +81,8 @@ export class IpylabModel extends WidgetModel {
   initialize(attributes: any, options: any): void {
     super.initialize(attributes, options);
     this.send({ init: 'ipylabInit' });
+    this.on('msg:custom', this.onCustomMessage, this);
+    IpylabModel.onKernelLost(this.kernel, this.close, this);
     this.widget_manager.get_model(this.model_id).then(() => this.ipylabInit());
   }
 
@@ -107,8 +110,6 @@ export class IpylabModel extends WidgetModel {
       writable: false,
       configurable: true
     });
-    this.on('msg:custom', this.onCustomMessage, this);
-    IpylabModel.onKernelLost(this.kernel, this.close, this);
     this.save_changes();
     this.send({ init: 'ready' });
   }
@@ -116,16 +117,16 @@ export class IpylabModel extends WidgetModel {
   close(comm_closed?: boolean): Promise<void> {
     this._pendingOperations.forEach(opDone => opDone.reject('Closed'));
     this._pendingOperations.clear();
-    comm_closed = comm_closed || this.commClosed;
+    comm_closed = comm_closed || !this.commAvailable;
     if (!comm_closed) {
       this.send({ closed: true });
     }
     Object.defineProperty(this, 'base', { value: null });
-    return super.close(comm_closed);
+    return super.close(true);
   }
 
   save_changes(callbacks?: object): void {
-    if (!this.commClosed) {
+    if (this.commAvailable) {
       super.save_changes(callbacks);
     }
   }
@@ -238,9 +239,10 @@ export class IpylabModel extends WidgetModel {
     if (content.ipylab_FE) {
       // Result of an operation request sent to Python.
       const op = this._pendingOperations.get(content.ipylab_FE);
+      const { kwgs, toLuminoWidget, toObject } = content;
       this._pendingOperations.delete(content.ipylab_FE);
       try {
-        await this.transformContent(content);
+        await this.replaceParts(kwgs, toLuminoWidget, toObject);
       } catch (e) {
         content.error = e;
       }
@@ -253,75 +255,67 @@ export class IpylabModel extends WidgetModel {
       }
     } else if (content.ipylab_PY) {
       this.do_operation_for_python(content);
+    } else if (content.close) {
+      this.close(true);
     }
   }
 
   /**
-   * Perform an operation requested by Python returning the result if successful
-   * or an 'error' message if unsuccessful.
+   * Perform an operation request from Python.
    * @param content
    */
   private async do_operation_for_python(content: any) {
     const { operation, ipylab_PY, transform } = content;
+    const { kwgs, toLuminoWidget, toObject } = content;
     try {
-      await this.transformContent(content);
-      let result, buffers;
-      result = await this.operation(operation, content.kwgs);
-      if ((result as any)?.buffers) {
-        buffers = (result as any).buffers;
-        delete (result as any).buffers;
+      await this.replaceParts(kwgs, toLuminoWidget, toObject);
+      let obj, buffers;
+      obj = await this.operation(operation, kwgs);
+      if (obj?.payload) {
+        buffers = obj.buffers;
+        obj = obj.payload;
       }
-      if ((result as any)?.payload) {
-        result = (result as any).payload;
-      }
-      const response = {
-        ipylab_PY,
-        operation,
-        payload: (await this.transformObject(result, transform)) ?? null
-      };
-      this.send(response, null, buffers);
+      const payload = (await this.transformObject(obj, transform)) ?? null;
+      this.send({ ipylab_PY, operation, payload }, null, buffers);
     } catch (e) {
-      this.send({
-        operation: operation,
-        ipylab_PY: content.ipylab_PY,
-        error: `${(e as Error).message}`
-      });
+      this.send({ operation, ipylab_PY, error: `${(e as Error).message}` });
       console.error(e);
     }
   }
 
-  async transformContent(content: any) {
-    if (content.toLuminoWidget instanceof Array) {
+  /**
+   * Replace parts in obj that are indicated by the arrays.
+   *
+   * @param obj The object (map) with elements to be replaced.
+   * @param toLuminoWidget A list of elements to replace with widgets.
+   * @param toObject A list of elements to replace with objects.
+   */
+  async replaceParts(
+    obj: Map<string, any>,
+    toLuminoWidget?: Array<string>,
+    toObject?: Array<string>
+  ) {
+    if (toLuminoWidget instanceof Array) {
       // Replace values in kwgs with widgets
-      for (const subpath of content.toLuminoWidget) {
-        const value = getNestedProperty({
-          obj: content.kwgs,
-          subpath,
-          nullIfMissing: false
-        });
-        if (value && typeof value === 'string') {
-          const lw = (await IpylabModel.toLuminoWidget({ id: value })).widget;
-          setNestedProperty({ obj: content.kwgs, subpath, value: lw });
+      for (const subpath of toLuminoWidget) {
+        const value = getNestedProperty({ obj, subpath });
+        if (value) {
+          const lw = await IpylabModel.toLuminoWidget({ id: value });
+          setNestedProperty({ obj, subpath, value: lw });
         }
       }
     }
-    if (content.toObject) {
-      for (const subpath of content.toObject) {
-        let value = getNestedProperty({
-          obj: content.kwgs,
-          subpath,
-          nullIfMissing: false
-        });
-        let base;
+    if (toObject instanceof Array) {
+      for (const subpath of toObject) {
+        let base, value;
+        value = getNestedProperty({ obj, subpath });
         if (value) {
           [base, value] = this.toBaseAndSubpath(value);
           value = await IpylabModel.toObject(base, value);
-          setNestedProperty({ obj: content.kwgs, subpath, value });
+          setNestedProperty({ obj, subpath, value });
         }
       }
     }
-    delete content.toLuminoWidget;
-    delete content.toObject;
   }
 
   /**
@@ -483,20 +477,17 @@ export class IpylabModel extends WidgetModel {
     cid = '',
     id = '',
     ipy_model = ''
-  }: { cid?: string; id?: string; ipy_model?: string } = {}): Promise<{
-    widget: Widget;
-    vpath: string;
-  }> {
+  }: { cid?: string; id?: string; ipy_model?: string } = {}): Promise<Widget> {
     let widget: Widget;
-    let vpath = '';
 
+    widget = IpylabModel.ConnectionModel.getConnection(cid) as Widget;
+    if (widget instanceof Widget) {
+      return widget;
+    }
     if (!ipy_model && id.slice(0, 10) === 'IPY_MODEL_') {
       ipy_model = id.slice(10).split(':', 1)[0];
     }
-
-    if (IpylabModel.ConnectionModel.connections.has(cid)) {
-      widget = IpylabModel.ConnectionModel.connections.get(cid) as Widget;
-    } else if (ipy_model) {
+    if (ipy_model) {
       let model = await IpylabModel.getWidgetModel(ipy_model);
       if ((model as ConnectionModel).isConnectionModel) {
         model = (model as ConnectionModel).base;
@@ -506,18 +497,15 @@ export class IpylabModel extends WidgetModel {
         throw new Error(`Model '${name}' does not have a view!`);
       }
       const manager = model.widget_manager as KernelWidgetManager;
-      const kernel = manager.kernel;
-      const jfem = await IpylabModel.ensureFrontend(kernel);
       widget = (await manager.create_view(model, {})).luminoWidget;
-      IpylabModel.onKernelLost(kernel, widget.dispose, widget);
-      vpath = jfem.vpath;
+      IpylabModel.onKernelLost(manager.kernel, widget.dispose, widget);
     }
     if (!(widget instanceof Widget)) {
       throw new Error(
         `Unable to create a luminoWidget cid='${cid}' id='${id}' ipy_model='${ipy_model}`
       );
     }
-    return { widget, vpath };
+    return widget;
   }
 
   /**
@@ -643,12 +631,11 @@ export class IpylabModel extends WidgetModel {
     return (this.widget_manager as any).kernel;
   }
 
-  get commClosed() {
+  get commAvailable(): boolean {
     return (
-      this.kernel.isDisposed ||
-      !this.comm_live ||
-      !this.kernel?.status ||
-      ['dead', 'restarting'].includes(this.kernel?.status)
+      !this.kernel?.isDisposed &&
+      this.comm &&
+      !['dead', 'restarting'].includes(this.kernel?.status)
     );
   }
 
@@ -689,6 +676,7 @@ export class IpylabModel extends WidgetModel {
   static tracker = new WidgetTracker<Widget>({ namespace: 'ipylab' });
   static JFEM: typeof JupyterFrontEndModel;
   static ConnectionModel: typeof ConnectionModel;
+  static Notification = Notification;
 }
 
 /**

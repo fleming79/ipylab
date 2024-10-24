@@ -53,11 +53,9 @@ export class ShellModel extends IpylabModel {
 
   private static async addToShell(args: any): Promise<Widget> {
     let widget: Widget | MainAreaWidget;
-    let vpath: string;
 
     try {
-      const info = await IpylabModel.toLuminoWidget(args);
-      ({ widget, vpath } = info);
+      widget = await IpylabModel.toLuminoWidget(args);
       // Create a new lumino widget
     } catch (e) {
       if (args.evaluate) {
@@ -77,15 +75,15 @@ export class ShellModel extends IpylabModel {
       w.node.removeChild(w.toolbar.node);
       w.addClass('ipylab-MainArea');
     }
+    args.cid =
+      args.cid || IpylabModel.ConnectionModel.new_cid('ShellConnection');
+    IpylabModel.ConnectionModel.registerConnection(args.cid, widget);
+
     widget.id = widget.id || args.cid || UUID.uuid4();
-    if (args.cid) {
-      IpylabModel.ConnectionModel.registerConnection(args.cid, widget);
-    }
     IpylabModel.app.shell.add(widget as any, args.area || 'main', args.options);
 
     // Register widgets originating from IpyWidgets
     if (args.ipy_model) {
-      args.vpath = vpath;
       widget.addClass('ipylab-shell');
       if (!IpylabModel.tracker.has(widget)) {
         (widget as any).ipylabSettings = args;

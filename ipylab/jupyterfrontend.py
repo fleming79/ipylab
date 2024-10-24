@@ -18,7 +18,7 @@ import ipylab
 import ipylab.hookspecs
 from ipylab import Ipylab, ShellConnection, Transform
 from ipylab.commands import CommandPalette, CommandRegistry
-from ipylab.common import InsertMode, IpylabKwgs, pack
+from ipylab.common import InsertMode, IpylabKwgs, Obj, pack
 from ipylab.dialog import Dialog
 from ipylab.ipylab import IpylabBase, IpylabPlugin
 from ipylab.launcher import Launcher
@@ -50,7 +50,7 @@ class JupyterFrontEnd(Ipylab):
     SINGLE = True
 
     _model_name = Unicode("JupyterFrontEndModel").tag(sync=True)
-    ipylab_base = IpylabBase(ipylab.Obj.IpylabModel, "app").tag(sync=True)
+    ipylab_base = IpylabBase(Obj.IpylabModel, "app").tag(sync=True)
     version = Unicode(read_only=True).tag(sync=True)
     current_widget_id = Unicode(read_only=True).tag(sync=True)
     current_session = Dict(read_only=True).tag(sync=True)
@@ -232,10 +232,7 @@ class JupyterFrontEnd(Ipylab):
 
     async def _open_console(self, args: dict, objects: dict, namespace_name: str, **kwgs: Unpack[IpylabKwgs]):
         args = {"path": self.vpath, "insertMode": InsertMode.split_bottom} | args
-        kwgs["transform"] = {
-            "transform": Transform.connection,
-            "cid": ShellConnection.to_cid("console", self.vpath),
-        }
+        kwgs["transform"] = {"transform": Transform.connection}
         kwgs["namespace_name"] = namespace_name  # type: ignore
 
         # plugins

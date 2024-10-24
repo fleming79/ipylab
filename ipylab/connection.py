@@ -67,14 +67,14 @@ class Connection(Ipylab):
     _connections: weakref.WeakValueDictionary[str, Self] = weakref.WeakValueDictionary()
     _model_name = Unicode("ConnectionModel").tag(sync=True)
     cid = Unicode(read_only=True, help="connection id").tag(sync=True)
-    prefix: ClassVar = f"{_PREFIX}Connection"
+    prefix: ClassVar = f"{_PREFIX}Connection{_SEP}"
     auto_dispose = Bool(False, read_only=True, help="Dispose of the object in frontend when closed.").tag(sync=True)
     _dispose = Bool(read_only=True).tag(sync=True)
     ipylab_base = None
 
     def __init_subclass__(cls, **kwargs) -> None:
-        cls.prefix = f"{cls._PREFIX}{cls.__name__}"
-        cls._CLASS_DEFINITIONS[cls.prefix] = cls
+        cls.prefix = f"{cls._PREFIX}{cls.__name__}{cls._SEP}"
+        cls._CLASS_DEFINITIONS[cls.prefix.strip(cls._SEP)] = cls
         super().__init_subclass__(**kwargs)
 
     def __new__(cls, cid: str, **kwgs):
@@ -98,10 +98,15 @@ class Connection(Ipylab):
     @classmethod
     def to_cid(cls, *args: str) -> str:
         """Generate a cid."""
-        args = tuple(a.removeprefix(cls.prefix).removeprefix(cls._PREFIX).strip() for a in args if a)
+        args = tuple(aa for a in args if (aa := a.strip()))
+        if args and args[0].startswith(cls.prefix):
+            if len(args) != 1:
+                msg = "Extending a cid with extra args is not allowed!"
+                raise ValueError(msg)
+            return args[0]
         if not args:
             args = (str(uuid.uuid4()),)
-        return f"{cls.prefix}{cls._SEP}{'>'.join(args)}"
+        return cls.prefix + cls._SEP.join(args)
 
     @classmethod
     def get_instances(cls) -> Generator[Self, Any, None]:
@@ -161,10 +166,7 @@ class ShellConnection(Connection):
     _model_name = Unicode("ShellConnectionModel").tag(sync=True)
 
     widget = Instance(Widget, allow_none=True, default_value=None, help="The widget that has the view")
-
-    @observe("widget")
-    def _observe_widget(self, _):
-        self.set_trait("auto_dispose", bool(self.widget))
+    auto_dispose = Bool(True).tag(sync=True)
 
     def activate(self):
         "Activate the connected widget in the shell."

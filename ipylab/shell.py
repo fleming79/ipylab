@@ -2,6 +2,7 @@
 # Distributed under the terms of the Modified BSD License.
 from __future__ import annotations
 
+import inspect
 from typing import TYPE_CHECKING
 
 from ipywidgets import TypedTuple, Widget
@@ -9,10 +10,10 @@ from traitlets import Container, Instance, Unicode
 
 import ipylab
 from ipylab import Area, InsertMode, Ipylab, ShellConnection, Transform, pack
+from ipylab.common import Obj
 from ipylab.ipylab import IpylabBase
 
 if TYPE_CHECKING:
-    import inspect
     from asyncio import Task
     from typing import Literal
 
@@ -36,7 +37,7 @@ class Shell(Ipylab):
     SINGLE = True
 
     _model_name = Unicode("ShellModel", help="Name of the model.", read_only=True).tag(sync=True)
-    ipylab_base = IpylabBase(ipylab.Obj.IpylabModel, "app.shell").tag(sync=True)
+    ipylab_base = IpylabBase(Obj.IpylabModel, "app.shell").tag(sync=True)
 
     connections: Container[tuple[ShellConnection, ...]] = TypedTuple(trait=Instance(ShellConnection))
 
@@ -92,6 +93,8 @@ class Shell(Ipylab):
             "rank": int(rank) if rank else None,
             "ref": f"{pack(ref)}.id" if isinstance(ref, ShellConnection) else None,
         } | (options or {})
+        args["area"] = area
+
         if isinstance(obj, ShellConnection):
             if cid and cid != obj.cid:
                 msg = f"The provided {cid=} does not match {obj.cid=}"
@@ -101,30 +104,31 @@ class Shell(Ipylab):
             if not obj._view_name:  # noqa: SLF001
                 msg = f"This widget does not have a view {obj}"
                 raise RuntimeError(msg)
-            if not cid and self.connections:
+            if not cid and reversed(self.connections):
                 for c in self.connections:
                     if c.widget is obj:
                         cid = c.cid
                         break
+            hooks["trait_add_fwd"] = [("widget", obj)]
             if isinstance(obj, ipylab.Panel):
                 hooks["tuple_add_rev"].append(("connections", obj))
             args["ipy_model"] = obj.model_id
         else:
             args["evaluate"] = pack(obj)
-        cid = ShellConnection.to_cid(cid)
-        if isinstance(obj, Widget) and obj._view_name:  # noqa: SLF001
-            conn = ShellConnection(cid)
-            conn.set_trait("widget", obj)
 
-        args["area"] = area
-        args["cid"] = cid
+        args["cid"] = ShellConnection.to_cid(cid)
 
         async def add_to_shell():
             if "evaluate" in args:
                 if isinstance(vpath, dict):
-                    args["vpath"] = await self.app.dialog.get_text(vpath["title"])
+                    result = self.hook.vpath_getter(app=self.app, kwgs=vpath)
+                    while inspect.isawaitable(result):
+                        result = await result
+                    args["vpath"] = result
                 else:
                     args["vpath"] = vpath or self.app.vpath
+            else:
+                args["vpath"] = self.app.vpath
             return await self.operation("addToShell", args=args, transform=Transform.connection)
 
         return self.to_task(add_to_shell(), "Add to shell", hooks=hooks)

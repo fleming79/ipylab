@@ -162,18 +162,21 @@ class Transform(StrEnum):
         return transform_
 
     @classmethod
-    def transform_payload(cls, transform: TransformType, payload):
+    async def transform_payload(cls, transform: TransformType, payload):
         """Transform the payload according to the transform."""
         transform_ = transform["transform"] if isinstance(transform, dict) else transform
         match transform_:
             case Transform.advanced:
                 mappings = typing.cast(TransformDictAdvanced, transform)["mappings"]
-                return {key: cls.transform_payload(mappings[key], payload[key]) for key in mappings}
+                return {key: await cls.transform_payload(mappings[key], payload[key]) for key in mappings}
             case Transform.connection:
-                return ipylab.Connection(**payload)
+                # Use a context to ensure the connection is valid.
+                async with ipylab.Connection(payload["cid"]) as conn:
+                    return conn
             case Transform.auto:
-                if isinstance(payload, dict) and payload.get("cid"):
-                    return ipylab.Connection(**payload)
+                if isinstance(payload, dict) and (cid := payload.get("cid")):
+                    async with ipylab.Connection(cid) as conn:
+                        return conn
         return payload
 
 

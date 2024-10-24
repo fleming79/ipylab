@@ -10,9 +10,8 @@ from ipywidgets import TypedTuple
 from traitlets import Bool, Container, Dict, ForwardDeclaredInstance, Instance, Tuple, Unicode
 from traitlets import Callable as CallableTrait
 
-import ipylab
 from ipylab._compat.typing import Any, NotRequired, TypedDict, Unpack
-from ipylab.common import IpylabKwgs, TaskHooks, pack
+from ipylab.common import IpylabKwgs, Obj, TaskHooks, pack
 from ipylab.connection import Connection
 from ipylab.ipylab import Ipylab, IpylabBase, Transform, register
 from ipylab.widgets import Icon
@@ -121,7 +120,7 @@ class CommandPalette(Ipylab):
 
     SINGLE = True
 
-    ipylab_base = IpylabBase(ipylab.Obj.IpylabModel, "palette").tag(sync=True)
+    ipylab_base = IpylabBase(Obj.IpylabModel, "palette").tag(sync=True)
 
     info = Dict(help="info about the item")
     connections: Container[tuple[CommandPalletItemConnection, ...]] = TypedTuple(
@@ -154,7 +153,7 @@ class CommandPalette(Ipylab):
 @register
 class CommandRegistry(Ipylab):
     _model_name = Unicode("CommandRegistryModel").tag(sync=True)
-    ipylab_base = IpylabBase(ipylab.Obj.IpylabModel, "").tag(sync=True)
+    ipylab_base = IpylabBase(Obj.IpylabModel, "").tag(sync=True)
     name = Unicode(APP_COMMANDS_NAME, read_only=True, help="Use the default registry").tag(sync=True)
     all_commands = Tuple(read_only=True).tag(sync=True)
     connections: Container[tuple[CommandConnection, ...]] = TypedTuple(trait=Instance(CommandConnection))
@@ -265,6 +264,6 @@ class CommandRegistry(Ipylab):
                     if id_ not in cmd.all_commands:
                         msg = f"Command '{command_id}' not registered!"
                         raise ValueError(msg)
-                return await cmd.operation("execute", id=id_, args=args, **kwgs)
+                return await cmd.operation("execute", id=id_, args=args or {}, **kwgs)
 
         return self.to_task(execute_command())
