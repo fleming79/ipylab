@@ -3,15 +3,16 @@
 from __future__ import annotations
 
 import inspect
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, override
 
 import traitlets
 from ipywidgets import TypedTuple, register
-from traitlets import Container, Instance, Unicode
+from traitlets import Bool, Container, Dict, Instance, Unicode
 
 from ipylab import Connection, NotificationType, Transform, pack
 from ipylab._compat.typing import NotRequired, TypedDict
-from ipylab.ipylab import Ipylab
+from ipylab.common import Obj
+from ipylab.ipylab import Ipylab, IpylabBase
 
 if TYPE_CHECKING:
     from asyncio import Task
@@ -33,9 +34,14 @@ class NotifyAction(TypedDict):
 class ActionConnection(Connection):
     callback = traitlets.Callable()
 
+    info = Dict(help="info about the item")
+    auto_dispose = Bool(True).tag(sync=True)
+
 
 class NotificationConnection(Connection):
+    info = Dict(help="info about the item")
     actions: Container[tuple[ActionConnection, ...]] = TypedTuple(trait=Instance(ActionConnection))
+    auto_dispose = Bool(True).tag(sync=True)
 
     def update(
         self,
@@ -46,44 +52,47 @@ class NotificationConnection(Connection):
         actions: Iterable[NotifyAction | ActionConnection] = (),
     ) -> Task[bool]:
         args = {
-            "id": self.id,
+            "id": f"{pack(self)}.id",
             "message": message,
             "type": NotificationType(type) if type else None,
             "autoClose": auto_close,
         }
+        to_object = ["args.id"]
 
         async def update():
-            actions_ = [await self.app.notification._ensure_action(v) for v in actions]  # noqa: SLF001
-            if actions_:
-                args["actions"] = list(map(pack, actions_))  # type: ignore
-                to_object = [f"options.actions.{i}" for i in range(len(actions_))]
-            else:
-                to_object = None
-            result = await self.app.notification.execute_method("update", args, toObject=to_object)
-            for action in actions_:
-                await self._add_to_tuple_trait(self, "actions", action)
-            return result
+            async with self.app.notification as n:
+                actions_ = [await n._ensure_action(v) for v in actions]  # noqa: SLF001
+                if actions_:
+                    args["actions"] = list(map(pack, actions_))  # type: ignore
+                    to_object.extend(f"options.actions.{i}" for i in range(len(actions_)))
+                result = await n.operation("update", toObject=to_object, args=args)
+                for action in actions_:
+                    action.add_to_tuple("actions", self)
+                return result
 
         return self.to_task(update())
 
 
 @register
 class NotificationManager(Ipylab):
-    """Create new notifications with access to the notification manager.
+    """Create new notifications with access to the notification manager as base.
 
     ref: https://jupyterlab.readthedocs.io/en/stable/extension/ui_helpers.html#notifications
     """
 
+    SINGLE = True
+
     _model_name = Unicode("NotificationManagerModel").tag(sync=True)
-    _basename = Unicode("notificationManager").tag(sync=True)
-    SINGLETON = True
+    ipylab_base = IpylabBase(Obj.IpylabModel, "Notification.manager").tag(sync=True)
+
     notifications: Container[tuple[NotificationConnection, ...]] = TypedTuple(trait=Instance(NotificationConnection))
     actions: Container[tuple[ActionConnection, ...]] = TypedTuple(trait=Instance(ActionConnection))
 
+    @override
     async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list):
         """Overload this function as required."""
         match operation:
-            case "action callback":
+            case "action_callback":
                 callback = ActionConnection.get_existing_connection(payload["cid"]).callback
                 result = callback()
                 while inspect.isawaitable(result):
@@ -93,9 +102,9 @@ class NotificationManager(Ipylab):
 
     async def _ensure_action(self, value: ActionConnection | NotifyAction) -> ActionConnection:
         "Create a new action."
-        if not isinstance(value, dict):
-            action = ActionConnection.get_existing_connection(str(value))
-            value = action.info | {"callback": action.callback}  # type: ignore
+        if isinstance(value, ActionConnection):
+            async with value:
+                return value
         return await self.new_action(**value)  # type: ignore
 
     def notify(
@@ -118,31 +127,26 @@ class NotificationManager(Ipylab):
             caption: NotRequired[str]
         """
 
-        options = {
-            "message": message,
-            "type": NotificationType(type) if type else None,
-            "autoClose": auto_close,
-        }
+        options = {"autoClose": auto_close}
+        info = {"type": NotificationType(type), "message": message, "options": options}
 
         async def notify():
             actions_ = [await self._ensure_action(v) for v in actions]
             if actions_:
-                options["actions"] = list(map(pack, actions_))  # type: ignore
+                options["actions"] = actions_  # type: ignore
+            cid = NotificationConnection.to_cid()
             notification: NotificationConnection = await self.operation(
                 "notification",
-                type=NotificationType(type),
                 message=message,
+                type=NotificationType(type) if type else None,
                 options=options,
-                transform={
-                    "transform": Transform.connection,
-                    "cid": NotificationConnection.to_cid(),
-                    "auto_dispose": True,
-                },
-                toObject=[f"options.actions.{i}" for i in range(len(actions_))] if actions_ else None,
+                transform={"transform": Transform.connection, "cid": cid, "auto_dispose": True},
+                toObject=[f"options.actions[{i}]" for i in range(len(actions_))] if actions_ else [],
             )
             for action in actions_:
-                await notification._add_to_tuple_trait(self, "actions", action)  # noqa: SLF001
-            await self._add_to_tuple_trait(self, "notifications", notification)
+                action.add_to_tuple("actions", notification)
+            notification.add_to_tuple("notifications", self)
+            notification.set_trait("info", info)
             return notification
 
         return self.to_task(notify())
@@ -159,16 +163,10 @@ class NotificationManager(Ipylab):
         "Create an action to use in a notification."
         cid = ActionConnection.to_cid()
         info = {"label": label, "displayType": display_type, "keep_open": keep_open, "caption": caption}
-        task = self.operation(
+        return self.operation(
             "createAction",
-            **info,
             cid=cid,
-            transform={"transform": Transform.connection, "cid": cid, "auto_dispose": True, "info": info},
+            transform={"transform": Transform.connection, "cid": cid, "auto_dispose": True},
+            hooks={"trait_add_fwd": [("callback", callback), ("info", info)]},
+            **info,
         )
-
-        async def new_action():
-            action: ActionConnection = await task
-            action.set_trait("callback", callback)
-            return action
-
-        return self.to_task(new_action())

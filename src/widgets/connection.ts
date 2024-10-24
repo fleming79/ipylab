@@ -2,9 +2,8 @@
 // Distributed under the terms of the Modified BSD License.
 
 import { PromiseDelegate, UUID } from '@lumino/coreutils';
+import { Signal } from '@lumino/signaling';
 import { IObservableDisposable, IpylabModel, Widget } from './ipylab';
-import { ensureObservableDisposable } from './utils';
-
 /**
  * Provides a connection to an object using a unique 'cid'.
  *
@@ -94,7 +93,7 @@ export class ConnectionModel extends IpylabModel {
     if (Private.connections.has(cid) && Private.connections.get(cid) !== obj) {
       throw new Error(`Another object is already registered for cid: ${cid}`);
     }
-    ensureObservableDisposable(obj);
+    ConnectionModel.ensureObservableDisposable(obj);
     obj.disposed.connect(() => {
       Private.connections.delete(cid);
       Private.connections_rev.delete(obj);
@@ -106,6 +105,45 @@ export class ConnectionModel extends IpylabModel {
       Private.pending.delete(cid);
     }
     return obj;
+  }
+
+  /**
+   * Modify the object to make it usable as an IObservableDisposable.
+   * @param obj The object to modify.
+   * @returns
+   */
+  static ensureObservableDisposable(obj: any) {
+    if (typeof obj !== 'object') {
+      throw new Error(`An object is required but got ${typeof obj} `);
+    }
+    if (obj.disposed) {
+      // Assume obj provides an IObservableDisposable interface.
+      return;
+    }
+    const args = { enumerable: false, configurable: true, writable: false };
+    if (!obj.dispose) {
+      Object.defineProperties(obj, {
+        dispose: { value: () => null as any, ...args },
+        ipylabDisposeOnClose: { value: true, ...args }
+      });
+    }
+    const disposed = new Signal<any, null>(obj);
+    const dispose_ = obj.dispose.bind(obj);
+    const dispose = () => {
+      if (obj.isDisposed) {
+        return;
+      }
+      dispose_();
+      disposed.emit(null);
+      Signal.clearData(obj);
+      if (!obj.isDisposed) {
+        obj.isDisposed = true;
+      }
+    };
+    Object.defineProperties(obj, {
+      dispose: { value: dispose.bind(obj), ...args },
+      disposed: { value: disposed, ...args }
+    });
   }
 
   static get_cid(obj: any, register = false): string | null {

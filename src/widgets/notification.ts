@@ -2,7 +2,8 @@
 // Distributed under the terms of the Modified BSD License.
 
 import { Notification } from '@jupyterlab/apputils';
-import { ObservableDisposableDelegate } from '@lumino/disposable';
+import { IObservableDisposable } from '@lumino/disposable';
+import { ISignal, Signal } from '@lumino/signaling';
 import { IpylabModel } from './ipylab';
 /**
  * The model for a notification.
@@ -18,37 +19,23 @@ export class NotificationManagerModel extends IpylabModel {
     };
   }
 
-  async ipylabInit(base: any = null) {
-    Notification.manager.changed.connect(this.update, this);
-    await super.ipylabInit(Notification);
-  }
-
-  close(comm_closed?: boolean): Promise<void> {
-    Notification.manager.changed.disconnect(this.update, this);
-    return super.close(comm_closed);
-  }
-
-  update() {
-    for (const id of this.notifications.keys()) {
-      if (!Notification.manager.has(id)) {
-        const obj = this.notifications.get(id);
-        if (obj) {
-          obj.dispose();
-        }
-        this.notifications.delete(id);
-      }
+  async operation(op: string, payload: any): Promise<any> {
+    switch (op) {
+      case 'update':
+        return this.base.update(payload.args);
+      case 'notification':
+        return this.notification(payload);
+      case 'createAction':
+        return this.createAction(payload);
+      default:
+        return await super.operation(op, payload);
     }
   }
 
   notification(payload: any) {
     const { message, type, options } = payload;
-    const id = Notification.manager.notify(message, type, options);
-    const obj = new ObservableDisposableDelegate(() =>
-      Notification.manager.dismiss(id)
-    ) as any;
-    obj.id = id;
-    this.notifications.set(id, obj);
-    return obj;
+    const id = this.base.notify(message, type, options);
+    return new NotifyLink(id);
   }
 
   createAction(payload: any) {
@@ -58,10 +45,50 @@ export class NotificationManagerModel extends IpylabModel {
       if (action.keep_open) {
         event.preventDefault();
       }
-      return this.scheduleOperation('action_callback', { cid }, 'done');
+      return this.scheduleOperation('action_callback', { cid }, 'auto');
     };
     return action;
   }
 
-  notifications = new Map<string, ObservableDisposableDelegate>();
+  public readonly base: typeof Notification.manager;
+  // notifications = new Set<NotifyObj>();
+}
+
+class NotifyLink implements IObservableDisposable {
+  constructor(public id: string = '') {
+    this.id = id;
+    this.manager.changed.connect(this._check_exists, this);
+  }
+
+  get manager() {
+    return IpylabModel.Notification.manager;
+  }
+
+  get disposed(): ISignal<this, void> {
+    return this._disposed;
+  }
+
+  get isDisposed(): boolean {
+    return this._isDisposed;
+  }
+
+  _check_exists() {
+    if (!this.manager.has(this.id)) {
+      this.dispose();
+    }
+  }
+
+  dispose(): void {
+    if (this.isDisposed) {
+      return;
+    }
+    this.manager.changed.disconnect(this._check_exists, this);
+    IpylabModel.Notification.manager.dismiss(this.id);
+    this._isDisposed = true;
+    this._disposed.emit(undefined);
+    Signal.clearData(this);
+  }
+
+  private _disposed = new Signal<this, void>(this);
+  private _isDisposed = false;
 }

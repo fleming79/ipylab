@@ -1,5 +1,6 @@
 // Copyright (c) ipylab contributors
 // Distributed under the terms of the Modified BSD License.
+
 import { Signal } from '@lumino/signaling';
 
 /**
@@ -240,54 +241,6 @@ export async function executeMethod({
   let func = getNestedProperty({ obj, subpath, basename });
   func = func.bind(owner, ...args);
   return await func();
-}
-
-/**
- * Modify the object to make it usable as an IObservableDisposable.
- * @param obj The object to modify.
- * @returns
- */
-export function ensureObservableDisposable(obj: any) {
-  if (typeof obj !== 'object') {
-    throw new Error(`An object is required but got ${typeof obj} `);
-  }
-  if (obj.disposed) {
-    // The presence of obj.disposed likely means obj provides
-    // an IObservableDisposable interface.
-    return;
-  }
-  if (!obj.dispose) {
-    Object.defineProperties(obj, {
-      dispose: { value: () => null as any, enumerable: false },
-      ipylabDisposeOnClose: { value: true, enumerable: false }
-    });
-  }
-  const disposed = new Signal<any, null>(obj);
-  const dispose_ = obj.dispose.bind(obj);
-  const dispose = () => {
-    if (obj.isDisposed) {
-      return;
-    }
-    dispose_();
-    disposed.emit(null);
-    Signal.clearData(obj);
-    if (!obj.isDisposed) {
-      obj.isDisposed = true;
-    }
-  };
-  Object.defineProperties(obj, {
-    dispose: {
-      value: dispose.bind(obj),
-      enumerable: false,
-      configurable: true,
-      writable: false
-    },
-    disposed: {
-      value: disposed,
-      writable: true,
-      enumerable: false
-    }
-  });
 }
 
 /**

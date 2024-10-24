@@ -385,7 +385,6 @@ class Ipylab(WidgetBase):
         basename: Base | None
             specify the 'obj' to use in the fronted.
         """
-        hooks = kwgs.pop("hooks", None)
         # validation
         self._check_closed()
         if not operation or not isinstance(operation, str):
@@ -405,9 +404,9 @@ class Ipylab(WidgetBase):
 
         return self.to_task(self._send_receive(content), name=ipylab_PY, hooks=hooks)
 
-    def _obj_operation(self, obj: Obj, subpath: str, operation: str, args: tuple, **kwgs: Unpack[IpylabKwgs]):
+    def _obj_operation(self, base: Obj, subpath: str, operation: str, args: tuple, **kwgs: Unpack[IpylabKwgs]):
         return self.operation(
-            "genericOperation", genericOperation=operation, basename=obj, subpath=subpath, args=args, **kwgs
+            "genericOperation", genericOperation=operation, basename=base, subpath=subpath, args=args, **kwgs
         )
 
     def execute_method(self, subpath: str, *args, obj=Obj.base, **kwgs: Unpack[IpylabKwgs]):
