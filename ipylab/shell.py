@@ -86,7 +86,7 @@ class Shell(Ipylab):
         ```
         """
         cid = args.pop("cid", "")
-        hooks: TaskHooks = {"tuple_add_rev": [("connections", self)]}
+        hooks: TaskHooks = {"add_to_tuple_fwd": [(self, "connections")]}
         args["options"] = {
             "activate": activate,
             "mode": InsertMode(mode),
@@ -111,25 +111,26 @@ class Shell(Ipylab):
                         break
             hooks["trait_add_fwd"] = [("widget", obj)]
             if isinstance(obj, ipylab.Panel):
-                hooks["tuple_add_rev"].append(("connections", obj))
+                hooks["add_to_tuple_fwd"].append((self, "connections"))
             args["ipy_model"] = obj.model_id
         else:
             args["evaluate"] = pack(obj)
 
         args["cid"] = ShellConnection.to_cid(cid)
 
-        async def add_to_shell():
-            if "evaluate" in args:
-                if isinstance(vpath, dict):
-                    result = self.hook.vpath_getter(app=self.app, kwgs=vpath)
-                    while inspect.isawaitable(result):
-                        result = await result
-                    args["vpath"] = result
+        async def add_to_shell() -> ShellConnection:
+            async with self.app as app:
+                if "evaluate" in args:
+                    if isinstance(vpath, dict):
+                        result = self.hook.vpath_getter(app=app, kwgs=vpath)
+                        while inspect.isawaitable(result):
+                            result = await result
+                        args["vpath"] = result
+                    else:
+                        args["vpath"] = vpath or app.vpath
                 else:
-                    args["vpath"] = vpath or self.app.vpath
-            else:
-                args["vpath"] = self.app.vpath
-            return await self.operation("addToShell", args=args, transform=Transform.connection)
+                    args["vpath"] = app.vpath
+                return await self.operation("addToShell", transform=Transform.connection, args=args)
 
         return self.to_task(add_to_shell(), "Add to shell", hooks=hooks)
 

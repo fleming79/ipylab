@@ -12,8 +12,6 @@ export class JupyterFrontEndModel extends IpylabModel {
   defaults(): Backbone.ObjectHash {
     return { ...super.defaults(), _model_name: 'JupyterFrontEndModel' };
   }
-  static JFEM = JupyterFrontEndModel;
-
   async ipylabInit(base: any = null) {
     this.set('version', JFEM.app.version);
     JFEM.sessionManager.runningChanged.connect(this.updateAllSessions, this);
@@ -30,9 +28,9 @@ export class JupyterFrontEndModel extends IpylabModel {
     if (!Private.vpathTojfem.has(this.vpath)) {
       Private.vpathTojfem.set(this.vpath, new PromiseDelegate());
     }
-    JFEM.jfemPromises.get(this.kernel.id).resolve(this);
     Private.vpathTojfem.get(this.vpath).resolve(this);
     await super.ipylabInit(base);
+    JFEM.jfemPromises.get(this.kernel.id).resolve(this);
   }
 
   close(comm_closed?: boolean): Promise<void> {

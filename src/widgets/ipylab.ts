@@ -80,7 +80,8 @@ export class IpylabModel extends WidgetModel {
 
   initialize(attributes: any, options: any): void {
     super.initialize(attributes, options);
-    this.send({ init: 'ipylabInit' });
+    this.set('ready', false);
+    this.save_changes();
     this.on('msg:custom', this.onCustomMessage, this);
     IpylabModel.onKernelLost(this.kernel, this.close, this);
     this.widget_manager.get_model(this.model_id).then(() => this.ipylabInit());
@@ -110,8 +111,12 @@ export class IpylabModel extends WidgetModel {
       writable: false,
       configurable: true
     });
+    this.set_ready();
+  }
+
+  set_ready() {
+    this.set('ready', true);
     this.save_changes();
-    this.send({ init: 'ready' });
   }
 
   close(comm_closed?: boolean): Promise<void> {
@@ -364,8 +369,8 @@ export class IpylabModel extends WidgetModel {
 
     switch (transform) {
       case 'auto':
-        if ((result = IpylabModel.ConnectionModel.get_cid(obj))) {
-          return { cid: result };
+        if (obj?.dispose) {
+          return { cid: IpylabModel.ConnectionModel.get_cid(obj, true) };
         }
         return await obj;
       case 'null':
@@ -373,10 +378,6 @@ export class IpylabModel extends WidgetModel {
       case 'connection':
         if (args.cid) {
           IpylabModel.ConnectionModel.registerConnection(args.cid, obj);
-          return { cid: args.cid };
-        }
-        if (args.auto_dispose) {
-          IpylabModel.onKernelLost(this.kernel, obj.dispose, obj, true);
         }
         return { cid: IpylabModel.ConnectionModel.get_cid(obj, true) };
       case 'advanced':
@@ -411,7 +412,8 @@ export class IpylabModel extends WidgetModel {
   }
 
   /**
-   * Start a new session that support comms needed for iplab needs for comms.
+   * Start a new session context and possibly a new kernel.
+   *
    * @returns
    */
   static async newSessionContext(vpath: string): Promise<SessionContext> {
@@ -539,14 +541,14 @@ export class IpylabModel extends WidgetModel {
    * @param kernel
    */
   static async ensureFrontend(kernel: Kernel.IKernelConnection, vpath = '') {
-    const manager = new KernelWidgetManager(kernel, IpylabModel.rendermime);
     if (!IpylabModel.jfemPromises.has(kernel.id)) {
+      const manager = new KernelWidgetManager(kernel, IpylabModel.rendermime);
       IpylabModel.jfemPromises.set(kernel.id, new PromiseDelegate());
       await kernel.requestExecute(
         {
           code: `
             import ipylab
-            ipylab.App(vpath='${vpath}')`,
+            ipylab.Ipylab._hook.start_app(vpath='${vpath}')`,
           store_history: false
         },
         true

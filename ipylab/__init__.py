@@ -34,3 +34,6 @@ __all__ = [
 def _jupyter_labextension_paths():
     "Called by Jupyterlab see: jupyterlab.federated_labextensions._get_labextension_metadata."
     return [{"src": "labextension", "dest": "ipylab"}]
+
+
+Ipylab._load_plugin_hooks()  # noqa: SLF001

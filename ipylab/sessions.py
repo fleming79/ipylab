@@ -2,14 +2,10 @@
 # Distributed under the terms of the Modified BSD License.
 
 from asyncio import Task
-from typing import TYPE_CHECKING
 
 from ipylab.common import Obj
 from ipylab.connection import Connection
-from ipylab.ipylab import Ipylab, IpylabBase, Transform
-
-if TYPE_CHECKING:
-    from ipylab.common import TransformType
+from ipylab.ipylab import Ipylab, IpylabBase
 
 
 class SessionManager(Ipylab):
@@ -37,5 +33,4 @@ class SessionManager(Ipylab):
 
         vpath: The session path.
         """
-        transform: TransformType = {"transform": Transform.connection, "cid": Connection.to_cid(), "auto_dispose": True}
-        return self.execute_method("newSessionContext", vpath, obj=Obj.IpylabModel, transform=transform)
+        return self.execute_method("newSessionContext", vpath, obj=Obj.IpylabModel)

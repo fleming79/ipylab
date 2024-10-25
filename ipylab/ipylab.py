@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import traceback
 import uuid
@@ -13,7 +14,7 @@ from ipywidgets import Widget, register
 from traitlets import Bool, Container, Dict, HasTraits, Instance, Set, TraitType, Unicode, observe
 
 import ipylab._frontend as _fe
-from ipylab.common import IpylabKwgs, Obj, TaskHooks, TaskHookType, Transform, TransformType, hookimpl, pack
+from ipylab.common import ErrorSource, IpylabKwgs, Obj, TaskHookType, Transform, TransformType, pack
 
 if TYPE_CHECKING:
     import logging
@@ -82,20 +83,42 @@ class Ipylab(WidgetBase):
     _model_name = Unicode("IpylabModel", help="Name of the model.", read_only=True).tag(sync=True)
     _python_class = Unicode().tag(sync=True)
     ipylab_base = IpylabBase(Obj.this, "").tag(sync=True)
+    ready = Bool(read_only=True, help="Set to by frontend when ready").tag(sync=True)
 
     _async_widget_base_init_complete = False
     _single_map: ClassVar[dict[Hashable, str]] = {}  # single_key : model_id
     _single_models: ClassVar[dict[str, Self]] = {}  #  model_id   : Widget
-    _ready_event = Instance(asyncio.Event, ())
+    ready_event = Instance(asyncio.Event, ())
     _comm = None
 
     _pending_operations: Dict[str, Response] = Dict()
     _tasks: Container[set[asyncio.Task]] = Set()
     _has_attrs_mappings: Container[set[tuple[HasTraits, str]]] = Set()
     close_extras: Container[weakref.WeakSet[Widget]] = Instance(weakref.WeakSet, (), help="extra items to close")  # type: ignore
-    ready = Bool(read_only=True, help="Set to True when `init` message received")
     if TYPE_CHECKING:
         log: logging.Logger
+
+    @classmethod
+    def _load_plugin_hooks(cls):
+        if hasattr(cls, "_hook"):
+            return
+        import pluggy
+
+        from ipylab import hookspecs, lib
+
+        cls._plugin_manager = pm = pluggy.PluginManager("ipylab")
+        pm.add_hookspecs(hookspecs)
+        pm.register(lib)
+        pm.load_setuptools_entrypoints("ipylab")
+        cls._hook = pm.hook
+
+    @property
+    def plugin_manager(self):
+        return self._plugin_manager
+
+    @property
+    def hook(self):
+        return self._hook
 
     @classmethod
     def _single_key(cls, kwgs: dict) -> Hashable:  # noqa: ARG003
@@ -143,14 +166,14 @@ class Ipylab(WidgetBase):
     async def __aenter__(self):
         if not self.ready:
             self._check_closed()
-            await self._ready_event.wait()
+            await self.ready_event.wait()
         self._check_closed()
         return self
 
     async def __aexit__(self, exc_type, exc, tb):
         pass
 
-    @observe("comm")
+    @observe("comm", "ready")
     def _observe_comm(self, change: dict):
         if not self.comm:
             for task in self._tasks:
@@ -166,35 +189,42 @@ class Ipylab(WidgetBase):
                         obj.set_trait(name, tuple(v for v in val if v.comm))
             if self.SINGLE:
                 self._single_models.pop(change["old"].id)
+        if change["name"] == "ready":
+            if self.ready:
+                self.ready_event.set()
+                for aw in self.hook.ready(obj=self):
+                    if inspect.isawaitable(aw):
+                        self.to_task(aw)
+            else:
+                self.ready_event.clear()
 
     def close(self):
         self.send({"close": True})
         super().close()
+
+    def on_error(self, source: ErrorSource, error: Exception):
+        self.hook.on_error(obj=self, source=source, error=error)
 
     def _check_closed(self):
         if not self._repr_mimebundle_:
             msg = f"This widget is closed {self!r}"
             raise RuntimeError(msg)
 
-    def add_to_tuple(self, name: str, obj: HasTraits):
+    def add_to_tuple(self, owner: HasTraits, name: str):
         """Add self to the tuple of obj."""
 
-        items = getattr(obj, name)
+        items = getattr(owner, name)
         if self.comm and self not in items:
-            obj.set_trait(name, (*items, self))
+            owner.set_trait(name, (*items, self))
         # see: _observe_comm for removal
-        self._has_attrs_mappings.add((obj, name))
+        self._has_attrs_mappings.add((owner, name))
 
-    def add_as_trait(self, name: str, obj: HasTraits):
+    def add_as_trait(self, obj: HasTraits, name: str):
         "Add self as a trait to obj."
         self._check_closed()
         obj.set_trait(name, self)
         # see: _observe_comm for removal
         self._has_attrs_mappings.add((obj, name))
-
-    @property
-    def hook(self):
-        return self.app.plugin_manager.hook
 
     @property
     def rep_info(self) -> dict[str, Any]:
@@ -231,7 +261,8 @@ class Ipylab(WidgetBase):
                 try:
                     self.hook.task_result(obj=self, aw=aw, result=result, hooks=hooks)
                 except Exception as e:
-                    self.hook.on_task_error(obj=self, aw=aw, error=e)
+                    self.on_error(ErrorSource.TaskError, e)
+                    raise e from None
                 return result
         except Exception as e:
             try:
@@ -259,24 +290,22 @@ class Ipylab(WidgetBase):
     def send(self, content, buffers=None):
         try:
             super().send(json.dumps(content, default=pack), buffers)
-        except Exception as error:
-            self.hook.on_send_error(obj=self, error=error, content=content, buffers=buffers)
+        except Exception as e:
+            self.on_error(ErrorSource.SendError, e)
+            raise e from None
 
     async def _send_receive(self, content: dict):
         async with self:
             self._pending_operations[content["ipylab_PY"]] = response = Response()
             self.send(content)
             try:
-                return await self._wait_response_check_error(response, content)
+                payload = await response.wait()
+                return Transform.transform_payload(content["transform"], payload)
             except asyncio.CancelledError:
                 if not self.comm:
                     msg = f"This widget is closed {self!r}"
                     raise asyncio.CancelledError(msg) from None
                 raise
-
-    async def _wait_response_check_error(self, response: Response, content: dict) -> Any:
-        payload = await response.wait()
-        return await Transform.transform_payload(content["transform"], payload)
 
     def _on_custom_msg(self, _, msg: str, buffers: list):
         if not isinstance(msg, str):
@@ -289,28 +318,13 @@ class Ipylab(WidgetBase):
                     self._pending_operations.pop(content["ipylab_PY"]).set(content.get("payload"), error)
                 elif "ipylab_FE" in content:
                     self.to_task(self._do_operation_for_fe(buffers=buffers, **content))
-            elif "init" in content:
-                match content["init"]:
-                    case "ipylabInit":
-                        self._ready_event.clear()
-                        self.set_trait("ready", False)
-                    case "ready":
-                        self._ready_event.set()
-                        self.set_trait("ready", True)
-                        self.on_frontend_init()
             elif "closed" in content:
                 self.close()
             if error:
-                self.hook.on_frontend_error(obj=self, error=error, content=content, buffers=buffers)
+                self.on_error(ErrorSource.FrontendError, error)
         except Exception as e:
-            self.hook.on_message_error(obj=self, error=e, msg=msg, buffers=buffers)
-
-    def on_frontend_init(self):
-        """Called when the frontend is initialized.
-
-        This will occur on initial connection and whenever the model is restored from the kernel.
-
-        The 'ready' trait offers a similar callback functionality using traits instead."""
+            self.on_error(ErrorSource.MessageError, e)
+            raise e from None
 
     async def _do_operation_for_fe(self, *, ipylab_FE: str, operation: str, payload: dict, buffers: list):
         """Handle operation requests from the frontend and reply with a result."""
@@ -329,7 +343,7 @@ class Ipylab(WidgetBase):
                 "repr": repr(e).replace("'", '"'),
                 "traceback": traceback.format_tb(e.__traceback__),
             }
-            self.hook.on_do_operation_for_fe_error(obj=self, error=e, content=content, buffers=buffers)
+            self.on_error(ErrorSource.OperationForFrontendError, e)
         finally:
             self.send(content, buffers)
 
@@ -346,7 +360,7 @@ class Ipylab(WidgetBase):
         toObject: Iterable[str] = (),
         hooks: TaskHookType = None,
         **kwgs,
-    ):
+    ) -> Task[Any]:
         """Create a new task requesting an operation to be performed in the frontend.
 
         operation: str
@@ -418,7 +432,7 @@ class Ipylab(WidgetBase):
     def set_property(self, subpath: str, value, *, obj=Obj.base, **kwgs: Unpack[IpylabKwgs]):
         return self._obj_operation(obj, subpath, "setProperty", value, **kwgs)
 
-    def update_property(self, subpath: str, value: dict, *, obj=Obj.base, **kwgs: Unpack[IpylabKwgs]):
+    def update_property(self, subpath: str, value: dict[str, Any], *, obj=Obj.base, **kwgs: Unpack[IpylabKwgs]):
         return self._obj_operation(obj, subpath, "updateProperty", (value,), **kwgs)
 
     def list_properties(
@@ -426,74 +440,3 @@ class Ipylab(WidgetBase):
     ) -> Task[dict]:
         args = ({"depth": depth, "omitHidden": skip_hidden},)
         return self._obj_operation(obj, subpath, "listProperties", args, **kwgs)
-
-
-class IpylabPlugin:
-    def handle_error(self, obj: Ipylab, title, msg):
-        obj.log.error(msg)
-        obj.app.dialog.show_error_message(title, msg)
-
-    @hookimpl
-    def on_frontend_error(self, obj: Ipylab, error: Exception, content: dict, buffers) -> None:  # noqa: ARG002
-        self.handle_error(obj, "Frontend error", f"{error=} {obj=}")
-
-    @hookimpl
-    def on_send_error(self, obj: Ipylab, error: Exception, content: dict, buffers) -> None:  # noqa: ARG002
-        self.handle_error(obj, "Send error", f"{error=} {obj=}")
-
-    @hookimpl
-    def unhandled_frontend_operation_message(self, obj: Ipylab, operation: str):
-        self.handle_error(obj, "Unhandled frontend message", f"The {operation=} is unhandled for {obj} ")
-
-    @hookimpl
-    def on_do_operation_for_fe_error(self, obj: Ipylab, error: Exception, content: dict, buffers):  # noqa: ARG002
-        self.handle_error(obj, "Error performing operation for frontend", str(error))
-
-    @hookimpl
-    def on_task_error(self, obj: Ipylab, aw: str, error: Exception) -> None:  # noqa: ARG002
-        self.handle_error(obj, "Task error", str(error))
-
-    @hookimpl
-    def on_message_error(self, obj: Ipylab, msg: str, error: Exception) -> None:
-        self.handle_error(obj, "Message error", f"{error=}\n{obj=}\n{msg=}'")
-
-    @hookimpl
-    def task_result(self, obj: Ipylab, result: HasTraits, hooks: TaskHooks):  # noqa: ARG002
-        # close with
-        for item in hooks.pop("close_with_fwd", ()):
-            if isinstance(result, Ipylab):
-                result.close_extras.add(item)
-        for item in hooks.pop("close_with_rev", ()):
-            if isinstance(result, Widget):
-                item.close_extras.add(result)
-
-        # tuple add
-        for name, value in hooks.pop("tuple_add_fwd", ()):
-            value.add_to_tuple(name, result)
-        for name, value in hooks.pop("tuple_add_rev", ()):
-            if isinstance(result, Ipylab):
-                result.add_to_tuple(name, value)
-
-        # trait add
-        for name, value in hooks.pop("trait_add_fwd", ()):
-            if isinstance(value, Ipylab):
-                value.add_as_trait(name, result)
-            else:
-                result.set_trait(name, value)
-        for name, value in hooks.pop("trait_add_rev_", ()):
-            if isinstance(result, Ipylab):
-                result.add_as_trait(name, value)
-            else:
-                value.set_trait(name, result)
-
-        if hooks:
-            msg = f"Invalid hooks detected: {hooks}"
-            raise ValueError(msg)
-
-    @hookimpl
-    def opening_console(self, app: App, args: dict, objects: dict, kwgs: IpylabKwgs):
-        "no-op"
-
-    @hookimpl
-    def vpath_getter(self, app: App, kwgs: dict) -> Awaitable[str] | str:
-        return app.dialog.get_text(**kwgs)

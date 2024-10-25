@@ -3,162 +3,126 @@
 
 from __future__ import annotations
 
-import typing as t
+from typing import TYPE_CHECKING, Literal
 
 import pluggy
 
 hookspec = pluggy.HookspecMarker("ipylab")
 
-if t.TYPE_CHECKING:
+if TYPE_CHECKING:
     from collections.abc import Awaitable
 
     from ipylab import App, Ipylab
-    from ipylab.common import IpylabKwgs
+    from ipylab.common import ErrorSource, IpylabKwgs
 
 
-class IpylabHookspec:
-    @hookspec()
-    async def autostart(self, app: App):
-        """
-        Called inside each Python kernel when the frontend is 'ready'.
+@hookspec(firstresult=True)
+def start_app(vpath: str) -> App:  # type: ignore
+    "Start the App"
 
-        Use this with modules that define entry points.
 
-        To run in the Ipylab kernel exclusively use.
+@hookspec()
+def ready(obj: Ipylab) -> None | Awaitable[None]:
+    """
+    Called for each object that is ready.
 
-        ``` python
-        if not app.is_ipylab_kernel:
-            return
-        ```
-        """
+    Return a coro or awaitable for it to run as a task in the obj.
+    """
 
-    @hookspec(firstresult=True)
-    def namespace_objects(self, objects: dict, namespace_name: str, app: App) -> None:
-        "Set objects that are available by default in the namespace."
 
-    @hookspec(firstresult=True)
-    def on_frontend_error(self, obj: Ipylab, error: Exception, content: dict, buffers) -> None:
-        """
-        Called with details of an error that occurred in the frontend.
+@hookspec(historic=True)
+async def autostart(app: App) -> None | Awaitable[None]:
+    """
+    Called inside each Python kernel when the frontend is 'ready'.
 
-        Fired when the task handling comms receives the error prior to raising it.
+    Use this with modules that define entry points.
 
-        Args
-        ----
+    To run in the Ipylab kernel exclusively use.
 
-        obj: Ipylab
-            The object from where the error.
-        error: str
-            The message from the JupyterFrontend.
-        content:
-            The content of the message accompanying the frontend error.
-        """
+    ``` python
+    if not app.is_ipylab_kernel:
+        return
+    ```
 
-    @hookspec(firstresult=True)
-    def on_do_operation_for_fe_error(self, obj: Ipylab, error: Exception, content: dict, buffers) -> None:
-        """
-        Called when an exception occurs when performing an operation request for the frontend.
+    Historic
+    --------
 
-        Fired when the task handling comms receives the error prior to raising it.
+    This plugin is historic so will activate when a plugin is registered after
+    the app is ready.
+    """
 
-        Args
-        ----
 
-        obj: Ipylab
-            The object from where the error.
-        error: str
-            The message from the JupyterFrontend.
-        content:
-            The content of the message accompanying the frontend error.
-        """
+@hookspec(firstresult=True)
+def autostart_result(app: App, result: Awaitable | None) -> None | Literal[True]:
+    "Called with the result of autostart (firstresult=True)."
+    # We use underscore so it is registered first
 
-    @hookspec(firstresult=True)
-    def on_send_error(self, obj: Ipylab, error: Exception, content: dict, buffers) -> None:
-        """
-        Handle a send error message for logging purposes.
 
-        Fired when the task handling comms receives the error prior to raising it.
+@hookspec(firstresult=True)
+def namespace_objects(objects: dict, namespace_name: str, app: App) -> None:
+    "Set objects that are available by default in the namespace (firstresult=True)."
 
-        Args
-        ----
 
-        obj: Ipylab
-            The object from where the error.
-        error: str
-            The message from the JupyterFrontend.
-        content:
-            The content of the message accompanying the frontend error.
-        """
+@hookspec(firstresult=True)
+def on_error(obj: Ipylab, source: ErrorSource, error: Exception):
+    """
+    Intercept an error message for logging purposes (firstresult=True).
 
-    @hookspec(firstresult=True)
-    def on_task_error(self, obj: Ipylab, aw: Awaitable, error: Exception) -> None:
-        """
-        Fired when an exception occurs in a task started with the method `Ipylab.to_task`.
+    Fired when an exception occurs trying to process a message from the frontend.
 
-        Args
-        ----
+    Args
+    ----
 
-        obj: Ipylab
-            The object from where the error.
+    obj: Ipylab
+        The object from where the error.
 
-        aw: Awaitable
-            The awaitable object running in the task.
+    aw: Awaitable
+        The awaitable object running in the task.
 
-        error: Exception
-            The exception.
-        """
+    error: Exception
+        The exception.
+    """
 
-    @hookspec(firstresult=True)
-    def on_message_error(self, obj: Ipylab, msg: str, error: Exception) -> None:
-        """
-        Intercept an error message for logging purposes.
 
-        Fired when an exception occurs trying to process a message from the frontend.
+@hookspec
+def opening_console(app: App, args: dict, objects: dict, kwgs: IpylabKwgs) -> None | Awaitable[None]:
+    """
+    Called when the console is opening.
 
-        Args
-        ----
+    Add or remove items from the dicts to alter loading of console.
 
-        obj: Ipylab
-            The object from where the error.
+    Returned awaitables will be awaited prior to proceeding.
 
-        aw: Awaitable
-            The awaitable object running in the task.
+    Args
+    ----
 
-        error: Exception
-            The exception.
-        """
+    app: App
 
-    @hookspec
-    def opening_console(self, app: App, args: dict, objects: dict, kwgs: IpylabKwgs):
-        """Called when the console is opening.
+    The Ipylab widget that owns the shell connection if there is one.
 
-        Add or remove items from the dicts to alter loading of console.
+    args: dict
+        options used with `open_console`.
+        keys: [activate, ref (as id), insertMode, type]
 
-        Args
-        ----
+    objects: dict
+        objects for loading into the namespace.
+        'ref:(as ShellConnection) is used as the ref for options. This must be a ShellConnection or None.
 
-        app: App
+    kwgs:IpylabKwgs
+        Added keys 'namesapace_name' the name of the name space to load.
+    """
 
-        The Ipylab widget that owns the shell connection if there is one.
 
-        args: dict
-            options used with `open_console`.
-            keys: [activate, ref (as id), insertMode, type]
+@hookspec(firstresult=True)
+def vpath_getter(app: App, kwgs: dict) -> Awaitable[str] | str:  # type: ignore
+    """
+    Resolve with a request for a vpath (firstresult=True).
+    """
 
-        objects: dict
-            objects for loading into the namespace.
-            'ref:(as ShellConnection) is used as the ref for options. This must be a ShellConnection or None.
 
-        kwgs:IpylabKwgs
-            Added keys 'namesapace_name' the name of the name space to load.
-        """
+@hookspec
+def task_result(obj: Ipylab, result, aw: Awaitable, hooks: dict):
+    """
+    Called with the result of a task.
 
-    @hookspec
-    def task_result(self, obj: Ipylab, result, aw: Awaitable, hooks: dict) -> Awaitable[None] | None:
-        """Called with the result of a task.
-
-        Async functions are permitted which are called and awaited inside the task prior to completions."""
-
-    @hookspec(firstresult=True)
-    def vpath_getter(self, app: App, kwgs: dict) -> Awaitable[str] | str:  # type: ignore
-        "Resolve with a request for a vpath."
+    This is used by ipylab to provide `TaskHooks` to set traits between related objects."""

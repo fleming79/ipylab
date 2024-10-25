@@ -11,7 +11,7 @@ from traitlets import Bool, Container, Dict, Instance, Unicode
 
 from ipylab import Connection, NotificationType, Transform, pack
 from ipylab._compat.typing import NotRequired, TypedDict
-from ipylab.common import Obj
+from ipylab.common import Obj, TaskHooks, TransformType
 from ipylab.ipylab import Ipylab, IpylabBase
 
 if TYPE_CHECKING:
@@ -65,10 +65,9 @@ class NotificationConnection(Connection):
                 if actions_:
                     args["actions"] = list(map(pack, actions_))  # type: ignore
                     to_object.extend(f"options.actions.{i}" for i in range(len(actions_)))
-                result = await n.operation("update", toObject=to_object, args=args)
-                for action in actions_:
-                    action.add_to_tuple("actions", self)
-                return result
+                    for action in actions_:
+                        self.close_extras.add(action)
+                return await n.operation("update", toObject=to_object, args=args)
 
         return self.to_task(update())
 
@@ -85,8 +84,9 @@ class NotificationManager(Ipylab):
     _model_name = Unicode("NotificationManagerModel").tag(sync=True)
     ipylab_base = IpylabBase(Obj.IpylabModel, "Notification.manager").tag(sync=True)
 
-    notifications: Container[tuple[NotificationConnection, ...]] = TypedTuple(trait=Instance(NotificationConnection))
-    actions: Container[tuple[ActionConnection, ...]] = TypedTuple(trait=Instance(ActionConnection))
+    connections: Container[tuple[NotificationConnection | ActionConnection, ...]] = TypedTuple(
+        trait=Instance(Connection)
+    )
 
     @override
     async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list):
@@ -129,6 +129,10 @@ class NotificationManager(Ipylab):
 
         options = {"autoClose": auto_close}
         info = {"type": NotificationType(type), "message": message, "options": options}
+        hooks: TaskHooks = {
+            "add_to_tuple_fwd": [(self, "connections")],
+            "trait_add_fwd": [("info", info)],
+        }
 
         async def notify():
             actions_ = [await self._ensure_action(v) for v in actions]
@@ -140,16 +144,12 @@ class NotificationManager(Ipylab):
                 message=message,
                 type=NotificationType(type) if type else None,
                 options=options,
-                transform={"transform": Transform.connection, "cid": cid, "auto_dispose": True},
+                transform={"transform": Transform.connection, "cid": cid},
                 toObject=[f"options.actions[{i}]" for i in range(len(actions_))] if actions_ else [],
             )
-            for action in actions_:
-                action.add_to_tuple("actions", notification)
-            notification.add_to_tuple("notifications", self)
-            notification.set_trait("info", info)
             return notification
 
-        return self.to_task(notify())
+        return self.to_task(notify(), hooks=hooks)
 
     def new_action(
         self,
@@ -163,10 +163,10 @@ class NotificationManager(Ipylab):
         "Create an action to use in a notification."
         cid = ActionConnection.to_cid()
         info = {"label": label, "displayType": display_type, "keep_open": keep_open, "caption": caption}
-        return self.operation(
-            "createAction",
-            cid=cid,
-            transform={"transform": Transform.connection, "cid": cid, "auto_dispose": True},
-            hooks={"trait_add_fwd": [("callback", callback), ("info", info)]},
-            **info,
-        )
+        transform: TransformType = {"transform": Transform.connection, "cid": cid}
+        hooks: TaskHooks = {
+            "trait_add_fwd": [("callback", callback), ("info", info)],
+            "add_to_tuple_fwd": [(self, "connections")],
+            "close_with_fwd": [self],
+        }
+        return self.operation("createAction", cid=cid, transform=transform, hooks=hooks, **info)

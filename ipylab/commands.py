@@ -11,7 +11,7 @@ from traitlets import Bool, Container, Dict, ForwardDeclaredInstance, Instance, 
 from traitlets import Callable as CallableTrait
 
 from ipylab._compat.typing import Any, NotRequired, TypedDict, Unpack
-from ipylab.common import IpylabKwgs, Obj, TaskHooks, pack
+from ipylab.common import IpylabKwgs, Obj, TaskHooks, TransformType, pack
 from ipylab.connection import Connection
 from ipylab.ipylab import Ipylab, IpylabBase, Transform, register
 from ipylab.widgets import Icon
@@ -47,24 +47,21 @@ class CommandConnection(Connection):
 
     auto_dispose = Bool(True).tag(sync=True)
 
+    info = Dict()
     args = Dict()
     python_command = CallableTrait(allow_none=False)
     namespace_name = Unicode("")
+
     _config_options: ClassVar = get_args(CommandOptions)
-    commands_name = Unicode(read_only=True)
 
     @override
     @classmethod
     def to_cid(cls, commands_name: str, name: str):
         return super().to_cid(commands_name, name)
 
-    @override
-    def __init__(self, *, cid: str, commands_name=APP_COMMANDS_NAME):
-        super().__init__(cid=cid, _commands_name=commands_name)
-
     @property
     def commands(self):
-        return CommandRegistry(name=self.commands_name)
+        return CommandRegistry(name=self.cid.split(self._SEP)[1])
 
     def configure(self, *, emit=True, **kwgs: Unpack[CommandOptions]) -> Task[CommandOptions]:
         if diff := set(kwgs).difference(self._config_options):
@@ -72,7 +69,7 @@ class CommandConnection(Connection):
             raise KeyError(msg)
 
         async def configure():
-            config = await self.update_property("config", kwgs)  # type: ignore
+            config: CommandOptions = await self.update_property("config", kwgs)  # type: ignore
             if emit:
                 await self.execute_method("commandChanged.emit", {"id": self.cid})
             return config
@@ -136,12 +133,9 @@ class CommandPalette(Ipylab):
         """
         cid = self.remove(command, category)
         info = {"args": args, "category": category, "command": command, "rank": rank}
-        return self.execute_method(
-            "addItem",
-            info,
-            transform={"transform": Transform.connection, "cid": cid, "auto_dispose": True},
-            hooks={"tuple_add_rev": [("connections", self)], "trait_add_fwd": [("info", info)]},
-        )
+        transform: TransformType = {"transform": Transform.connection, "cid": cid}
+        hooks: TaskHooks = {"add_to_tuple_fwd": [(self, "connections")], "trait_add_fwd": [(info, "info")]}
+        return self.execute_method("addItem", info, transform=transform, hooks=hooks)
 
     def remove(self, command: str | CommandConnection, category: str):
         cid = CommandPalletItemConnection.to_cid(command, category)
@@ -199,7 +193,7 @@ class CommandRegistry(Ipylab):
         """
         cid = self.remove(name)
         hooks: TaskHooks = {
-            "tuple_add_rev": [("connections", self)],
+            "add_to_tuple_fwd": [(self, "connections")],
             "trait_add_fwd": [("namespace_name", namespace_name), ("python_command", execute), ("args", args or {})],
         }
         return self.operation(
@@ -208,7 +202,7 @@ class CommandRegistry(Ipylab):
             caption=caption,
             label=label or name,
             iconClass=icon_class,
-            transform={"transform": Transform.connection, "cid": cid, "auto_dispose": True},
+            transform={"transform": Transform.connection, "cid": cid},
             icon=f"{pack(icon)}.labIcon" if isinstance(icon, Icon) else None,
             toObject=["icon"] if isinstance(icon, Icon) else (),
             hooks=hooks,

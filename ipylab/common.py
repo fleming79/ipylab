@@ -78,18 +78,24 @@ class InsertMode(StrEnum):
     tab_after = "tab-after"
 
 
+class ErrorSource(StrEnum):
+    FrontendError = "Frontend error"
+    TaskError = "Task error"
+    SendError = "Send error"
+    MessageError = "Message processing error"
+    OperationForFrontendError = "Operation for frontend error"
+
+
 class Transform(StrEnum):
-    """An eumeration of transformations than can be applied to serialized data.
+    """An eumeration of transformations to apply to the result of an operation
+    performed on the Frontend prior to returning to Python and transformation
+    of the result in python.
 
-    Data sent between the kernel and Frontend is serialized using JSON. The transform is used
-    to specify how that data should be transformed either prior to sending and/or once received.
+    Transformations that require parameters can be specified as dict with the key `transform`.
 
-    Transformations that require parameters should be specified in a dict with the key 'transform' specifying
-    the transform, and other keys providing the parameters accordingly.
-
-    - raw: [default] No conversion. Note: data is serialized when sending, some object serialization will fail.
-    - function: Use a function to calculate the return value. ['code'] = 'function...'
+    - auto: [default] Raw data or a connection.
     - connection: Return a connection to a disposable object in the frontend.
+    - function: Use a function to calculate the return value. ['code'] = 'function...'
     - advanced: A mapping of keys to transformations to apply sequentially on the object.
 
     `function`
@@ -107,7 +113,6 @@ class Transform(StrEnum):
     transform = {
         "transform": Transform.connection,
         "cid": "ID TO USE FOR CONNECTION",
-        "info": {} # Optional Dict of info.
     }
 
     `advanced`
@@ -138,12 +143,10 @@ class Transform(StrEnum):
                     return TransformDictFunction(transform=Transform.function, code=code)
                 case cls.connection:
                     cid = transform.get("cid")
-                    if cid and not isinstance(cid, str):
-                        raise TypeError
-                    transform_ = TransformDictConnection(transform=Transform.connection, cid=cid)
-                    if info := transform.get("info"):
-                        transform_["info"] = dict(info)
-                    return transform_
+                    if cid and not cid.startswith(ipylab.Connection._PREFIX):  # noqa: SLF001
+                        msg = f"'cid' should start with '{ipylab.Connection._PREFIX}' but got {cid=}"  # noqa: SLF001
+                        raise ValueError(msg)
+                    return TransformDictConnection(transform=Transform.connection, cid=cid)
                 case cls.advanced:
                     mappings = {}
                     transform_ = TransformDictAdvanced(transform=Transform.advanced, mappings=mappings)
@@ -162,21 +165,18 @@ class Transform(StrEnum):
         return transform_
 
     @classmethod
-    async def transform_payload(cls, transform: TransformType, payload):
+    def transform_payload(cls, transform: TransformType, payload):
         """Transform the payload according to the transform."""
         transform_ = transform["transform"] if isinstance(transform, dict) else transform
         match transform_:
             case Transform.advanced:
                 mappings = typing.cast(TransformDictAdvanced, transform)["mappings"]
-                return {key: await cls.transform_payload(mappings[key], payload[key]) for key in mappings}
-            case Transform.connection:
+                return {key: cls.transform_payload(mappings[key], payload[key]) for key in mappings}
+            case Transform.connection | Transform.auto if isinstance(payload, dict) and (cid := payload.get("cid")):
                 # Use a context to ensure the connection is valid.
-                async with ipylab.Connection(payload["cid"]) as conn:
-                    return conn
-            case Transform.auto:
-                if isinstance(payload, dict) and (cid := payload.get("cid")):
-                    async with ipylab.Connection(cid) as conn:
-                        return conn
+                conn = ipylab.Connection(cid)
+                conn._check_closed()  # noqa: SLF001
+                return conn
         return payload
 
 
@@ -191,7 +191,7 @@ class NotificationType(StrEnum):
 
 class TransformDictFunction(TypedDict):
     transform: Literal[Transform.function]
-    code: NotRequired[str]
+    code: str
 
 
 class TransformDictAdvanced(TypedDict):
@@ -202,8 +202,6 @@ class TransformDictAdvanced(TypedDict):
 class TransformDictConnection(TypedDict):
     transform: Literal[Transform.connection]
     cid: NotRequired[str | None]
-    auto_dispose: NotRequired[bool]
-    info: NotRequired[dict]
 
 
 TransformType = Transform | TransformDictAdvanced | TransformDictFunction | TransformDictConnection
@@ -225,14 +223,14 @@ class TaskHooks(TypedDict):
     see: `Hookspec.task_result`
     """
 
-    close_with_rev: NotRequired[list[Ipylab]]
-    close_with_fwd: NotRequired[list[Widget]]
+    close_with_fwd: NotRequired[list[Ipylab]]  # result is closed when any item in list is closed
+    close_with_rev: NotRequired[list[Widget]]  #
 
-    trait_add_rev_: NotRequired[list[tuple[str, HasTraits]]]
     trait_add_fwd: NotRequired[list[tuple[str, Any]]]
+    trait_add_rev: NotRequired[list[tuple[HasTraits, str]]]
 
-    tuple_add_rev: NotRequired[list[tuple[str, Any]]]
-    tuple_add_fwd: NotRequired[list[tuple[str, Ipylab]]]
+    add_to_tuple_fwd: NotRequired[list[tuple[HasTraits, str]]]
+    add_to_tuple_rev: NotRequired[list[tuple[str, Ipylab]]]
 
 
 TaskHookType = TaskHooks | None

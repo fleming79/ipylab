@@ -113,13 +113,12 @@ class Connection(Ipylab):
         "Get all instances of this class (including subclasses)."
         for item in cls._connections.values():
             if isinstance(item, cls):
-                yield item  # type: ignore
+                yield item
 
     @observe("comm")
-    def _observe_comm(self, change: dict):
+    def _connection_observe_comm(self, _):
         if not self.comm:
             self._connections.pop(self.cid, None)
-        super()._observe_comm(change)
 
     def close(self, *, dispose=True):
         """Permanently close the widget.

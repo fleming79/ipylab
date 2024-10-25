@@ -2,17 +2,15 @@
 # Distributed under the terms of the Modified BSD License.
 from __future__ import annotations
 
-import asyncio
 import functools
 import inspect
 from collections import OrderedDict
 from typing import TYPE_CHECKING, Any, Unpack, override
 
 import ipywidgets
-import pluggy
 from IPython.core.getipython import get_ipython
-from ipywidgets import TypedTuple, Widget, register, widget_serialization
-from traitlets import Bool, Container, Dict, Instance, Tuple, Unicode
+from ipywidgets import TypedTuple, Widget, register
+from traitlets import Bool, Container, Dict, Instance, Tuple, Unicode, observe
 
 import ipylab
 import ipylab.hookspecs
@@ -20,7 +18,7 @@ from ipylab import Ipylab, ShellConnection, Transform
 from ipylab.commands import CommandPalette, CommandRegistry
 from ipylab.common import InsertMode, IpylabKwgs, Obj, pack
 from ipylab.dialog import Dialog
-from ipylab.ipylab import IpylabBase, IpylabPlugin
+from ipylab.ipylab import IpylabBase
 from ipylab.launcher import Launcher
 from ipylab.menu import ContextMenu, MainMenu
 from ipylab.notification import NotificationManager
@@ -29,7 +27,6 @@ from ipylab.shell import Shell
 
 if TYPE_CHECKING:
     from asyncio import Task
-    from collections.abc import Iterable
     from typing import ClassVar
 
 
@@ -44,7 +41,7 @@ class LastUpdatedDict(OrderedDict):
 
 
 @register
-class JupyterFrontEnd(Ipylab):
+class App(Ipylab):
     "A connection to the 'app' in the frontend. A singleton (per kernel) not to be subclassed."
 
     SINGLE = True
@@ -60,7 +57,7 @@ class JupyterFrontEnd(Ipylab):
 
     shell = Instance(Shell, (), read_only=True)
     dialog = Instance(Dialog, (), read_only=True)
-    commands = Instance(CommandRegistry, (), read_only=True).tag(sync=True, **widget_serialization)
+    commands = Instance(CommandRegistry, (), read_only=True)
     command_pallet = Instance(CommandPalette, (), read_only=True)
     launcher = Instance(Launcher, (), read_only=True)
     session_manager = Instance(SessionManager, (), read_only=True)
@@ -86,40 +83,29 @@ class JupyterFrontEnd(Ipylab):
     def __init__(self, **kwgs):
         if self._async_widget_base_init_complete:
             return
+
         if vpath := kwgs.pop("vpath", None):
             self.set_trait("vpath", vpath)
             self.set_trait("is_ipylab_kernel", vpath == "ipylab")
         super().__init__(**kwgs)
-        if self.model_id:
-            self._plugin_manager = pm = pluggy.PluginManager("ipylab")
-            pm.add_hookspecs(ipylab.hookspecs.IpylabHookspec)
-            pm.register(IpylabPlugin())
-            pm.load_setuptools_entrypoints("ipylab")
 
     def close(self):
         "Cannot close"
 
-    @property
-    def plugin_manager(self):
-        return self._plugin_manager
-
-    @override
-    def on_frontend_init(self):
-        async def autostart():
-            results = self.hook.autostart(app=self)
-            for coro in asyncio.as_completed(filter(inspect.isawaitable, results)):
-                result = await coro
-                if isinstance(result, Exception):
-                    await self.dialog.show_error_message("Plugin failed", str(result))
-            self.log.info("Finished running %d autostart hooks.", len(results))
-            if self.is_ipylab_kernel:
-                await self.operation("ipylab_kernel_ready", init_count=self._frontend_init_count)
+    @observe("ready")
+    def _observe_ready(self, _):
+        if self.ready:
+            self.operation("ipylab_kernel_ready", init_count=self._frontend_init_count)
             self._frontend_init_count += 1
+            self.hook.autostart._call_history.clear()  # type: ignore  # noqa: SLF001
+            self.hook.autostart.call_historic(kwargs={"app": self}, result_callback=self._autostart_callback)
 
-        self.to_task(autostart(), "run autostart hooks")
+    def _autostart_callback(self, result):
+        self.hook.autostart_result(app=self, result=result)
 
-    def _gen_repr_from_keys(self, keys: Iterable):  # noqa: ARG002
-        return super()._gen_repr_from_keys(("vpath",))
+    @property
+    def rep_info(self):
+        return {"vpath": self.vpath}
 
     @override
     async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list) -> Any:
@@ -197,18 +183,15 @@ class JupyterFrontEnd(Ipylab):
 
     def get_namespace(self, name="", objects: dict | None = None):
         "Get the 'globals' namespace stored for name."
-        d = self._ipy_default_namespace
         if self._ipy_shell:
             if "" not in self._namespaces:
                 self._namespaces[""] = LastUpdatedDict(self._ipy_shell.user_ns)
-            if self.activate_namespace == name:
-                d = self._ipy_shell.user_ns
-                self._namespaces.pop(name)
+            if self.active_namespace == name:
+                self._namespaces.update(self._ipy_shell.user_ns)
         if name not in self._namespaces:
-            self._namespaces[name] = LastUpdatedDict(d)
-            self.set_trait("namespaces", tuple(self.namespace_names))
+            self._namespaces[name] = LastUpdatedDict(self._ipy_default_namespace)
         objects = {"ipylab": ipylab, "ipywidgets": ipywidgets, "ipw": ipywidgets, "app": self} | (objects or {})
-        self.hook.namespace_objects(defaults=objects, namespace_name=name, app=self)
+        self.hook.namespace_objects(objects=objects, namespace_name=name, app=self)
         self._namespaces[name].update(objects)
         return self._namespaces[name]
 
@@ -227,8 +210,6 @@ class JupyterFrontEnd(Ipylab):
         self._namespaces.pop(name, None)
         if activate:
             self.activate_namespace(name, objects)
-        else:
-            self.set_trait("namespaces", tuple(self.namespace_names))
 
     async def _open_console(self, args: dict, objects: dict, namespace_name: str, **kwgs: Unpack[IpylabKwgs]):
         args = {"path": self.vpath, "insertMode": InsertMode.split_bottom} | args
@@ -249,9 +230,9 @@ class JupyterFrontEnd(Ipylab):
             self.activate_namespace(namespace_name, objects=objects)
 
         conn: ShellConnection = await self.commands.execute("console:open", args, **kwgs)
-        conn.add_as_trait("console", self)
+        conn.add_as_trait(self, "console")
         if isinstance((widget := objects.get("widget")), ipylab.Panel):
-            conn.add_as_trait("console", widget)
+            conn.add_as_trait(widget, "console")
         return conn
 
     def open_console(
@@ -284,7 +265,7 @@ class JupyterFrontEnd(Ipylab):
 
         """
         namespace_name = options.get("namespace_name", "")
-        glbls = self.get_namespace(namespace_name) | options | {"buffers": buffers}
+        glbls = self.get_namespace(namespace_name, options | {"buffers": buffers})
         evaluate = options.get("evaluate", {})
         if isinstance(evaluate, str):
             evaluate = {"payload": evaluate}
@@ -304,8 +285,8 @@ class JupyterFrontEnd(Ipylab):
                     result = await result
             glbls[name] = result
         buffers = glbls.pop("buffers", [])
-        assert self.get_namespace(namespace_name) is glbls  # noqa: S101
+        if namespace_name == self.active_namespace:
+            self.activate_namespace(namespace_name)
+        else:
+            self.get_namespace(namespace_name, glbls)
         return {"payload": glbls.get("payload"), "buffers": buffers}
-
-
-App = JupyterFrontEnd

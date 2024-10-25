@@ -25,8 +25,12 @@ export class CommandRegistryModel extends IpylabModel {
           : new CommandRegistry();
     }
     await super.ipylabInit(base);
+  }
+
+  set_ready() {
     this.base.commandChanged.connect(this.sendCommandList, this);
     this.sendCommandList();
+    super.set_ready();
   }
 
   /**
@@ -37,7 +41,7 @@ export class CommandRegistryModel extends IpylabModel {
    * @returns - a promise that is fulfilled when all the associated views have been removed.
    */
   close(comm_closed = false): Promise<void> {
-    this.base.commandChanged.disconnect(this.sendCommandList, this);
+    this?.base?.commandChanged?.disconnect(this.sendCommandList, this);
     return super.close(comm_closed);
   }
 

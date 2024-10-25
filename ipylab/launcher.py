@@ -8,7 +8,7 @@ from ipywidgets import TypedTuple
 from traitlets import Container, Instance
 
 from ipylab.commands import CommandConnection, CommandPalletItemConnection
-from ipylab.common import Obj
+from ipylab.common import Obj, TaskHooks
 from ipylab.connection import Connection
 from ipylab.ipylab import Ipylab, IpylabBase, Transform
 
@@ -34,7 +34,7 @@ class Launcher(Ipylab):
 
     ipylab_base = IpylabBase(Obj.IpylabModel, "launcher").tag(sync=True)
 
-    items: Container[tuple[LauncherConnection, ...]] = TypedTuple(trait=Instance(LauncherConnection))
+    connections: Container[tuple[LauncherConnection, ...]] = TypedTuple(trait=Instance(LauncherConnection))
 
     def add(self, cmd: CommandConnection, category: str, *, rank=None, **args) -> Task[LauncherConnection]:
         """Add a launcher for the command (must be registered in this kernel).
@@ -42,17 +42,9 @@ class Launcher(Ipylab):
         ref: https://jupyterlab.readthedocs.io/en/latest/api/interfaces/launcher.ILauncher.IItemOptions.html
         """
         cid = self.remove(cmd, category)
-
-        return self.execute_method(
-            Obj.base,
-            "add",
-            ({"command": cmd, "category": category, "rank": rank, "args": args},),
-            transform={"transform": Transform.connection, "cid": cid},
-            hooks={
-                "close_with_fwd": [cmd],
-                "tuple_add_fwd": [("connections", self)],
-            },
-        )
+        hooks: TaskHooks = {"close_with_fwd": [cmd], "add_to_tuple_fwd": [(self, "connections")]}
+        args = {"command": str(cmd), "category": category, "rank": rank, "args": args}
+        return self.execute_method("add", args, transform={"transform": Transform.connection, "cid": cid}, hooks=hooks)
 
     def remove(self, command: str | CommandConnection, category: str):
         cid = LauncherConnection.to_cid(command, category)
