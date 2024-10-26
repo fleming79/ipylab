@@ -12,7 +12,8 @@ hookspec = pluggy.HookspecMarker("ipylab")
 if TYPE_CHECKING:
     from collections.abc import Awaitable
 
-    from ipylab import App, Ipylab
+    import ipylab
+    from ipylab import App
     from ipylab.common import ErrorSource, IpylabKwgs
 
 
@@ -22,7 +23,7 @@ def start_app(vpath: str) -> App:  # type: ignore
 
 
 @hookspec()
-def ready(obj: Ipylab) -> None | Awaitable[None]:
+def ready(obj: ipylab.Ipylab) -> None | Awaitable[None]:
     """
     Called for each object that is ready.
 
@@ -31,7 +32,7 @@ def ready(obj: Ipylab) -> None | Awaitable[None]:
 
 
 @hookspec(historic=True)
-async def autostart(app: App) -> None | Awaitable[None]:
+async def autostart(app: ipylab.App) -> None | Awaitable[None]:
     """
     Called inside each Python kernel when the frontend is 'ready'.
 
@@ -53,18 +54,18 @@ async def autostart(app: App) -> None | Awaitable[None]:
 
 
 @hookspec(firstresult=True)
-def autostart_result(app: App, result: Awaitable | None) -> None | Literal[True]:
+def autostart_result(app: ipylab.App, result: Awaitable | None) -> None | Literal[True]:
     "Called with the result of autostart (firstresult=True)."
     # We use underscore so it is registered first
 
 
 @hookspec(firstresult=True)
-def namespace_objects(objects: dict, namespace_name: str, app: App) -> None:
+def namespace_objects(objects: dict, namespace_name: str, app: ipylab.App) -> None:
     "Set objects that are available by default in the namespace (firstresult=True)."
 
 
 @hookspec(firstresult=True)
-def on_error(obj: Ipylab, source: ErrorSource, error: Exception):
+def on_error(obj: ipylab.Ipylab, source: ErrorSource, error: Exception):
     """
     Intercept an error message for logging purposes (firstresult=True).
 
@@ -73,7 +74,7 @@ def on_error(obj: Ipylab, source: ErrorSource, error: Exception):
     Args
     ----
 
-    obj: Ipylab
+    obj: ipylab.Ipylab
         The object from where the error.
 
     aw: Awaitable
@@ -85,7 +86,7 @@ def on_error(obj: Ipylab, source: ErrorSource, error: Exception):
 
 
 @hookspec
-def opening_console(app: App, args: dict, objects: dict, kwgs: IpylabKwgs) -> None | Awaitable[None]:
+def opening_console(app: ipylab.App, args: dict, objects: dict, kwgs: IpylabKwgs) -> None | Awaitable[None]:
     """
     Called when the console is opening.
 
@@ -96,7 +97,7 @@ def opening_console(app: App, args: dict, objects: dict, kwgs: IpylabKwgs) -> No
     Args
     ----
 
-    app: App
+    app: ipylab.App
 
     The Ipylab widget that owns the shell connection if there is one.
 
@@ -114,14 +115,14 @@ def opening_console(app: App, args: dict, objects: dict, kwgs: IpylabKwgs) -> No
 
 
 @hookspec(firstresult=True)
-def vpath_getter(app: App, kwgs: dict) -> Awaitable[str] | str:  # type: ignore
+def vpath_getter(app: ipylab.App, kwgs: dict) -> Awaitable[str] | str:  # type: ignore
     """
     Resolve with a request for a vpath (firstresult=True).
     """
 
 
 @hookspec
-def task_result(obj: Ipylab, result, aw: Awaitable, hooks: dict):
+def task_result(obj: ipylab.Ipylab, result, aw: Awaitable, hooks: dict):
     """
     Called with the result of a task.
 

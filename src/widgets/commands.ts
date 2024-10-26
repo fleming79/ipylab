@@ -2,7 +2,8 @@
 // Distributed under the terms of the Modified BSD License.
 
 import { CommandRegistry } from '@lumino/commands';
-import { IDisposable, IpylabModel } from './ipylab';
+import { IpylabModel } from './ipylab';
+import { IDisposable } from '@lumino/disposable';
 
 /**
  * The model for a command registry.

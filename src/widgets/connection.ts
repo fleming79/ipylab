@@ -3,7 +3,10 @@
 
 import { PromiseDelegate, UUID } from '@lumino/coreutils';
 import { Signal } from '@lumino/signaling';
-import { IObservableDisposable, IpylabModel, Widget } from './ipylab';
+import { IpylabModel } from './ipylab';
+import { IObservableDisposable } from '@lumino/disposable';
+import { Widget } from '@lumino/widgets';
+import { ILabShell } from '@jupyterlab/application';
 /**
  * Provides a connection to an object using a unique 'cid'.
  *
@@ -162,6 +165,32 @@ export class ConnectionModel extends IpylabModel {
 
   static getConnection(cid: string): IObservableDisposable | undefined {
     return Private.connections.get(cid);
+  }
+
+  /**
+   * Get the lumino widget from the shell using its id.
+   *
+   * @param id
+   * @returns
+   */
+  static getLuminoWidgetFromShell(id: string): Widget | null {
+    for (const area of [
+      'main',
+      'header',
+      'top',
+      'menu',
+      'left',
+      'right',
+      'bottom'
+    ]) {
+      for (const widget of IpylabModel.labShell.widgets(
+        area as ILabShell.Area
+      )) {
+        if (widget.id === id) {
+          return widget;
+        }
+      }
+    }
   }
 
   static new_cid(cls: string): string {

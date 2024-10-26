@@ -1,6 +1,8 @@
 // Copyright (c) ipylab contributors
 // Distributed under the terms of the Modified BSD License.
 
+import { KernelWidgetManager } from '@jupyter-widgets/jupyterlab-manager';
+import type { Kernel } from '@jupyterlab/services';
 import { PromiseDelegate } from '@lumino/coreutils';
 import { IpylabAutostart } from './autostart';
 import { IpylabModel } from './ipylab';
@@ -22,19 +24,19 @@ export class JupyterFrontEndModel extends IpylabModel {
     }
     this.updateAllSessions();
 
-    if (!JFEM.jfemPromises.has(this.kernel.id)) {
-      JFEM.jfemPromises.set(this.kernel.id, new PromiseDelegate());
+    if (!Private.jfemPromises.has(this.kernel.id)) {
+      Private.jfemPromises.set(this.kernel.id, new PromiseDelegate());
     }
     if (!Private.vpathTojfem.has(this.vpath)) {
       Private.vpathTojfem.set(this.vpath, new PromiseDelegate());
     }
     Private.vpathTojfem.get(this.vpath).resolve(this);
     await super.ipylabInit(base);
-    JFEM.jfemPromises.get(this.kernel.id).resolve(this);
+    Private.jfemPromises.get(this.kernel.id).resolve(this);
   }
 
   close(comm_closed?: boolean): Promise<void> {
-    JFEM.jfemPromises.delete(this.kernel.id);
+    Private.jfemPromises.delete(this.kernel.id);
     Private.vpathTojfem.delete(this.vpath);
     JFEM.labShell.currentChanged.disconnect(this.updateSessionInfo, this);
     JFEM.labShell.activeChanged.disconnect(this.updateSessionInfo, this);
@@ -87,7 +89,7 @@ export class JupyterFrontEndModel extends IpylabModel {
         )) as any;
       case 'shutdownKernel':
         if (payload.vpath) {
-          if (JFEM.jfemPromises.has(payload.vpath)) {
+          if (Private.jfemPromises.has(payload.vpath)) {
             await JFEM.getModel(payload.vpath).then(jfem =>
               jfem.kernel.shutdown()
             );
@@ -101,6 +103,30 @@ export class JupyterFrontEndModel extends IpylabModel {
       default:
         return await super.operation(op, payload);
     }
+  }
+
+  /**
+   * Ensure the JupyterFrontendModel 'app' is running in the kernel.
+   * @param kernel
+   */
+  static async ensureFrontend(kernel: Kernel.IKernelConnection, vpath = '') {
+    if (!Private.jfemPromises.has(kernel.id)) {
+      const manager = new KernelWidgetManager(kernel, IpylabModel.rendermime);
+      Private.jfemPromises.set(kernel.id, new PromiseDelegate());
+      await kernel.requestExecute(
+        {
+          code: `
+            import ipylab
+            ipylab.Ipylab._hook.start_app(vpath='${vpath}')`,
+          store_history: false
+        },
+        true
+      ).done;
+      if (!manager.restoredStatus) {
+        await new Promise(resolve => manager.restored.connect(resolve));
+      }
+    }
+    return await Private.jfemPromises.get(kernel.id).promise;
   }
 
   static async getModel(vpath: string) {
@@ -139,6 +165,14 @@ const JFEM = JupyterFrontEndModel;
  */
 namespace Private {
   export const vpathTojfem = new Map<
+    string,
+    PromiseDelegate<JupyterFrontEndModel>
+  >();
+
+  /**
+   * Promises to frontends that may be loading.
+   */
+  export const jfemPromises = new Map<
     string,
     PromiseDelegate<JupyterFrontEndModel>
   >();

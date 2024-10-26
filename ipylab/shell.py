@@ -111,7 +111,7 @@ class Shell(Ipylab):
                         break
             hooks["trait_add_fwd"] = [("widget", obj)]
             if isinstance(obj, ipylab.Panel):
-                hooks["add_to_tuple_fwd"].append((self, "connections"))
+                hooks["add_to_tuple_fwd"].append((obj, "connections"))
             args["ipy_model"] = obj.model_id
         else:
             args["evaluate"] = pack(obj)

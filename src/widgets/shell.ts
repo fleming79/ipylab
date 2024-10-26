@@ -3,7 +3,8 @@
 
 import { MainAreaWidget } from '@jupyterlab/apputils';
 import { UUID } from '@lumino/coreutils';
-import { IpylabModel, Widget } from './ipylab';
+import { IpylabModel } from './ipylab';
+import { Widget } from '@lumino/widgets';
 
 export class ShellModel extends IpylabModel {
   /**
@@ -30,7 +31,7 @@ export class ShellModel extends IpylabModel {
     // Wait for backend to load/reload plugins.
 
     const freshLoad = await IpylabModel.ipylabKernelReady.promise;
-    if (freshLoad && IpylabModel.jfemPromises.size <= 1 && !args.evaluate) {
+    if (freshLoad && !args.evaluate) {
       return;
     }
     await ShellModel.addToShell(args);

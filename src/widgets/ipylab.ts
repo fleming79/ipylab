@@ -8,7 +8,7 @@ import {
   WidgetModel
 } from '@jupyter-widgets/base';
 import { KernelWidgetManager } from '@jupyter-widgets/jupyterlab-manager';
-import { ILabShell, JupyterFrontEnd, LabShell } from '@jupyterlab/application';
+import { JupyterFrontEnd, LabShell } from '@jupyterlab/application';
 import {
   ICommandPalette,
   Notification,
@@ -23,14 +23,7 @@ import { ObservableMap } from '@jupyterlab/observables';
 import { IRenderMimeRegistry } from '@jupyterlab/rendermime';
 import type { Kernel, Session } from '@jupyterlab/services';
 import { ITranslator } from '@jupyterlab/translation';
-import { CommandRegistry } from '@lumino/commands';
-import {
-  JSONObject,
-  JSONValue,
-  PromiseDelegate,
-  UUID
-} from '@lumino/coreutils';
-import { IDisposable, IObservableDisposable } from '@lumino/disposable';
+import { JSONValue, PromiseDelegate, UUID } from '@lumino/coreutils';
 import { Signal } from '@lumino/signaling';
 import { Widget } from '@lumino/widgets';
 import { MODULE_NAME, MODULE_VERSION } from '../version';
@@ -45,19 +38,6 @@ import {
   toJSONsubstituteCylic,
   updateProperty
 } from './utils';
-export {
-  CommandRegistry,
-  IDisposable,
-  ILabShell,
-  ILauncher,
-  IObservableDisposable,
-  ISerializers,
-  ITranslator,
-  JSONObject,
-  JSONValue,
-  JupyterFrontEnd,
-  Widget
-};
 
 /**
  * Base model for common features
@@ -83,7 +63,7 @@ export class IpylabModel extends WidgetModel {
     this.set('ready', false);
     this.save_changes();
     this.on('msg:custom', this.onCustomMessage, this);
-    IpylabModel.onKernelLost(this.kernel, this.close, this);
+    IpylabModel.onKernelLost(this.kernel, this.onKernelLost, this);
     this.widget_manager.get_model(this.model_id).then(() => this.ipylabInit());
   }
 
@@ -117,6 +97,10 @@ export class IpylabModel extends WidgetModel {
   set_ready() {
     this.set('ready', true);
     this.save_changes();
+  }
+
+  onKernelLost() {
+    this.close(true);
   }
 
   close(comm_closed?: boolean): Promise<void> {
@@ -439,7 +423,7 @@ export class IpylabModel extends WidgetModel {
       throw new Error('Cancelling because a kernel was not provided');
     }
     const kernel = sessionContext.session.kernel;
-    await IpylabModel.ensureFrontend(kernel, vpath);
+    await IpylabModel.JFEM.ensureFrontend(kernel, vpath);
     return sessionContext;
   }
 
@@ -508,56 +492,6 @@ export class IpylabModel extends WidgetModel {
       );
     }
     return widget;
-  }
-
-  /**
-   * Get the lumino widget from the shell using its id.
-   *
-   * @param id
-   * @returns
-   */
-  static getLuminoWidgetFromShell(id: string): Widget | null {
-    for (const area of [
-      'main',
-      'header',
-      'top',
-      'menu',
-      'left',
-      'right',
-      'bottom'
-    ]) {
-      for (const widget of IpylabModel.labShell.widgets(
-        area as ILabShell.Area
-      )) {
-        if (widget.id === id) {
-          return widget;
-        }
-      }
-    }
-  }
-
-  /**
-   * Ensure the JupyterFrontendModel 'app' is running in the kernel.
-   * @param kernel
-   */
-  static async ensureFrontend(kernel: Kernel.IKernelConnection, vpath = '') {
-    if (!IpylabModel.jfemPromises.has(kernel.id)) {
-      const manager = new KernelWidgetManager(kernel, IpylabModel.rendermime);
-      IpylabModel.jfemPromises.set(kernel.id, new PromiseDelegate());
-      await kernel.requestExecute(
-        {
-          code: `
-            import ipylab
-            ipylab.Ipylab._hook.start_app(vpath='${vpath}')`,
-          store_history: false
-        },
-        true
-      ).done;
-      if (!manager.restoredStatus) {
-        await new Promise(resolve => manager.restored.connect(resolve));
-      }
-    }
-    return await IpylabModel.jfemPromises.get(kernel.id).promise;
   }
 
   /**
@@ -641,13 +575,6 @@ export class IpylabModel extends WidgetModel {
     );
   }
 
-  /**
-   * Promises to frontends that may be loading.
-   */
-  static jfemPromises = new Map<
-    string,
-    PromiseDelegate<JupyterFrontEndModel>
-  >();
   static get sessionManager(): Session.IManager {
     return IpylabModel.app.serviceManager.sessions;
   }

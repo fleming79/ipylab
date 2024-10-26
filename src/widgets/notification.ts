@@ -51,9 +51,13 @@ export class NotificationManagerModel extends IpylabModel {
   }
 
   public readonly base: typeof Notification.manager;
-  // notifications = new Set<NotifyObj>();
 }
 
+/**
+ * A small object to keep track of a notification in the notification manager by its id.
+ *
+ * It will dispose itself once the manager no longer 'has' the id registered.
+ */
 class NotifyLink implements IObservableDisposable {
   constructor(public id: string = '') {
     this.id = id;
