@@ -37,7 +37,7 @@ import {
   toFunction,
   toJSONsubstituteCylic,
   updateProperty
-} from './utils';
+} from '../utils';
 
 /**
  * Base model for common features
