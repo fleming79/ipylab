@@ -2,8 +2,7 @@
 // Distributed under the terms of the Modified BSD License.
 
 import { Notification } from '@jupyterlab/apputils';
-import { IObservableDisposable } from '@lumino/disposable';
-import { ISignal, Signal } from '@lumino/signaling';
+import { ObservableDisposable } from '../observable_disposable';
 import { IpylabModel } from './ipylab';
 /**
  * The model for a notification.
@@ -58,22 +57,15 @@ export class NotificationManagerModel extends IpylabModel {
  *
  * It will dispose itself once the manager no longer 'has' the id registered.
  */
-class NotifyLink implements IObservableDisposable {
+class NotifyLink extends ObservableDisposable {
   constructor(public id: string = '') {
+    super();
     this.id = id;
     this.manager.changed.connect(this._check_exists, this);
   }
 
   get manager() {
     return IpylabModel.Notification.manager;
-  }
-
-  get disposed(): ISignal<this, void> {
-    return this._disposed;
-  }
-
-  get isDisposed(): boolean {
-    return this._isDisposed;
   }
 
   _check_exists() {
@@ -88,11 +80,6 @@ class NotifyLink implements IObservableDisposable {
     }
     this.manager.changed.disconnect(this._check_exists, this);
     IpylabModel.Notification.manager.dismiss(this.id);
-    this._isDisposed = true;
-    this._disposed.emit(undefined);
-    Signal.clearData(this);
+    super.dispose();
   }
-
-  private _disposed = new Signal<this, void>(this);
-  private _isDisposed = false;
 }

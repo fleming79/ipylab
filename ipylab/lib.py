@@ -34,7 +34,7 @@ def start_app(vpath: str):
 
 @hookimpl
 def on_error(obj: Ipylab, source: ErrorSource, error: Exception):
-    # TODO: Better error logging.
+    # TODO: Better error logging. Probably using the log.
     msg = f"{error!r}"
     obj.log.error(msg)
     obj.app.dialog.show_error_message(str(source), str(traceback.format_tb(error.__traceback__)))
@@ -53,6 +53,9 @@ def task_result(obj: Ipylab, result: HasTraits, hooks: TaskHooks):  # noqa: ARG0
     for owner in hooks.pop("close_with_fwd", ()):
         # Close result with each item.
         if isinstance(owner, Ipylab) and isinstance(result, Widget):
+            if not owner.comm:
+                result.close()
+                raise RuntimeError(str(owner))
             owner.close_extras.add(result)
     for obj_ in hooks.pop("close_with_rev", ()):
         # Close each item with the result.

@@ -82,8 +82,10 @@ export class IpylabModel extends WidgetModel {
       [base, subpath] = this.toBaseAndSubpath(this.get('ipylab_base'), 'this');
       base = getNestedProperty({ obj: base, subpath, nullIfMissing: true });
       if (!base) {
+        this.send({
+          error: `Invalid ipylab_base '${this.get('ipylab_base')}'!`
+        });
         this.close();
-        this.error(`Invalid ipylab_base '${this.get('ipylab_base')}'!`);
       }
     }
     Object.defineProperty(this, 'base', {
@@ -199,6 +201,7 @@ export class IpylabModel extends WidgetModel {
       case 'getProperty':
         return await getNestedProperty(payload);
       case 'listProperties':
+        payload.obj = getNestedProperty(payload);
         return listProperties(payload);
       case 'setProperty':
         return setNestedProperty(payload);

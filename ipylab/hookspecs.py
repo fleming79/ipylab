@@ -55,19 +55,26 @@ async def autostart(app: ipylab.App) -> None | Awaitable[None]:
 
 @hookspec(firstresult=True)
 def autostart_result(app: ipylab.App, result: Awaitable | None) -> None | Literal[True]:
-    "Called with the result of autostart (firstresult=True)."
+    """
+    Called with the result of autostart.
+
+    Used by ipylab to ensure autostart coroutines are run in a task.
+    """
     # We use underscore so it is registered first
 
 
 @hookspec(firstresult=True)
 def namespace_objects(objects: dict, namespace_name: str, app: ipylab.App) -> None:
-    "Set objects that are available by default in the namespace (firstresult=True)."
+    """
+    Called when loading a namespace.
+
+    You can use this to customise the objects available in the namespace."""
 
 
 @hookspec(firstresult=True)
 def on_error(obj: ipylab.Ipylab, source: ErrorSource, error: Exception):
     """
-    Intercept an error message for logging purposes (firstresult=True).
+    Intercept an error message for logging purposes.
 
     Fired when an exception occurs trying to process a message from the frontend.
 
@@ -117,7 +124,7 @@ def opening_console(app: ipylab.App, args: dict, objects: dict, kwgs: IpylabKwgs
 @hookspec(firstresult=True)
 def vpath_getter(app: ipylab.App, kwgs: dict) -> Awaitable[str] | str:  # type: ignore
     """
-    Resolve with a request for a vpath (firstresult=True).
+    Resolve with a request for a vpath.
     """
 
 

@@ -10,6 +10,13 @@ import { FileDialog } from '@jupyterlab/filebrowser';
 import { IpylabModel } from './ipylab';
 
 export class DialogModel extends IpylabModel {
+  /**
+   * The default attributes.
+   */
+  defaults(): Backbone.ObjectHash {
+    return { ...super.defaults(), _model_name: 'DialogModel' };
+  }
+
   async operation(op: string, payload: any): Promise<any> {
     function _get_result(result: any): any {
       if (result.value === null) {
@@ -47,12 +54,5 @@ export class DialogModel extends IpylabModel {
       default:
         return await super.operation(op, payload);
     }
-  }
-
-  /**
-   * The default attributes.
-   */
-  defaults(): Backbone.ObjectHash {
-    return { ...super.defaults(), _model_name: 'DialogModel' };
   }
 }

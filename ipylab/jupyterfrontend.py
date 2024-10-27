@@ -104,7 +104,7 @@ class App(Ipylab):
         self.hook.autostart_result(app=self, result=result)
 
     @property
-    def rep_info(self):
+    def repr_info(self):
         return {"vpath": self.vpath}
 
     @override

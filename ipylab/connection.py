@@ -8,7 +8,7 @@ import weakref
 from typing import TYPE_CHECKING, Any, ClassVar, override
 
 from ipywidgets import Widget, register
-from traitlets import Bool, Instance, Unicode, observe
+from traitlets import Bool, Dict, Instance, Unicode, observe
 
 from ipylab.ipylab import Ipylab
 
@@ -67,10 +67,11 @@ class Connection(Ipylab):
     _connections: weakref.WeakValueDictionary[str, Self] = weakref.WeakValueDictionary()
     _model_name = Unicode("ConnectionModel").tag(sync=True)
     cid = Unicode(read_only=True, help="connection id").tag(sync=True)
-    prefix: ClassVar = f"{_PREFIX}Connection"
+    prefix: ClassVar = f"{_PREFIX}Connection{_SEP}"
     auto_dispose = Bool(False, read_only=True, help="Dispose of the object in frontend when closed.").tag(sync=True)
     _dispose = Bool(read_only=True).tag(sync=True)
     ipylab_base = None
+    info: Dict | None = None
 
     def __init_subclass__(cls, **kwargs) -> None:
         cls.prefix = f"{cls._PREFIX}{cls.__name__}{cls._SEP}"
@@ -92,7 +93,9 @@ class Connection(Ipylab):
 
     @property
     @override
-    def rep_info(self):
+    def repr_info(self):
+        if self.info:
+            return {"cid": self.cid, "info": self.info}
         return {"cid": self.cid}
 
     @classmethod
@@ -155,7 +158,7 @@ class Connection(Ipylab):
         return conn
 
 
-Connection._CLASS_DEFINITIONS[Connection.prefix] = Connection  # noqa: SLF001
+Connection._CLASS_DEFINITIONS[Connection.prefix.strip(Connection._SEP)] = Connection  # noqa: SLF001
 
 
 class ShellConnection(Connection):

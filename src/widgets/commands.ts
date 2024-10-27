@@ -4,6 +4,7 @@
 import { CommandRegistry } from '@lumino/commands';
 import { IpylabModel } from './ipylab';
 import { IDisposable } from '@lumino/disposable';
+import { ObservableDisposable } from '../observable_disposable';
 
 /**
  * The model for a command registry.
@@ -81,7 +82,7 @@ export class CommandRegistryModel extends IpylabModel {
     // Make a new object and define functions so we can dynamically update.
     delete options.icon;
     const isToggled = isToggleable ? () => options.isToggled ?? true : null;
-    const options_ = {
+    const mappings = {
       caption: () => options.caption ?? '',
       className: () => options.className ?? '',
       dataset: () => options.dataset ?? {},
@@ -100,10 +101,35 @@ export class CommandRegistryModel extends IpylabModel {
       mnemonic: () => Number(options.mnemonic ?? -1),
       usage: () => options.usage ?? ''
     };
-    const command = this.base.addCommand(id, options_ as any);
-    (command as any).id = id;
-    (command as any).config = options;
-    return command;
+    const command = this.base.addCommand(id, mappings as any);
+    return new CommandLink(command, id, options, mappings);
   }
   public readonly base: CommandRegistry;
+}
+
+class CommandLink extends ObservableDisposable {
+  constructor(
+    command: IDisposable,
+    id: string = '',
+    options: CommandRegistry.ICommandOptions,
+    mappings: any
+  ) {
+    super();
+    this.command = command;
+    this.id = id;
+    this.config = options;
+    this.mappings = mappings;
+  }
+
+  dispose(): void {
+    if (this.isDisposed) {
+      return;
+    }
+    this.command.dispose();
+    super.dispose();
+  }
+  readonly id: string;
+  readonly config: CommandRegistry.ICommandOptions;
+  readonly command: IDisposable;
+  readonly mappings: any;
 }

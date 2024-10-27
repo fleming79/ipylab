@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import inspect
 import json
 import traceback
@@ -11,7 +12,7 @@ import weakref
 from typing import TYPE_CHECKING, Any, TypeVar, Unpack
 
 from ipywidgets import Widget, register
-from traitlets import Bool, Container, Dict, HasTraits, Instance, Set, TraitType, Unicode, observe
+from traitlets import Bool, Container, Dict, HasTraits, Instance, Set, TraitError, TraitType, Unicode, observe
 
 import ipylab._frontend as _fe
 from ipylab.common import ErrorSource, IpylabKwgs, Obj, TaskHookType, Transform, TransformType, pack
@@ -19,7 +20,7 @@ from ipylab.common import ErrorSource, IpylabKwgs, Obj, TaskHookType, Transform,
 if TYPE_CHECKING:
     import logging
     from asyncio import Task
-    from collections.abc import Awaitable, Hashable, Iterable
+    from collections.abc import Awaitable, Hashable
     from typing import ClassVar
 
     from ipylab import App
@@ -112,6 +113,11 @@ class Ipylab(WidgetBase):
         pm.load_setuptools_entrypoints("ipylab")
         cls._hook = pm.hook
 
+    @classmethod
+    def _single_key(cls, kwgs: dict) -> Hashable:  # noqa: ARG003
+        """The key used for finding instances when SINGLE is enabled."""
+        return cls
+
     @property
     def plugin_manager(self):
         return self._plugin_manager
@@ -120,10 +126,10 @@ class Ipylab(WidgetBase):
     def hook(self):
         return self._hook
 
-    @classmethod
-    def _single_key(cls, kwgs: dict) -> Hashable:  # noqa: ARG003
-        """The key used for finding instances when SINGLE is enabled."""
-        return cls
+    @property
+    def repr_info(self) -> dict[str, Any] | str:
+        "Extra info to provide for __repr__."
+        return {}
 
     def __new__(cls, **kwgs) -> Self:
         model_id = kwgs.get("model_id") or cls._single_map.get(cls._single_key(kwgs)) if cls.SINGLE else None
@@ -158,7 +164,11 @@ class Ipylab(WidgetBase):
             status = "Not ready"
         else:
             status = ""
-        info = ", ".join(f"{k}={v!r}" for k, v in self.rep_info.items())
+        info = (
+            ", ".join(f"{k}={v!r}" for k, v in self.repr_info.items())
+            if isinstance(self.repr_info, dict)
+            else self.repr_info
+        )
         if status:
             return f"< {status}: {self.__class__.__name__}({info}) >"
         return f"{status}{self.__class__.__name__}({info})"
@@ -184,11 +194,12 @@ class Ipylab(WidgetBase):
             for obj, name in self._has_attrs_mappings:
                 if val := getattr(obj, name, None):
                     if val is self:
-                        obj.set_trait(name, None)
+                        with contextlib.suppress(TraitError):
+                            obj.set_trait(name, None)
                     elif isinstance(val, tuple):
                         obj.set_trait(name, tuple(v for v in val if v.comm))
             if self.SINGLE:
-                self._single_models.pop(change["old"].id)
+                self._single_models.pop(change["old"].comm_id, None)  # type: ignore
         if change["name"] == "ready":
             if self.ready:
                 self.ready_event.set()
@@ -198,59 +209,10 @@ class Ipylab(WidgetBase):
             else:
                 self.ready_event.clear()
 
-    def close(self):
-        self.send({"close": True})
-        super().close()
-
-    def on_error(self, source: ErrorSource, error: Exception):
-        self.hook.on_error(obj=self, source=source, error=error)
-
     def _check_closed(self):
         if not self._repr_mimebundle_:
             msg = f"This widget is closed {self!r}"
             raise RuntimeError(msg)
-
-    def add_to_tuple(self, owner: HasTraits, name: str):
-        """Add self to the tuple of obj."""
-
-        items = getattr(owner, name)
-        if self.comm and self not in items:
-            owner.set_trait(name, (*items, self))
-        # see: _observe_comm for removal
-        self._has_attrs_mappings.add((owner, name))
-
-    def add_as_trait(self, obj: HasTraits, name: str):
-        "Add self as a trait to obj."
-        self._check_closed()
-        obj.set_trait(name, self)
-        # see: _observe_comm for removal
-        self._has_attrs_mappings.add((obj, name))
-
-    @property
-    def rep_info(self) -> dict[str, Any]:
-        "Extra info to provide for __repr__."
-        return {}
-
-    def to_task(self, aw: Awaitable[T], name: str | None = None, *, hooks: TaskHookType = None) -> Task[T]:
-        """Run aw in a task.
-
-        If the task is running when this object is closed the task will be cancel.
-        Noting the corresponding promise in the frontend will run to completion.
-
-        aw: An awaitable to run in the task.
-
-        name: str
-            The name of the task.
-
-        hooks: TaskHookType
-
-        """
-
-        self._check_closed()
-        task = asyncio.create_task(self._wrap_awaitable(aw, hooks), name=name)
-        self._tasks.add(task)
-        task.add_done_callback(self._task_done_callback)
-        return task
 
     async def _wrap_awaitable(self, aw: Awaitable[T], hooks: TaskHookType) -> T:
         try:
@@ -286,13 +248,6 @@ class Ipylab(WidgetBase):
             )
             return IpylabFrontendError(msg)
         return IpylabFrontendError(f'{self.__class__.__name__} failed with message "{error}"')
-
-    def send(self, content, buffers=None):
-        try:
-            super().send(json.dumps(content, default=pack), buffers)
-        except Exception as e:
-            self.on_error(ErrorSource.SendError, e)
-            raise e from None
 
     async def _send_receive(self, content: dict):
         async with self:
@@ -351,13 +306,69 @@ class Ipylab(WidgetBase):
         """Perform an operation for a custom message with an ipylab_FE uuid."""
         raise NotImplementedError(operation)
 
+    def _obj_operation(self, base: Obj, subpath: str, operation: str, ipl_kwgs: IpylabKwgs, **kwgs):
+        return self.operation(
+            "genericOperation", genericOperation=operation, basename=base, subpath=subpath, **ipl_kwgs, **kwgs
+        )
+
+    def close(self):
+        self.send({"close": True})
+        super().close()
+
+    def on_error(self, source: ErrorSource, error: Exception):
+        self.hook.on_error(obj=self, source=source, error=error)
+
+    def add_to_tuple(self, owner: HasTraits, name: str):
+        """Add self to the tuple of obj."""
+
+        items = getattr(owner, name)
+        if self.comm and self not in items:
+            owner.set_trait(name, (*items, self))
+        # see: _observe_comm for removal
+        self._has_attrs_mappings.add((owner, name))
+
+    def add_as_trait(self, obj: HasTraits, name: str):
+        "Add self as a trait to obj."
+        self._check_closed()
+        obj.set_trait(name, self)
+        # see: _observe_comm for removal
+        self._has_attrs_mappings.add((obj, name))
+
+    def send(self, content, buffers=None):
+        try:
+            super().send(json.dumps(content, default=pack), buffers)
+        except Exception as e:
+            self.on_error(ErrorSource.SendError, e)
+            raise e from None
+
+    def to_task(self, aw: Awaitable[T], name: str | None = None, *, hooks: TaskHookType = None) -> Task[T]:
+        """Run aw in a task.
+
+        If the task is running when this object is closed the task will be cancel.
+        Noting the corresponding promise in the frontend will run to completion.
+
+        aw: An awaitable to run in the task.
+
+        name: str
+            The name of the task.
+
+        hooks: TaskHookType
+
+        """
+
+        self._check_closed()
+        task = asyncio.create_task(self._wrap_awaitable(aw, hooks), name=name)
+        self._tasks.add(task)
+        task.add_done_callback(self._task_done_callback)
+        return task
+
     def operation(
         self,
         operation: str,
         *,
         transform: TransformType = Transform.auto,
-        toLuminoWidget: Iterable[str] | None = None,
-        toObject: Iterable[str] = (),
+        toLuminoWidget: list[str] | None = None,
+        toObject: list[str] | None = None,
         hooks: TaskHookType = None,
         **kwgs,
     ) -> Task[Any]:
@@ -370,73 +381,48 @@ class Ipylab(WidgetBase):
             The transform to apply to the result of the operation.
             see: ipylab.Transform
 
-        toLuminoWidget: Iterable[str] | None
-            A list of item name mappings to convert to a Lumino widget in the frontend.
-            Each string should correspond to the dotted subpath/index in kwgs that has
-            the packed (json version of the widget or id of a lumino widget)
+        toLuminoWidget: List[str] | None
+            A list of item name mappings to convert to a Lumino widget in the frontend
+            prior to performing the operation.
 
-        toObject:  Iterable[str] | None
-            A list of item name mappings in the .
+        toObject:  List[str] | None
+            A list of item name mappings to convert to objects in the frontend prior
+            to performing the operation.
 
-            ```
-            Examples:
-            --------
-
-            ```python
-            kwgs = {"widget": "IPY_MODEL_<UUID>", "options": {"ref": "IPY_MODEL_<UUID>"}}
-            toLuminoWidget = ["widget", "options.ref"]
-
-            kwgs = {
-                "args": [
-                    "IPY_MODEL_<UUID>",
-                    1,
-                    "dotted.attribute.name",
-                    "IPY_MODEL_<UUID>.value",
-                ]
-            }
-            toLuminoWidget = ["args[0]", "kwgs.options.ref"]
-            toObject = ["args[2]", "args[3]"]
-        basename: Base | None
-            specify the 'obj' to use in the fronted.
+        hooks: TaskHookType
+            see: TaskHooks
         """
         # validation
         self._check_closed()
         if not operation or not isinstance(operation, str):
             msg = f"Invalid {operation=}"
             raise ValueError(msg)
-        ipylab_PY = str(uuid.uuid4())  # noqa: N806
+        name = str(uuid.uuid4())
         content = {
-            "ipylab_PY": ipylab_PY,
+            "ipylab_PY": name,
             "operation": operation,
             "kwgs": kwgs,
             "transform": Transform.validate(transform),
         }
         if toLuminoWidget:
-            content["toLuminoWidget"] = list(map(str, toLuminoWidget))
+            content["toLuminoWidget"] = toLuminoWidget
         if toObject:
-            content["toObject"] = list(map(str, toObject))
-
-        return self.to_task(self._send_receive(content), name=ipylab_PY, hooks=hooks)
-
-    def _obj_operation(self, base: Obj, subpath: str, operation: str, args: tuple, **kwgs: Unpack[IpylabKwgs]):
-        return self.operation(
-            "genericOperation", genericOperation=operation, basename=base, subpath=subpath, args=args, **kwgs
-        )
+            content["toObject"] = toObject
+        return self.to_task(self._send_receive(content), name=name, hooks=hooks)
 
     def execute_method(self, subpath: str, *args, obj=Obj.base, **kwgs: Unpack[IpylabKwgs]):
-        return self._obj_operation(obj, subpath, "executeMethod", args, **kwgs)
+        return self._obj_operation(obj, subpath, "executeMethod", kwgs, args=args)
 
     def get_property(self, subpath: str, *, obj=Obj.base, null_if_missing=False, **kwgs: Unpack[IpylabKwgs]):
-        return self._obj_operation(obj, subpath, "getProperty", (null_if_missing,), **kwgs)
+        return self._obj_operation(obj, subpath, "getProperty", kwgs, null_if_missing=null_if_missing)
 
     def set_property(self, subpath: str, value, *, obj=Obj.base, **kwgs: Unpack[IpylabKwgs]):
-        return self._obj_operation(obj, subpath, "setProperty", value, **kwgs)
+        return self._obj_operation(obj, subpath, "setProperty", kwgs, value=value)
 
     def update_property(self, subpath: str, value: dict[str, Any], *, obj=Obj.base, **kwgs: Unpack[IpylabKwgs]):
-        return self._obj_operation(obj, subpath, "updateProperty", (value,), **kwgs)
+        return self._obj_operation(obj, subpath, "updateProperty", kwgs, value=value)
 
     def list_properties(
         self, subpath="", *, obj=Obj.base, depth=3, skip_hidden=True, **kwgs: Unpack[IpylabKwgs]
     ) -> Task[dict]:
-        args = ({"depth": depth, "omitHidden": skip_hidden},)
-        return self._obj_operation(obj, subpath, "listProperties", args, **kwgs)
+        return self._obj_operation(obj, subpath, "listProperties", kwgs, depth=depth, omitHidden=skip_hidden)

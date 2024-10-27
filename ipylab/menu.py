@@ -2,37 +2,32 @@
 # Distributed under the terms of the Modified BSD License.
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 from ipywidgets import TypedTuple
-from traitlets import Container, Instance, Unicode, observe
+from traitlets import Bool, Container, Dict, Instance, Union
 
-from ipylab.commands import CommandConnection
+from ipylab.commands import APP_COMMANDS_NAME, CommandConnection, CommandRegistry
+from ipylab.common import Obj, pack
 from ipylab.connection import Connection
-from ipylab.ipylab import Ipylab, Transform
+from ipylab.ipylab import Ipylab, IpylabBase, Transform
 
 if TYPE_CHECKING:
     from asyncio import Task
     from typing import Literal
+
+    from ipylab.common import TaskHooks, TransformType
 
 
 __all__ = ["MenuItemConnection", "MenuConnection", "MainMenu", "ContextMenu"]
 
 
 class MenuItemConnection(Connection):
-    """A connection to an ipylab menu item.
+    """A connection to an ipylab menu item."""
 
-    ref:
-    """
-
-    @observe("comm")
-    def _ipylab_observe_comm(self, _):
-        if self.comm and (cmd := CommandConnection.get_existing_connection(self.info.get("command", ""), quiet=True)):
-            # Dispose when the command is disposed.
-            cmd.observe(lambda _: self.close())
-
-    def close(self):
-        super().close(dispose=True)
+    auto_dispose = Bool(True).tag(sync=True)
+    info = Dict()
+    menu: Instance[RankedMenu] = Instance("ipylab.menu.RankedMenu")
 
 
 class RankedMenu(Ipylab):
@@ -41,24 +36,7 @@ class RankedMenu(Ipylab):
     ref: https://jupyterlab.readthedocs.io/en/4.0   .x/api/classes/ui_components.RankedMenu.html
     """
 
-    items: Container[tuple[MenuItemConnection, ...]] = TypedTuple(trait=Instance(MenuItemConnection))
-
-    @observe("comm")
-    def _ipylab_observe_comm(self, _):
-        if not self.comm:
-            for item in self.items:
-                item.close()
-
-    def __new__(cls, *, model_id=None, **kwgs):
-        kwgs.pop("basename", None)
-        return super().__new__(cls, model_id=model_id, **kwgs)
-
-    def __init__(self, *, model_id=None, basename="", **kwgs):
-        if self._async_widget_base_init_complete:
-            return
-        if basename:
-            self.set_trait("_basename", basename)
-        super().__init__(model_id=model_id, **kwgs)
+    connections: Container[tuple[MenuItemConnection, ...]] = TypedTuple(trait=Instance(MenuItemConnection))
 
     def add_item(
         self,
@@ -79,8 +57,7 @@ class RankedMenu(Ipylab):
             info = {"rank": rank, "args": args, "type": type, "selector": selector}
         else:
             info = {"rank": rank, "args": args, "type": type}
-
-        as_object = None
+        to_object = []
         match type:
             case "command":
                 if not command:
@@ -95,22 +72,17 @@ class RankedMenu(Ipylab):
                     msg = "`submenu` must be an instance of MenuItemConnection"
                     raise TypeError(msg)
                 info["submenu"] = submenu
-                as_object = ["args.0.submenu"]
+                to_object = ["args[0].submenu"]
             case _:
                 msg = f"Invalid type {type}"
                 raise ValueError(msg)
-        task = self.execute_method(
-            "addItem",
-            info,
-            transform={
-                "transform": Transform.connection,
-                "cid": MenuItemConnection.to_cid(),
-                "auto_dispose": True,
-                "info": info,
-            },
-            toObject=as_object,
-        )
-        return self.to_task(self._add_to_tuple_trait(self, "items", task))
+        hooks: TaskHooks = {
+            "trait_add_fwd": [("info", info), ("menu", self)],
+            "close_with_fwd": [self],
+            "add_to_tuple_fwd": [(self, "connections")],
+        }
+        transform: TransformType = {"transform": Transform.connection, "cid": MenuItemConnection.to_cid()}
+        return self.execute_method("addItem", info, hooks=hooks, transform=transform, toObject=to_object)
 
     def activate(self):
         async def activate():
@@ -124,71 +96,104 @@ class RankedMenu(Ipylab):
 class MenuConnection(RankedMenu, Connection):
     """A connection to a custom menu"""
 
+    auto_dispose = Bool(True).tag(sync=True)
+    info = Dict()
+    commands = Instance(CommandRegistry)
 
-class MainMenu(Ipylab):
+
+class Menu(RankedMenu):
+    SINGLE = True
+
+    ipylab_base = IpylabBase(Obj.IpylabModel, "palette").tag(sync=True)
+
+    commands = Instance(CommandRegistry)
+    connections: Container[tuple[MenuConnection, ...]] = TypedTuple(
+        trait=Union([Instance(MenuConnection), Instance(MenuItemConnection)])
+    )
+
+    @classmethod
+    @override
+    def _single_key(cls, kwgs: dict):
+        return cls, kwgs["commands"]
+
+    def __init__(self, *, commands: CommandRegistry, **kwgs):
+        commands.close_extras.add(self)
+        super().__init__(commands=commands, **kwgs)
+
+    def create_menu(self, label: str, rank: int = 500) -> Task[MenuConnection]:
+        "Make a new menu that can be used where a menu is required."
+        cid = MenuConnection.to_cid()
+        options = {"id": cid, "label": label, "rank": int(rank)}
+        hooks: TaskHooks = {
+            "trait_add_fwd": [("info", options), ("commands", self.commands)],
+            "add_to_tuple_fwd": [(self, "connections")],
+            "close_with_fwd": [self],
+        }
+        return self.app.execute_method(
+            "generateMenu",
+            f"{pack(self.commands)}.base",
+            options,
+            (Obj.this, "translator"),
+            obj=Obj.MainMenu,
+            toObject=["args[0]", "args[2]"],
+            transform={"transform": Transform.connection, "cid": cid},
+            hooks=hooks,
+        )
+
+
+class MainMenu(Menu):
     """Direct access to the Jupyterlab main menu.
 
     ref: https://jupyterlab.readthedocs.io/en/4.0.x/api/classes/mainmenu.MainMenu.html
     """
 
-    _basename = Unicode("menu").tag(sync=True)
-    SINGLETON = True
+    SINGLE = True
 
-    edit_menu = Instance(RankedMenu, kw={"basename": "menu.editMenu"})
-    file_menu = Instance(RankedMenu, kw={"basename": "menu.fileMenu"})
-    kernel_menu = Instance(RankedMenu, kw={"basename": "menu.kernelMenu"})
-    run_menu = Instance(RankedMenu, kw={"basename": "menu.runMenu"})
-    settings_menu = Instance(RankedMenu, kw={"basename": "menu.settingsMenu"})
-    view_menu = Instance(RankedMenu, kw={"basename": "menu.viewMenu"})
-    tabs_menu = Instance(RankedMenu, kw={"basename": "menu.tabsMenu"})
+    ipylab_base = IpylabBase(Obj.IpylabModel, "mainMenu").tag(sync=True)
 
-    menus: Container[tuple[MenuConnection, ...]] = TypedTuple(trait=Instance(MenuConnection))
-    _all_menus: Container[tuple[MenuConnection, ...]] = TypedTuple(trait=Instance(MenuConnection))
+    edit_menu = Instance(RankedMenu, kw={"ipylab_base": (Obj.IpylabModel, "menu.editMenu")})
+    file_menu = Instance(RankedMenu, kw={"basename": (Obj.IpylabModel, "menu.fileMenu")})
+    kernel_menu = Instance(RankedMenu, kw={"basename": (Obj.IpylabModel, "menu.kernelMenu")})
+    run_menu = Instance(RankedMenu, kw={"basename": (Obj.IpylabModel, "menu.runMenu")})
+    settings_menu = Instance(RankedMenu, kw={"basename": (Obj.IpylabModel, "menu.settingsMenu")})
+    view_menu = Instance(RankedMenu, kw={"basename": (Obj.IpylabModel, "menu.viewMenu")})
+    tabs_menu = Instance(RankedMenu, kw={"basename": (Obj.IpylabModel, "menu.tabsMenu")})
 
-    def add_menu(self, label: str, *, update=True, rank: int = 500) -> Task[MenuConnection]:
+    @classmethod
+    @override
+    def _single_key(cls, kwgs: dict):
+        return cls
+
+    def __init__(self):
+        if self._async_widget_base_init_complete:
+            return
+        super().__init__(commands=CommandRegistry(name=APP_COMMANDS_NAME))
+
+    def add_menu(self, menu: MenuConnection, *, update=True, rank: int = 500) -> Task[None]:
         """Add a top level menu to the shell.
 
         ref: https://jupyterlab.readthedocs.io/en/4.0.x/api/classes/mainmenu.MainMenu.html#addMenu
         """
-        cid = MenuConnection.to_cid(label)
-        task = self._generate_menu(id=cid, label=label, cid=cid, rank=rank)
-
-        async def add_menu():
-            menu = await task
-            await self.execute_method("addMenu", menu, update, {"rank": rank}, toObject=["args.0"])
-            return menu
-
-        return self.to_task(self._add_to_tuple_trait(self, "menus", add_menu()))
-
-    def create_menu(self, label: str, *, rank: int = 500) -> Task[MenuConnection]:
-        """Make a new unique menu, likely to be used as a submenu."""
-        cid = MenuConnection.to_cid()
-        return self._generate_menu(id=f"{cid}|{label}", label=label, cid=cid, rank=rank)
-
-    def _generate_menu(self, *, id: str, label: str, cid: str, rank: int = 500) -> Task[MenuConnection]:  # noqa: A002
-        "Make a new menu that can be used where a menu is required."
-        if existing := MenuConnection.get_existing_connection(cid, quiet=True):
-            existing.close(dispose=True)
-        info = {"id": id, "label": label, "rank": int(rank)}
-        coro = self.app.operation(
-            "generateMenu",
-            options=info,
-            transform={"transform": Transform.connection, "cid": cid, "auto_dispose": True, "info": info},
-        )
-        return self.to_task(self._add_to_tuple_trait(self, "_all_menus", coro))
+        options = {"rank": rank}
+        return self.execute_method("addMenu", menu, update, options, toObject=["args[0]"])
 
 
-class ContextMenuConnection(RankedMenu, Connection):
-    """A connection to a custom context menu"""
+class ContextMenu(Menu):
+    """Menu available on mouse right click."""
 
+    SINGLE = True
+    # TODO: Support custom context menus.
+    # This would require a model similar to CommandRegistryModel.
 
-class ContextMenu(RankedMenu):
-    """Direct access to the Jupyterlab context menu."""
+    ipylab_base = IpylabBase(Obj.IpylabModel, "app.contextMenu").tag(sync=True)
 
-    _basename = Unicode("app.contextMenu").tag(sync=True)
-    SINGLETON = True
+    @classmethod
+    @override
+    def _single_key(cls, kwgs: dict):
+        return cls
 
-    _all_menus: Container[tuple[ContextMenuConnection, ...]] = TypedTuple(trait=Instance(ContextMenuConnection))
+    def __init__(self):
+        super().__init__(commands=CommandRegistry(name=APP_COMMANDS_NAME))
 
     def add_item(
         self,
@@ -206,3 +211,7 @@ class ContextMenu(RankedMenu):
         ref: https://jupyterlab.readthedocs.io/en/stable/extension/extension_points.html#context-menu
         """
         return super().add_item(command=command, selector=selector, submenu=submenu, rank=rank, type=type, **args)
+
+    @override
+    def activate(self):
+        raise NotImplementedError
