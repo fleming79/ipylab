@@ -11,7 +11,7 @@ packaging instructions are in the `pyproject.toml` file to wrap your extension i
 Python package. Before generating a package, you first need to install some tools:
 
 ```bash
-pip install build twine hatch
+pip install -e .[dev]
 ```
 
 Bump the version using `hatch`. By default this will create a tag.
@@ -36,7 +36,7 @@ git clean -dfX
 To create a Python source package (`.tar.gz`) and the binary package (`.whl`) in the `dist/` directory, do:
 
 ```bash
-python -m build
+hatch build
 ```
 
 > `python setup.py sdist bdist_wheel` is deprecated and will not work for this package.

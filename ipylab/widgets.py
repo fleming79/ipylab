@@ -17,9 +17,9 @@ from ipylab.ipylab import WidgetBase
 
 if TYPE_CHECKING:
     from asyncio import Task
+    from typing import Unpack
 
     from ipylab import App
-    from ipylab._compat.typing import Unpack
 
 
 @register

@@ -15,9 +15,7 @@ from ipylab.ipylab import Ipylab
 
 if TYPE_CHECKING:
     from collections.abc import Generator
-    from typing import Literal, overload
-
-    from ipylab._compat.typing import Self
+    from typing import Literal, Self, overload
 
 
 @register

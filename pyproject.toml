@@ -10,7 +10,7 @@ build-backend = "hatchling.build"
 name = "ipylab"
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 classifiers = [
   "Framework :: Jupyter",
   "Framework :: Jupyter :: JupyterLab",
@@ -20,9 +20,9 @@ classifiers = [
   "License :: OSI Approved :: BSD License",
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
 ]
 
 
@@ -31,8 +31,7 @@ dependencies = [
   "ipywidgets>=8.1.5",
   "jupyterlab_widgets>=3.0.11",
   "pluggy~=1.1",
-  "backports.strenum; python_version < '3.11'",
-  "typing_extensions; python_version < '3.11'",
+  "typing_extensions; python_version < '3.12'",
 ]
 dynamic = ["version", "description", "authors", "urls", "keywords"]
 
@@ -94,7 +93,7 @@ ignore = ["W002"]
 
 [tool.ruff]
 extend = "ruff_defaults.toml"
-target-version = "py310"
+target-version = "py311"
 src = ['docs']
 
 [tool.codespell]

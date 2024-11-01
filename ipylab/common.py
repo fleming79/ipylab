@@ -5,14 +5,13 @@ from __future__ import annotations
 
 import inspect
 import typing
-from typing import TYPE_CHECKING, Any, Literal
+from enum import StrEnum
+from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict
 
 import pluggy
 from ipywidgets import Widget, widget_serialization
 
 import ipylab
-from ipylab._compat.enum import StrEnum
-from ipylab._compat.typing import NotRequired, TypedDict
 
 __all__ = ["Area", "Obj", "InsertMode", "Transform", "TransformType", "hookimpl", "pack", "IpylabKwgs"]
 
@@ -213,8 +212,8 @@ TransformType = Transform | TransformDictAdvanced | TransformDictFunction | Tran
 
 class IpylabKwgs(TypedDict):
     transform: NotRequired[TransformType]
-    toLuminoWidget: NotRequired[list[str]]  # noqa: N815
-    toObject: NotRequired[list[str]]  # noqa: N815
+    toLuminoWidget: NotRequired[list[str]]
+    toObject: NotRequired[list[str]]
     hooks: NotRequired[TaskHookType]
 
 

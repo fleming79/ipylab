@@ -38,7 +38,7 @@ def _jupyter_labextension_paths():
     return [{"src": "labextension", "dest": "ipylab"}]
 
 
+JupyterFrontEnd = App
+
 plugin_manager = _get_plugin_manager()
 del _get_plugin_manager
-
-JupyterFrontEnd = App

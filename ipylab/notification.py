@@ -4,14 +4,14 @@
 from __future__ import annotations
 
 import inspect
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict
 
 import traitlets
 from ipywidgets import TypedTuple, register
 from traitlets import Bool, Container, Dict, Instance, Unicode
 
 from ipylab import Connection, NotificationType, Transform, pack
-from ipylab._compat.typing import NotRequired, TypedDict, override
+from ipylab._compat.typing import override
 from ipylab.common import Obj, TaskHooks, TransformType
 from ipylab.ipylab import Ipylab, IpylabBase
 

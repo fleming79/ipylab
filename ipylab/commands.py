@@ -5,13 +5,13 @@ from __future__ import annotations
 
 import functools
 import inspect
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, NotRequired, TypedDict, Unpack
 
 from ipywidgets import TypedTuple
 from traitlets import Bool, Container, Dict, Instance, Tuple, Unicode
 from traitlets import Callable as CallableTrait
 
-from ipylab._compat.typing import Any, NotRequired, TypedDict, Unpack, override
+from ipylab._compat.typing import override
 from ipylab.common import IpylabKwgs, Obj, TaskHooks, TransformType, pack
 from ipylab.connection import Connection
 from ipylab.ipylab import Ipylab, IpylabBase, Transform, register
@@ -30,14 +30,14 @@ APP_COMMANDS_NAME = "Jupyterlab"
 
 class CommandOptions(TypedDict):
     caption: NotRequired[str]
-    className: NotRequired[str]  # noqa: N815
+    className: NotRequired[str]
     dataset: NotRequired[Any]
-    describedBy: NotRequired[dict]  # noqa: N815
-    iconClass: NotRequired[str]  # noqa: N815
-    iconLabel: NotRequired[str]  # noqa: N815
-    isEnabled: NotRequired[bool]  # noqa: N815
-    isToggled: NotRequired[bool]  # noqa: N815
-    isVisible: NotRequired[bool]  # noqa: N815
+    describedBy: NotRequired[dict]
+    iconClass: NotRequired[str]
+    iconLabel: NotRequired[str]
+    isEnabled: NotRequired[bool]
+    isToggled: NotRequired[bool]
+    isVisible: NotRequired[bool]
     label: NotRequired[str]
     mnemonic: NotRequired[str]
     usage: NotRequired[str]

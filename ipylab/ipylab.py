@@ -22,10 +22,9 @@ from ipylab.log import LogPayloadType, LogTypes
 if TYPE_CHECKING:
     from asyncio import Task
     from collections.abc import Awaitable, Callable, Hashable
-    from typing import ClassVar
+    from typing import ClassVar, Self, Unpack
 
     from ipylab import App
-    from ipylab._compat.typing import Self, Unpack
 
 
 __all__ = ["Ipylab", "WidgetBase"]
