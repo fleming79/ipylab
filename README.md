@@ -88,20 +88,38 @@ jupyter lab
 
 ```bash
 # create a new conda environment
-mamba create -n ipylab -c conda-forge jupyter-packaging nodejs python -y
+mamba create -n ipylab -c conda-forge nodejs python=3.10 -y
 
 # activate the environment
 conda activate ipylab
 
 # install the Python package
-python -m pip install -e ".[dev]"
+pip install -e ".[dev]"
 
 # link the extension files
 jupyter labextension develop . --overwrite
 
 # compile the extension
-jlpm && jlpm run build
+jlpm clean
+jlpm build
+
+# pre-commit (optional)
+pip install pre-commit
+pre-commit run
+
+# or, to install the git hook
+pre-commit install
+
+# Use jlpm script to lint the JS
+jlpm lint
+#or
+jlpm lint:check
+
 ```
+
+### VS code debugging
+
+A config file is included to debug ipylab with Firefox.
 
 ## Related projects
 

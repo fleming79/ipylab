@@ -1,175 +1,102 @@
 // Copyright (c) ipylab contributors
 // Distributed under the terms of the Modified BSD License.
 
-import { JupyterFrontEnd, ILabShell } from '@jupyterlab/application';
+import { MainAreaWidget } from '@jupyterlab/apputils';
+import { UUID } from '@lumino/coreutils';
+import { IpylabModel } from './ipylab';
+import { Widget } from '@lumino/widgets';
 
-import { DOMUtils } from '@jupyterlab/apputils';
-
-import {
-  ISerializers,
-  WidgetModel,
-  unpack_models
-} from '@jupyter-widgets/base';
-
-import { ArrayExt } from '@lumino/algorithm';
-
-import { Message, MessageLoop } from '@lumino/messaging';
-
-import { MODULE_NAME, MODULE_VERSION } from '../version';
-
-/**
- * The model for a shell.
- */
-export class ShellModel extends WidgetModel {
+export class ShellModel extends IpylabModel {
   /**
    * The default attributes.
    */
-  defaults(): any {
-    return {
-      ...super.defaults(),
-      _model_name: ShellModel.model_name,
-      _model_module: ShellModel.model_module,
-      _model_module_version: ShellModel.model_module_version,
-      _widgets: []
-    };
+  defaults(): Backbone.ObjectHash {
+    return { ...super.defaults(), _model_name: 'ShellModel' };
   }
 
-  /**
-   * Initialize a ShellModel instance.
-   *
-   * @param attributes The base attributes.
-   * @param options The initialization options.
-   */
-  initialize(attributes: any, options: any): void {
-    this._shell = ShellModel.shell;
-    this._labShell = ShellModel.labShell;
-
-    super.initialize(attributes, options);
-    this.on('msg:custom', this._onMessage.bind(this));
-
-    // restore existing widgets
-    const widgets = this.get('_widgets');
-    widgets.forEach((w: any) => this._add(w));
-  }
-
-  /**
-   * Add a widget to the application shell
-   *
-   * @param payload The payload to add
-   */
-  private async _add(payload: any): Promise<string> {
-    const { serializedWidget, area, args, id } = payload;
-    const model = await unpack_models(serializedWidget, this.widget_manager);
-    const view = await this.widget_manager.create_view(model, {});
-    const title = await unpack_models(model.get('title'), this.widget_manager);
-    const luminoWidget = view.luminoWidget;
-
-    luminoWidget.id = id ?? DOMUtils.createDomID();
-
-    MessageLoop.installMessageHook(
-      luminoWidget,
-      (handler: any, msg: Message) => {
-        switch (msg.type) {
-          case 'close-request': {
-            const widgets = this.get('_widgets').slice();
-            ArrayExt.removeAllWhere(widgets, (w: any) => w.id === handler.id);
-            this.set('_widgets', widgets);
-            this.save_changes();
-            break;
-          }
-        }
-        return true;
-      }
-    );
-
-    const updateTitle = async (): Promise<void> => {
-      luminoWidget.title.caption = title.get('caption');
-      luminoWidget.title.className = title.get('class_name');
-      luminoWidget.title.closable = title.get('closable');
-      luminoWidget.title.label = title.get('label');
-      luminoWidget.title.dataset = title.get('dataset');
-      luminoWidget.title.iconLabel = title.get('icon_label');
-
-      const icon = await unpack_models(title.get('icon'), this.widget_manager);
-      luminoWidget.title.icon = icon ? icon.labIcon : null;
-      luminoWidget.title.iconClass = icon ? null : title.get('icon_class');
-    };
-
-    title.on('change', updateTitle);
-    void updateTitle();
-
-    if ((area === 'left' || area === 'right') && this._labShell) {
-      let handler;
-      if (area === 'left') {
-        handler = this._labShell['_leftHandler'];
-      } else {
-        handler = this._labShell['_rightHandler'];
-      }
-
-      // handle tab closed event
-      handler.sideBar.tabCloseRequested.connect((sender: any, tab: any) => {
-        tab.title.owner.close();
-      });
-
-      luminoWidget.addClass('jp-SideAreaWidget');
-    }
-
-    this._shell.add(luminoWidget, area, args);
-    return luminoWidget.id;
-  }
-
-  /**
-   * Handle a custom message from the backend.
-   *
-   * @param msg The message to handle.
-   */
-  private async _onMessage(msg: any): Promise<void> {
-    switch (msg.func) {
-      case 'add': {
-        const id = await this._add(msg.payload);
-        // keep track of the widgets added to the shell
-        const widgets = this.get('_widgets');
-        this.set(
-          '_widgets',
-          widgets.concat({
-            ...msg.payload,
-            id
-          })
-        );
-        this.save_changes();
-        break;
-      }
-      case 'expandLeft': {
-        if (this._labShell) {
-          this._labShell.expandLeft();
-        }
-        break;
-      }
-      case 'expandRight': {
-        if (this._labShell) {
-          this._labShell.expandRight();
-        }
-        break;
-      }
+  async operation(op: string, payload: any): Promise<any> {
+    switch (op) {
+      case 'addToShell':
+        return await ShellModel.addToShell(payload.args);
       default:
-        break;
+        return await super.operation(op, payload);
     }
   }
 
-  static serializers: ISerializers = {
-    ...WidgetModel.serializers
-  };
+  /**
+   * Provided for IpylabModel.tracker for restoring widgets to the shell.
+   * @param args `ipylabSettings` in 'addToShell'
+   */
+  static async restoreToShell(args: any) {
+    // Wait for backend to load/reload plugins.
+    await ShellModel.JFEM.getModelByVpath(args.vpath);
+    try {
+      await ShellModel.addToShell(args);
+    } catch (e) {
+      if (args.evaluate) {
+        throw e;
+      }
+    }
+  }
 
-  static model_name = 'ShellModel';
-  static model_module = MODULE_NAME;
-  static model_module_version = MODULE_VERSION;
-  static view_name: string = null;
-  static view_module: string = null;
-  static view_module_version = MODULE_VERSION;
+  /**
+   * Add a widget to the application shell.
+   *
+   * This function can handle ipywidgets and native Widgets and  be used to move
+   * widgets about the shell.
+   *
+   * Ipywidgets are added to a tracker enabling restoration from a
+   * running kernel such as page refreshing and switching workspaces.
+   *
+   * Generative widget creation is supported with 'evaluate' using the same
+   * code as 'evalute'. The evaluated code MUST return a widget with a view to be valid.
+   *
+   * @param args An object with area, options, cid, id, vpath & evaluate.
+   */
 
-  private _shell: JupyterFrontEnd.IShell;
-  private _labShell: ILabShell;
+  private static async addToShell(args: any): Promise<Widget> {
+    let widget: Widget | MainAreaWidget;
 
-  static shell: JupyterFrontEnd.IShell;
-  static labShell: ILabShell;
+    try {
+      widget = await IpylabModel.toLuminoWidget(args);
+      // Create a new lumino widget
+    } catch (e) {
+      if (args.evaluate) {
+        // Evaluate code in python to get a panel and then add it to the shell.
+        const jfem = await IpylabModel.JFEM.getModelByVpath(args.vpath);
+        return await jfem.scheduleOperation('shell_eval', args, 'object');
+      } else {
+        throw e;
+      }
+    }
+    if (
+      (args.area === 'main' && !(widget instanceof MainAreaWidget)) ||
+      typeof widget.title === 'undefined'
+    ) {
+      // Wrap the widget with a MainAreaWidget
+      const w = (widget = new MainAreaWidget({ content: widget }));
+      w.node.removeChild(w.toolbar.node);
+      w.addClass('ipylab-MainArea');
+    }
+    args.cid =
+      args.cid || IpylabModel.ConnectionModel.new_cid('ShellConnection');
+    IpylabModel.ConnectionModel.registerConnection(args.cid, widget);
+
+    widget.id = widget.id || args.cid || UUID.uuid4();
+    IpylabModel.app.shell.add(widget as any, args.area || 'main', args.options);
+
+    // Register widgets originating from IpyWidgets
+    if (args.ipy_model) {
+      widget.addClass('ipylab-shell');
+      if (!IpylabModel.tracker.has(widget)) {
+        (widget as any).ipylabSettings = args;
+        IpylabModel.tracker.add(widget);
+      } else {
+        (widget as any).ipylabSettings.area = args.area;
+        (widget as any).ipylabSettings.options = args.options;
+        IpylabModel.tracker.save(widget);
+      }
+    }
+    return widget;
+  }
 }

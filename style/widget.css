@@ -3,30 +3,30 @@
 | Distributed under the terms of the Modified BSD License.
 |---------------------------------------------------------------------------- */
 
+.ipylab-Panel {
+  box-sizing: border-box;
+  display: flex;
+  height: 100%;
+  width: 100%;
+  flex-direction: column;
+  overflow: auto;
+}
+
+.ipylab-SplitPanel {
+  box-sizing: border-box;
+  display: flex;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
 /* Default Split Handle Color */
-.jp-JupyterLuminoSplitPanelWidget .p-SplitPanel-handle {
+.ipylab-SplitPanel .lm-SplitPanel-handle {
   background-color: var(--jp-border-color2);
 }
 
-.jp-SideAreaWidget {
-  background: var(--jp-layout-color1);
+.ipylab-MainArea {
+  box-sizing: border-box;
   display: flex;
-}
-
-.jp-SideBar.jp-mod-left .p-mod-closable .p-TabBar-tabCloseIcon,
-.jp-SideBar.jp-mod-right .p-mod-closable .p-TabBar-tabCloseIcon {
-  padding: 4px 0 4px 4px;
-  background-size: 16px;
-  height: 16px;
-  width: 16px;
-  background-image: var(--jp-icon-close);
-  background-position: center;
-  background-repeat: no-repeat;
-  align-self: center;
-}
-
-.jp-SideBar.jp-mod-left .p-mod-closable .p-TabBar-tabCloseIcon:hover,
-.jp-SideBar.jp-mod-right .p-mod-closable .p-TabBar-tabCloseIcon:hover {
-  background-size: 16px;
-  background-image: var(--jp-icon-inverse-close-circle);
+  margin: 0;
 }
