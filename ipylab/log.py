@@ -4,10 +4,8 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Literal
-
-from ipylab._compat.enum import StrEnum
-from ipylab._compat.typing import TypedDict
+from enum import StrEnum
+from typing import TYPE_CHECKING, Any, Literal, TypedDict
 
 if TYPE_CHECKING:
     from ipywidgets import Widget

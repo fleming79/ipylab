@@ -7,7 +7,7 @@ import functools
 import inspect
 import logging
 from collections import OrderedDict
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Unpack
 
 import ipywidgets
 from IPython.core.getipython import get_ipython
@@ -17,7 +17,7 @@ from traitlets import Bool, Container, Dict, Instance, Tuple, Unicode, UseEnum, 
 import ipylab
 import ipylab.hookspecs
 from ipylab import Ipylab, ShellConnection, Transform
-from ipylab._compat.typing import Unpack, override
+from ipylab._compat.typing import override
 from ipylab.commands import CommandPalette, CommandRegistry
 from ipylab.common import InsertMode, IpylabKwgs, Obj, pack
 from ipylab.dialog import Dialog
