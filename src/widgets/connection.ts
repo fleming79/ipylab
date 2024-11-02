@@ -30,14 +30,13 @@ export class ConnectionModel extends IpylabModel {
 
   async ipylabInit(base: any = null) {
     this.cid_ = this.get('cid');
-    try {
-      base = await this.getObject();
-      base.disposed.connect(this._base_disposed, this);
-      await super.ipylabInit(base);
-    } catch (e) {
+    base = await this.getObject();
+    if (!base) {
       this.close();
-      this.error(`Failed to establish connection for cid=${this.cid_} ${e}`);
+      return;
     }
+    base.disposed.connect(this._base_disposed, this);
+    await super.ipylabInit(base);
   }
 
   _base_disposed() {
@@ -59,18 +58,6 @@ export class ConnectionModel extends IpylabModel {
   async getObject(): Promise<IObservableDisposable> {
     // This is async for overloading
     return Private.connections.get(this.cid_);
-  }
-
-  ensurePending() {
-    const cid = this.get('cid');
-    if (!Private.pending.has(cid)) {
-      Private.pending.set(cid, new PromiseDelegate());
-    }
-    const pc = Private.pending.get(cid);
-    if (Private.connections.has(cid)) {
-      pc.resolve(null);
-    }
-    return pc;
   }
 
   /**
@@ -215,25 +202,21 @@ export class ShellConnectionModel extends ConnectionModel {
     return { ...super.defaults(), _model_name: 'ShellConnectionModel' };
   }
 
-  async getObject(): Promise<Widget> {
-    let base = Private.connections.get(this.cid_);
-    if (!base && !Private.pending.has(this.cid_)) {
-      const pending = this.ensurePending();
+  async getObject() {
+    if (
+      !Private.connections.has(this.cid_) &&
+      !Private.pending.has(this.cid_)
+    ) {
+      const pending = new PromiseDelegate<null>();
+      Private.pending.set(this.cid_, pending);
       IpylabModel.tracker.restored.then(() => {
         if (!Private.connections.has(this.cid_)) {
-          setTimeout(
-            () => pending.reject(`Shell connection not found ${this.cid_}`),
-            10000
-          );
+          setTimeout(() => pending.resolve(null), 10000);
         }
       });
     }
     await Private.pending.get(this.cid_)?.promise;
-    base = Private.connections.get(this.cid_);
-    if (!(base instanceof Widget)) {
-      this.error(`Failed to locate a widget cid=${this.cid_}`);
-    }
-    return base;
+    return Private.connections.get(this.cid_);
   }
 
   async operation(op: string, payload: any): Promise<any> {

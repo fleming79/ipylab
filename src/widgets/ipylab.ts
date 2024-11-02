@@ -31,6 +31,10 @@ import { MODULE_NAME, MODULE_VERSION } from '../version';
 import type { ConnectionModel } from './connection';
 import { JupyterFrontEndModel } from './frontend';
 
+// Determine if the per kernel widget manager is available
+
+export const PER_KERNEL_WM = Boolean((KernelWidgetManager as any)?.getManager);
+
 /**
  * Base model for common features
  */
@@ -56,6 +60,17 @@ export class IpylabModel extends WidgetModel {
     this.save_changes();
     this.on('msg:custom', this.onCustomMessage, this);
     IpylabModel.onKernelLost(this.kernel, this.onKernelLost, this);
+
+    if (this.widget_manager.restoredStatus || !PER_KERNEL_WM) {
+      this._startIpylabInit();
+    } else {
+      // Defer ipylabInit until widget restoration is finished.
+      this.widget_manager.restored.connect(this._startIpylabInit, this);
+    }
+  }
+
+  _startIpylabInit() {
+    this.widget_manager.restored.disconnect(this._startIpylabInit, this);
     this.widget_manager.get_model(this.model_id).then(() => this.ipylabInit());
   }
 
@@ -140,13 +155,6 @@ export class IpylabModel extends WidgetModel {
   }
 
   /**
-   * Throw an error with extra detail about the current object
-   */
-  error(msg: string): never {
-    throw new Error(`${msg}\nPython class = ${this.get('_python_class')}`);
-  }
-
-  /**
    * Schedule an operation to be performed in Python.
    * This is a mirror of `Ipylab.operation` in Python.
    *
@@ -206,7 +214,7 @@ export class IpylabModel extends WidgetModel {
       case 'updateProperty':
         return updateProperty(payload);
       default:
-        this.error(`'${payload.methodName}' has not been implemented`);
+        throw new Error(`'${payload.methodName}' has not been implemented`);
     }
   }
 
@@ -347,7 +355,7 @@ export class IpylabModel extends WidgetModel {
       case 'MainMenu':
         return MainMenu;
       default:
-        this.error(`Invalid basename: "${basename}"`);
+        throw new Error(`Invalid basename: "${basename}"`);
     }
   }
 
@@ -402,7 +410,7 @@ export class IpylabModel extends WidgetModel {
         }
         return obj;
       default:
-        this.error(`Invalid return mode: '${transform}'`);
+        throw new Error(`Invalid return mode: '${transform}'`);
     }
   }
 

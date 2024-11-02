@@ -238,19 +238,6 @@ class Ipylab(WidgetBase):
             return IpylabFrontendError(msg)
         return IpylabFrontendError(f'{self.__class__.__name__} failed with message "{error}"')
 
-    async def _send_receive(self, content: dict):
-        async with self:
-            self._pending_operations[content["ipylab_PY"]] = response = Response()
-            self.send(content)
-            try:
-                payload = await response.wait()
-                return Transform.transform_payload(content["transform"], payload)
-            except asyncio.CancelledError:
-                if not self.comm:
-                    msg = f"This widget is closed {self!r}"
-                    raise asyncio.CancelledError(msg) from None
-                raise
-
     def _on_custom_msg(self, _, msg: str, buffers: list):
         if not isinstance(msg, str):
             return
@@ -399,9 +386,9 @@ class Ipylab(WidgetBase):
         if not operation or not isinstance(operation, str):
             msg = f"Invalid {operation=}"
             raise ValueError(msg)
-        name = str(uuid.uuid4())
+        ipylab_PY = str(uuid.uuid4())  # noqa: N806
         content = {
-            "ipylab_PY": name,
+            "ipylab_PY": ipylab_PY,
             "operation": operation,
             "kwgs": kwgs,
             "transform": Transform.validate(transform),
@@ -410,7 +397,15 @@ class Ipylab(WidgetBase):
             content["toLuminoWidget"] = toLuminoWidget
         if toObject:
             content["toObject"] = toObject
-        return self.to_task(self._send_receive(content), name=name, hooks=hooks)
+
+        self._pending_operations[ipylab_PY] = response = Response()
+
+        async def _operation(content: dict):
+            self.send(content)
+            payload = await response.wait()
+            return Transform.transform_payload(content["transform"], payload)
+
+        return self.to_task(_operation(content), name=ipylab_PY, hooks=hooks)
 
     def execute_method(self, subpath: str, *args, obj=Obj.base, **kwgs: Unpack[IpylabKwgs]):
         return self._obj_operation(obj, subpath, "executeMethod", kwgs, args=args)
@@ -428,16 +423,3 @@ class Ipylab(WidgetBase):
         self, subpath="", *, obj=Obj.base, depth=3, skip_hidden=True, **kwgs: Unpack[IpylabKwgs]
     ) -> Task[dict]:
         return self._obj_operation(obj, subpath, "listProperties", kwgs, depth=depth, omitHidden=skip_hidden)
-
-
-def _get_plugin_manager():
-    # Only to be run once by __init__
-    import pluggy
-
-    from ipylab import hookspecs, lib
-
-    pm = pluggy.PluginManager("ipylab")
-    pm.add_hookspecs(hookspecs)
-    pm.register(lib)
-    pm.load_setuptools_entrypoints("ipylab")
-    return pm

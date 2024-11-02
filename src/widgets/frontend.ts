@@ -5,11 +5,11 @@ import { KernelWidgetManager } from '@jupyter-widgets/jupyterlab-manager';
 import { SessionContext, SessionContextDialogs } from '@jupyterlab/apputils';
 import { ILogger, ILoggerRegistry, IStateChange } from '@jupyterlab/logconsole';
 import { PromiseDelegate } from '@lumino/coreutils';
-import { IpylabModel } from './ipylab';
+import { IpylabModel, PER_KERNEL_WM } from './ipylab';
 
-// Determine if the per kernel widget manager is available
-export const PER_KERNEL_WM = Boolean((KernelWidgetManager as any)?.getManager);
-
+/**
+ * JupyterFrontEndModel (JFEM) is a SINGLETON per kernel.
+ */
 export class JupyterFrontEndModel extends IpylabModel {
   /**
    * The default attributes.
@@ -23,9 +23,6 @@ export class JupyterFrontEndModel extends IpylabModel {
     this.logger = JFEM.loggerRegistry.getLogger(this.vpath);
     this.logger.stateChanged.connect(this.loggerStateChanged as any, this);
     Private.jfems.set(this.kernel.id, this);
-    if (!Private.vpathTojfem.has(this.vpath)) {
-      Private.vpathTojfem.set(this.vpath, new PromiseDelegate());
-    }
   }
 
   async ipylabInit(base: any = null) {
@@ -39,6 +36,9 @@ export class JupyterFrontEndModel extends IpylabModel {
     }
     this.updateAllSessions();
     await super.ipylabInit(base);
+    if (!Private.vpathTojfem.has(this.vpath)) {
+      Private.vpathTojfem.set(this.vpath, new PromiseDelegate());
+    }
     Private.vpathTojfem.get(this.vpath).resolve(this);
   }
 
@@ -136,37 +136,49 @@ export class JupyterFrontEndModel extends IpylabModel {
           'A per-kernel KernelWidgetManager is required to start a new session!'
         );
       }
+      let kernel;
       Private.vpathTojfem.set(vpath, new PromiseDelegate());
-
-      const sessionContext = new SessionContext({
-        sessionManager: IpylabModel.sessionManager,
-        specsManager: IpylabModel.app.serviceManager.kernelspecs,
-        path: vpath,
-        name: vpath,
-        type: 'console',
-        kernelPreference: { language: 'python' }
-      });
-      await sessionContext.initialize();
-      if (!sessionContext.isReady) {
-        await new SessionContextDialogs({
-          translator: IpylabModel.translator
-        }).selectKernel(sessionContext!);
+      const model = await IpylabModel.sessionManager.findByPath(vpath);
+      if (model) {
+        kernel = IpylabModel.app.serviceManager.kernels.connectTo({
+          model: model.kernel
+        });
+      } else {
+        const sessionContext = new SessionContext({
+          sessionManager: IpylabModel.sessionManager,
+          specsManager: IpylabModel.app.serviceManager.kernelspecs,
+          path: vpath,
+          name: vpath,
+          type: 'console',
+          kernelPreference: { language: 'python' }
+        });
+        await sessionContext.initialize();
+        if (!sessionContext.isReady) {
+          await new SessionContextDialogs({
+            translator: IpylabModel.translator
+          }).selectKernel(sessionContext!);
+        }
+        if (!sessionContext.isReady) {
+          sessionContext.dispose();
+          throw new Error('Cancelling because a kernel was not provided');
+        }
+        kernel = sessionContext.session.kernel;
       }
-      if (!sessionContext.isReady) {
-        sessionContext.dispose();
-        throw new Error('Cancelling because a kernel was not provided');
+      const wm = new KernelWidgetManager(kernel, IpylabModel.rendermime);
+      if (!wm.restoredStatus) {
+        await new Promise(resolve => wm.restored.connect(resolve));
       }
-      const kernel = sessionContext.session.kernel;
-      new KernelWidgetManager(kernel, IpylabModel.rendermime);
-      await kernel.requestExecute(
-        {
-          code: `
+      if (!Private.jfems.has(kernel.id)) {
+        kernel.requestExecute(
+          {
+            code: `
             import ipylab
             ipylab.plugin_manager.hook.start_app(vpath='${vpath}')`,
-          store_history: false
-        },
-        true
-      ).done;
+            store_history: false
+          },
+          true
+        );
+      }
     }
     return await new Promise((resolve, reject) => {
       const timeoutID = setTimeout(() => {
@@ -174,7 +186,7 @@ export class JupyterFrontEndModel extends IpylabModel {
         Private.vpathTojfem.get(vpath).reject(msg);
         Private.vpathTojfem.delete(vpath);
         reject(msg);
-      }, 2000);
+      }, 10000);
       Private.vpathTojfem.get(vpath).promise.then(jfem => {
         clearTimeout(timeoutID);
         resolve(jfem);

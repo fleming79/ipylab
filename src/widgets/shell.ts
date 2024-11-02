@@ -30,13 +30,14 @@ export class ShellModel extends IpylabModel {
   static async restoreToShell(args: any) {
     // Wait for backend to load/reload plugins.
     await ShellModel.JFEM.getModelByVpath(args.vpath);
-    try {
-      await ShellModel.addToShell(args);
-    } catch (e) {
-      if (args.evaluate) {
-        throw e;
-      }
-    }
+    await new Promise(resolve => {
+      setTimeout(resolve, 5000);
+      ShellModel.addToShell(args).then(resolve, e => {
+        if (args.evaluate) {
+          throw e;
+        }
+      });
+    });
   }
 
   /**

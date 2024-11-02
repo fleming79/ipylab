@@ -70,7 +70,7 @@ class App(Ipylab):
     context_menu = Instance(ContextMenu, (), read_only=True)
     notification = Instance(NotificationManager, (), read_only=True)
     console = Instance(ShellConnection, allow_none=True, read_only=True)
-    log_handler = Instance(logging.Handler, allow_none=True, read_only=True)
+    logging_handler = Instance(logging.Handler, allow_none=True, read_only=True)
 
     active_namespace = Unicode("", read_only=True, help="name of the current namespace")
 
@@ -97,14 +97,14 @@ class App(Ipylab):
     @default("log")
     def _default_log(self):
         logger = logging.getLogger("ipylab")
-        if isinstance(self.log_handler, logging.Handler):
-            logger.addHandler(self.log_handler)
+        if isinstance(self.logging_handler, logging.Handler):
+            logger.addHandler(self.logging_handler)
         return logger
 
-    @default("log_handler")
-    def _default_log_handler(self):
+    @default("logging_handler")
+    def _default_logging_handler(self):
         handler = IpylabLogHandler(self)
-        fmt = "{name}:{message}"
+        fmt = f"{self.vpath}: " + "{name}:{message}"
         handler.setFormatter(logging.Formatter(fmt, style="{"))
         return handler
 

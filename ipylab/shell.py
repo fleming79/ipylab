@@ -56,8 +56,7 @@ class Shell(Ipylab):
         **args,
     ) -> Task[ShellConnection]:
         """
-        Add a widget or evaluation to the
-        [shell](https://jupyterlab.readthedocs.io/en/latest/extension/extension_points.html#shell).
+        Add a widget or evaluation to the shell.
 
         obj
         ---
@@ -75,7 +74,6 @@ class Shell(Ipylab):
 
         options: dict
             mode: InsertMode
-            https://jupyterlab.readthedocs.io/en/latest/api/interfaces/docregistry.DocumentRegistry.IOpenOptions.html
 
         Basic example
         -------------
@@ -86,7 +84,6 @@ class Shell(Ipylab):
         app.shell.add("ipylab.Panel([ipw.HTML('<h1>Test')])", vpath="test")
         ```
         """
-        cid = args.pop("cid", "")
         hooks: TaskHooks = {"add_to_tuple_fwd": [(self, "connections")]}
         args["options"] = {
             "activate": activate,
@@ -97,18 +94,18 @@ class Shell(Ipylab):
         args["area"] = area
 
         if isinstance(obj, ShellConnection):
-            if cid and cid != obj.cid:
-                msg = f"The provided {cid=} does not match {obj.cid=}"
+            if "cid" in args and args["cid"] != obj.cid:
+                msg = f"The provided {args['cid']=} does not match {obj.cid=}"
                 raise RuntimeError(msg)
-            cid = obj.cid
+            args["cid"] = obj.cid
         elif isinstance(obj, Widget):
             if not obj._view_name:  # noqa: SLF001
                 msg = f"This widget does not have a view {obj}"
                 raise RuntimeError(msg)
-            if not cid and reversed(self.connections):
+            if not args.get("cid") and reversed(self.connections):
                 for c in self.connections:
                     if c.widget is obj:
-                        cid = c.cid
+                        args["cid"] = c.cid
                         break
             hooks["trait_add_fwd"] = [("widget", obj)]
             if isinstance(obj, ipylab.Panel):
@@ -117,21 +114,18 @@ class Shell(Ipylab):
         else:
             args["evaluate"] = pack(obj)
 
-        args["cid"] = ShellConnection.to_cid(cid)
-
         async def add_to_shell() -> ShellConnection:
-            async with self.app as app:
-                if "evaluate" in args:
-                    if isinstance(vpath, dict):
-                        result = self.hook.vpath_getter(app=app, kwgs=vpath)
-                        while inspect.isawaitable(result):
-                            result = await result
-                        args["vpath"] = result
-                    else:
-                        args["vpath"] = vpath or app.vpath
+            if "evaluate" in args:
+                if isinstance(vpath, dict):
+                    result = self.hook.vpath_getter(app=self.app, kwgs=vpath)
+                    while inspect.isawaitable(result):
+                        result = await result
+                    args["vpath"] = result
                 else:
-                    args["vpath"] = app.vpath
-                return await self.operation("addToShell", transform=Transform.connection, args=args)
+                    args["vpath"] = vpath or self.app.vpath
+            else:
+                args["vpath"] = self.app.vpath
+            return await self.operation("addToShell", transform=Transform.connection, args=args)
 
         return self.to_task(add_to_shell(), "Add to shell", hooks=hooks)
 

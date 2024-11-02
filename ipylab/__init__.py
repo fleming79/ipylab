@@ -5,7 +5,7 @@ from __future__ import annotations  # noqa: I001
 
 from ipylab._frontend import module_version as __version__
 from ipylab.common import Area, InsertMode, NotificationType, Obj, Transform, hookimpl, pack
-from ipylab.ipylab import Ipylab, _get_plugin_manager
+from ipylab.ipylab import Ipylab
 from ipylab.connection import Connection, ShellConnection
 from ipylab import menu
 from ipylab.jupyterfrontend import App
@@ -39,6 +39,20 @@ def _jupyter_labextension_paths():
 
 
 JupyterFrontEnd = App
+
+
+def _get_plugin_manager():
+    # Only to be run once here
+    import pluggy
+
+    from ipylab import hookspecs, lib
+
+    pm = pluggy.PluginManager("ipylab")
+    pm.add_hookspecs(hookspecs)
+    pm.register(lib)
+    pm.load_setuptools_entrypoints("ipylab")
+    return pm
+
 
 plugin_manager = _get_plugin_manager()
 del _get_plugin_manager

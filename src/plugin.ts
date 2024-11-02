@@ -18,7 +18,7 @@ import { ISettingRegistry } from '@jupyterlab/settingregistry';
 import { ITranslator } from '@jupyterlab/translation';
 import { MODULE_NAME, MODULE_VERSION } from './version';
 import { IpylabModel, JupyterFrontEndModel, ShellModel } from './widget';
-import { PER_KERNEL_WM } from './widgets/frontend';
+import { PER_KERNEL_WM } from './widgets/ipylab';
 
 const PLUGIN_ID = 'ipylab:settings';
 
