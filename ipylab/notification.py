@@ -62,14 +62,13 @@ class NotificationConnection(Connection):
         to_object = ["args.id"]
 
         async def update():
-            async with ipylab.app.notification as n:
-                actions_ = [await n._ensure_action(v) for v in actions]  # noqa: SLF001
-                if actions_:
-                    args["actions"] = list(map(pack, actions_))  # type: ignore
-                    to_object.extend(f"options.actions.{i}" for i in range(len(actions_)))
-                    for action in actions_:
-                        self.close_extras.add(action)
-                return await n.operation("update", toObject=to_object, args=args)
+            actions_ = [await ipylab.app.notification._ensure_action(v) for v in actions]  # noqa: SLF001
+            if actions_:
+                args["actions"] = list(map(pack, actions_))  # type: ignore
+                to_object.extend(f"options.actions.{i}" for i in range(len(actions_)))
+                for action in actions_:
+                    self.close_extras.add(action)
+            return await ipylab.app.notification.operation("update", toObject=to_object, args=args)
 
         return self.to_task(update())
 
@@ -105,8 +104,8 @@ class NotificationManager(Ipylab):
     async def _ensure_action(self, value: ActionConnection | NotifyAction) -> ActionConnection:
         "Create a new action."
         if isinstance(value, ActionConnection):
-            async with value:
-                return value
+            await value.ready()
+            return value
         return await self.new_action(**value)  # type: ignore
 
     def notify(

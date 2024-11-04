@@ -102,10 +102,6 @@ class Ipylab(WidgetBase):
         return cls
 
     @property
-    def hook(self):
-        return ipylab.plugin_manager.hook
-
-    @property
     def repr_info(self) -> dict[str, Any] | str:
         "Extra info to provide for __repr__."
         return {}
@@ -156,16 +152,6 @@ class Ipylab(WidgetBase):
             return f"< {status}: {self.__class__.__name__}({info}) >"
         return f"{status}{self.__class__.__name__}({info})"
 
-    async def __aenter__(self):
-        if not self._ready:
-            self._check_closed()
-            await self.ready()
-        self._check_closed()
-        return self
-
-    async def __aexit__(self, exc_type, exc, tb):
-        pass
-
     @observe("comm", "_ready")
     def _observe_comm(self, change: dict):
         if not self.comm:
@@ -187,10 +173,10 @@ class Ipylab(WidgetBase):
         if change["name"] == "_ready":
             if self._ready:
                 self._ready_event.set()
-                for cb in self.hook.ready(obj=self):
-                    self.hook.ensure_run(obj=self, aw=cb)
+                for cb in ipylab.plugin_manager.hook.ready(obj=self):
+                    ipylab.plugin_manager.hook.ensure_run(obj=self, aw=cb)
                 for cb in self._on_ready_callbacks:
-                    self.hook.ensure_run(obj=self, aw=cb)
+                    ipylab.plugin_manager.hook.ensure_run(obj=self, aw=cb)
 
             else:
                 self._ready_event.clear()
@@ -201,22 +187,23 @@ class Ipylab(WidgetBase):
             raise RuntimeError(msg)
 
     async def _wrap_awaitable(self, aw: Awaitable[T], hooks: TaskHookType) -> T:
+        await self.ready()
         try:
-            async with self:
-                if not hooks:
-                    return await aw
-                result = await aw
-                try:
-                    self.hook.task_result(obj=self, aw=aw, result=result, hooks=hooks)
-                except Exception as e:
-                    self.on_error(ErrorSource.TaskError, e)
-                    raise e from None
-                return result
+            if not hooks:
+                return await aw
+            result = await aw
+            try:
+                ipylab.plugin_manager.hook.task_result(obj=self, aw=aw, result=result, hooks=hooks)
+            except Exception as e:
+                self.on_error(ErrorSource.TaskError, e)
+                raise e from None
         except Exception as e:
             try:
                 self.on_error(ErrorSource.TaskError, e)
             finally:
                 raise e
+        else:
+            return result
 
     def _task_done_callback(self, task: Task):
         self._tasks.discard(task)
@@ -289,8 +276,10 @@ class Ipylab(WidgetBase):
         super().close()
 
     async def ready(self):
-        await ipylab.app.ready()
-        await self._ready_event.wait()
+        if not ipylab.app._ready:  # noqa: SLF001
+            await ipylab.app.ready()
+        if not self._ready:
+            await self._ready_event.wait()
 
     def on_ready(self, callback, remove=False):  # noqa: FBT002
         if remove:
@@ -299,7 +288,7 @@ class Ipylab(WidgetBase):
             self._on_ready_callbacks.add(callback)
 
     def on_error(self, source: ErrorSource, error: Exception):
-        self.hook.on_error(obj=self, source=source, error=error)
+        ipylab.plugin_manager.hook.on_error(obj=self, source=source, error=error)
 
     def add_to_tuple(self, owner: HasTraits, name: str):
         """Add self to the tuple of obj."""

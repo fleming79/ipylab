@@ -100,11 +100,13 @@ class App(Ipylab):
     @observe("_ready")
     def _app_observe_ready(self, _):
         if self._ready:
-            self.hook.autostart._call_history.clear()  # type: ignore  # noqa: SLF001
-            self.hook.autostart.call_historic(kwargs={"app": self}, result_callback=self._autostart_callback)
+            ipylab.plugin_manager.hook.autostart._call_history.clear()  # type: ignore  # noqa: SLF001
+            ipylab.plugin_manager.hook.autostart.call_historic(
+                kwargs={"app": self}, result_callback=self._autostart_callback
+            )
 
     def _autostart_callback(self, result):
-        self.hook.ensure_run(obj=self, aw=result)
+        ipylab.plugin_manager.hook.ensure_run(obj=self, aw=result)
 
     @property
     def repr_info(self):
@@ -112,7 +114,8 @@ class App(Ipylab):
 
     @override
     async def ready(self):
-        await self._ready_event.wait()
+        if not self._ready:
+            await self._ready_event.wait()
 
     @override
     async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list) -> Any:
@@ -128,13 +131,13 @@ class App(Ipylab):
                 result["payload"] = await self.shell.add(widget, **payload)
                 return result
             case "open_console":
-                async with ShellConnection(payload["cid"]) as ref:
-                    ref.auto_dispose = False
-                    return await self._open_console(
-                        args=payload.get("args") or {},
-                        namespace_name=payload.get("namespace_name", ""),
-                        objects={"widget": ref.widget, "ref": ref},
-                    )
+                ref = ShellConnection(payload["cid"])
+                await ref.ready()
+                return await self._open_console(
+                    args=payload.get("args") or {},
+                    namespace_name=payload.get("namespace_name", ""),
+                    objects={"widget": ref.widget, "ref": ref},
+                )
         return await super()._do_operation_for_frontend(operation, payload, buffers)
 
     async def _open_console(self, args: dict, objects: dict, namespace_name: str, **kwgs: Unpack[IpylabKwgs]):
@@ -143,9 +146,9 @@ class App(Ipylab):
         kwgs["namespace_name"] = namespace_name  # type: ignore
 
         # plugins
-        plugin_results = self.hook.opening_console(app=self, args=args, objects=objects, kwgs=kwgs)
+        plugin_results = ipylab.plugin_manager.hook.opening_console(app=self, args=args, objects=objects, kwgs=kwgs)
         for result in plugin_results:
-            self.hook.ensure_run(obj=self, aw=result)
+            ipylab.plugin_manager.hook.ensure_run(obj=self, aw=result)
         if "ref" not in args and (ref := objects.get("ref")):
             args["ref"] = f"{pack(ref)}.id"
             kwgs["toObject"] = [*kwgs.pop("toObject", []), "args.ref"]
@@ -275,7 +278,7 @@ class App(Ipylab):
         if name not in self._namespaces:
             self._namespaces[name] = LastUpdatedDict(self._ipy_default_namespace)
         objects = {"ipylab": ipylab, "ipywidgets": ipywidgets, "ipw": ipywidgets, "app": self} | (objects or {})
-        self.hook.namespace_objects(objects=objects, namespace_name=name, app=self)
+        ipylab.plugin_manager.hook.namespace_objects(objects=objects, namespace_name=name, app=self)
         self._namespaces[name].update(objects)
         return self._namespaces[name]
 

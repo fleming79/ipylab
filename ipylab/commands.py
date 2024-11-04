@@ -288,12 +288,11 @@ class CommandRegistry(Ipylab):
 
         async def execute_command():
             id_ = str(command_id)
-            async with self as cmd:
-                if id_ not in cmd.all_commands:
-                    id_ = CommandConnection.to_cid(cmd.name, id_)
-                    if id_ not in cmd.all_commands:
-                        msg = f"Command '{command_id}' not registered!"
-                        raise ValueError(msg)
-                return await cmd.operation("execute", id=id_, args=args or {}, **kwgs)
+            if id_ not in self.all_commands:
+                id_ = CommandConnection.to_cid(self.name, id_)
+                if id_ not in self.all_commands:
+                    msg = f"Command '{command_id}' not registered!"
+                    raise ValueError(msg)
+            return await self.operation("execute", id=id_, args=args or {}, **kwgs)
 
         return self.to_task(execute_command())

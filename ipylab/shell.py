@@ -117,7 +117,7 @@ class Shell(Ipylab):
         async def add_to_shell() -> ShellConnection:
             if "evaluate" in args:
                 if isinstance(vpath, dict):
-                    result = self.hook.vpath_getter(app=ipylab.app, kwgs=vpath)
+                    result = ipylab.plugin_manager.hook.vpath_getter(app=ipylab.app, kwgs=vpath)
                     while inspect.isawaitable(result):
                         result = await result
                     args["vpath"] = result
