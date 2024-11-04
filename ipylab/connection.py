@@ -151,6 +151,11 @@ class ShellConnection(Connection):
     widget = Instance(Widget, allow_none=True, default_value=None, help="The widget that has the view")
     auto_dispose = Bool(True).tag(sync=True)
 
+    def __del__(self):
+        """Object disposal"""
+        # Losing strong references doesn't mean the widget should be closed.
+        self.close(dispose=False)
+
     def activate(self):
         "Activate the connected widget in the shell."
 

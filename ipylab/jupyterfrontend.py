@@ -80,17 +80,6 @@ class App(Ipylab):
     _ipy_shell = get_ipython()
     _ipy_default_namespace: ClassVar = getattr(_ipy_shell, "user_ns", {})
 
-    def __init_subclass__(cls, **kwargs) -> None:
-        msg = "Subclassing the `App` class is not allowed!"
-        raise RuntimeError(msg)
-
-    def __init__(self, **kwgs):
-        if self._async_widget_base_init_complete:
-            return
-        if vpath := kwgs.pop("vpath", None):
-            self.set_trait("vpath", vpath)
-        super().__init__(**kwgs)
-
     def close(self):
         "Cannot close"
 

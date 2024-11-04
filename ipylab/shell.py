@@ -123,6 +123,8 @@ class Shell(Ipylab):
                     args["vpath"] = result
                 else:
                     args["vpath"] = vpath or self.app.vpath
+                if args["vpath"] != self.app.vpath:
+                    hooks["trait_add_fwd"] = [("auto_dispose", False)]
             else:
                 args["vpath"] = self.app.vpath
             return await self.operation("addToShell", transform=Transform.connection, args=args)

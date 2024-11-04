@@ -13,22 +13,7 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
     import ipylab
-    from ipylab import App
     from ipylab.common import ErrorSource, IpylabKwgs
-
-
-@hookspec(firstresult=True)
-def start_app(vpath: str) -> App:  # type: ignore
-    """Start the App
-
-    This is called when a new kernel is created.
-
-    Args
-    ----
-
-    vpath: str
-        The path (virtual path) used for the session.
-    """
 
 
 @hookspec()

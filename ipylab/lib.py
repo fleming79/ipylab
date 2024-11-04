@@ -31,12 +31,6 @@ def trait_tuple_add(owner: HasTraits, name: str, value: Any):
 
 
 @hookimpl
-def start_app(vpath: str):
-    "Default implementation of App and Plugins"
-    ipylab.App(vpath=vpath)
-
-
-@hookimpl
 def on_error(obj: Ipylab, source: ErrorSource, error: Exception):
     msg = f"{source} {error}"
     obj.log.exception(msg, extra={"source": source, "error": error})

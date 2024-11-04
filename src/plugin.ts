@@ -17,8 +17,6 @@ import { IRenderMimeRegistry } from '@jupyterlab/rendermime';
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
 import { ITranslator } from '@jupyterlab/translation';
 import { MODULE_NAME, MODULE_VERSION } from './version';
-import { IpylabModel, JupyterFrontEndModel, ShellModel } from './widget';
-import { PER_KERNEL_WM } from './widgets/ipylab';
 
 const PLUGIN_ID = 'ipylab:settings';
 
@@ -49,103 +47,90 @@ const extension: JupyterFrontEndPlugin<void> = {
     IMainMenu,
     ILoggerRegistry
   ],
-  activate: activate
-};
+  activate: async (
+    app: JupyterFrontEnd,
+    registry: IJupyterWidgetRegistry,
+    rendermime: IRenderMimeRegistry,
+    settings: ISettingRegistry,
+    restorer: ILayoutRestorer,
+    palette: ICommandPalette,
+    labShell: ILabShell | null,
+    defaultBrowser: IDefaultFileBrowser | null,
+    launcher: ILauncher | null,
+    translator: ITranslator | null,
+    mainMenu: IMainMenu | null,
+    loggerRegistry: ILoggerRegistry | null
+  ) => {
+    // add globals
+    const exports = await import('./widget');
 
-/**
- * Activate the JupyterLab extension.
- *
- * @param app Jupyter Front End
- * @param registry Jupyter Widget Registry
- * @param palette Jupyter Commands
- * @param labShell Jupyter Shell
- * @param defaultBrowser Jupyter Default File Browser
- * @param launcher [optional] Jupyter Launcher
- * @param translator Jupyter Translator
- */
-async function activate(
-  app: JupyterFrontEnd,
-  registry: IJupyterWidgetRegistry,
-  rendermime: IRenderMimeRegistry,
-  settings: ISettingRegistry,
-  restorer: ILayoutRestorer,
-  palette: ICommandPalette,
-  labShell: ILabShell | null,
-  defaultBrowser: IDefaultFileBrowser | null,
-  launcher: ILauncher | null,
-  translator: ITranslator | null,
-  mainMenu: IMainMenu | null,
-  loggerRegistry: ILoggerRegistry | null
-): Promise<void> {
-  // add globals
-  IpylabModel.app = app;
-  IpylabModel.rendermime = rendermime;
-  IpylabModel.labShell = labShell;
-  IpylabModel.defaultBrowser = defaultBrowser;
-  IpylabModel.palette = palette;
-  IpylabModel.translator = translator;
-  IpylabModel.launcher = launcher;
-  IpylabModel.mainMenu = mainMenu;
-  IpylabModel.JFEM.loggerRegistry = loggerRegistry;
+    exports.IpylabModel.app = app;
+    exports.IpylabModel.rendermime = rendermime;
+    exports.IpylabModel.labShell = labShell;
+    exports.IpylabModel.defaultBrowser = defaultBrowser;
+    exports.IpylabModel.palette = palette;
+    exports.IpylabModel.translator = translator;
+    exports.IpylabModel.launcher = launcher;
+    exports.IpylabModel.mainMenu = mainMenu;
+    exports.JupyterFrontEndModel.loggerRegistry = loggerRegistry;
 
-  const exports = {
-    name: MODULE_NAME,
-    version: MODULE_VERSION,
-    exports: await import('./widget')
-  };
-
-  registry.registerWidget(exports);
-
-  app.commands.addCommand(CommandIDs.openConsole, {
-    execute: JupyterFrontEndModel.openConsole,
-    label: 'Open console'
-  });
-  app.commands.addCommand(CommandIDs.toggleLogConsole, {
-    execute: JupyterFrontEndModel.toggleLogConsole,
-    label: 'Toggle log console'
-  });
-  app.contextMenu.addItem({
-    command: CommandIDs.openConsole,
-    selector: '.ipylab-shell',
-    rank: 1
-  });
-  app.contextMenu.addItem({
-    command: CommandIDs.toggleLogConsole,
-    selector: '.ipylab-shell',
-    rank: 2
-  });
-
-  let when;
-  if (PER_KERNEL_WM) {
-    app.commands.addCommand(CommandIDs.restore, {
-      execute: ShellModel.restoreToShell
-    });
-    app.commands.addCommand(CommandIDs.checkStartKernel, {
-      label: 'Start or restart ipylab kernel',
-      caption: 'Start or restart  the python kernel with path="ipylab".',
-      execute: () => IpylabModel.JFEM.startIpylabKernel(true)
+    registry.registerWidget({
+      name: MODULE_NAME,
+      version: MODULE_VERSION,
+      exports
     });
 
-    palette.addItem({
-      command: CommandIDs.checkStartKernel,
-      category: 'ipylab',
-      rank: 50
+    app.commands.addCommand(CommandIDs.openConsole, {
+      execute: exports.JupyterFrontEndModel.openConsole,
+      label: 'Open console'
     });
-    when = settings.load(PLUGIN_ID).then(async () => {
-      const config = await settings.get(PLUGIN_ID, 'autostart');
-      if (config.composite as boolean) {
-        await IpylabModel.JFEM.startIpylabKernel();
-      }
+    app.commands.addCommand(CommandIDs.toggleLogConsole, {
+      execute: exports.JupyterFrontEndModel.toggleLogConsole,
+      label: 'Toggle log console'
     });
-    // Handle state restoration.
-    if (restorer) {
-      void restorer.restore(IpylabModel.tracker, {
-        command: CommandIDs.restore,
-        args: widget => (widget as any).ipylabSettings,
-        name: widget => (widget as any).ipylabSettings.cid,
-        when
+    app.contextMenu.addItem({
+      command: CommandIDs.openConsole,
+      selector: '.ipylab-shell',
+      rank: 1
+    });
+    app.contextMenu.addItem({
+      command: CommandIDs.toggleLogConsole,
+      selector: '.ipylab-shell',
+      rank: 2
+    });
+
+    let when;
+    if (exports.IpylabModel.PER_KERNEL_WM) {
+      app.commands.addCommand(CommandIDs.restore, {
+        execute: exports.ShellModel.restoreToShell
       });
+      app.commands.addCommand(CommandIDs.checkStartKernel, {
+        label: 'Start or restart ipylab kernel',
+        caption: 'Start or restart  the python kernel with path="ipylab".',
+        execute: () => exports.JupyterFrontEndModel.startIpylabKernel(true)
+      });
+
+      palette.addItem({
+        command: CommandIDs.checkStartKernel,
+        category: 'ipylab',
+        rank: 50
+      });
+      when = settings.load(PLUGIN_ID).then(async () => {
+        const config = await settings.get(PLUGIN_ID, 'autostart');
+        if (config.composite as boolean) {
+          await exports.JupyterFrontEndModel.startIpylabKernel();
+        }
+      });
+      // Handle state restoration.
+      if (restorer) {
+        void restorer.restore(exports.IpylabModel.tracker, {
+          command: CommandIDs.restore,
+          args: widget => (widget as any).ipylabSettings,
+          name: widget => (widget as any).ipylabSettings.cid,
+          when
+        });
+      }
     }
   }
-}
+};
 export default extension;

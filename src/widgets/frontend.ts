@@ -6,7 +6,7 @@ import { SessionContext, SessionContextDialogs } from '@jupyterlab/apputils';
 import { ILogger, ILoggerRegistry, IStateChange } from '@jupyterlab/logconsole';
 import { Kernel } from '@jupyterlab/services';
 import { PromiseDelegate } from '@lumino/coreutils';
-import { IpylabModel, PER_KERNEL_WM } from './ipylab';
+import { IpylabModel } from './ipylab';
 
 /**
  * JupyterFrontEndModel (JFEM) is a SINGLETON per kernel.
@@ -28,7 +28,7 @@ export class JupyterFrontEndModel extends IpylabModel {
 
   async ipylabInit(base: any = null) {
     this.set('version', JFEM.app.version);
-    this.set('per_kernel_widget_manager_detected', PER_KERNEL_WM);
+    this.set('per_kernel_widget_manager_detected', JFEM.PER_KERNEL_WM);
     JFEM.sessionManager.runningChanged.connect(this.updateAllSessions, this);
     if (JFEM.labShell) {
       JFEM.labShell.currentChanged.connect(this.updateSessionInfo, this);
@@ -132,13 +132,15 @@ export class JupyterFrontEndModel extends IpylabModel {
       throw new Error(`Invalid vpath ${vpath}`);
     }
     if (!Private.vpathTojfem.has(vpath)) {
-      if (!PER_KERNEL_WM) {
+      if (!JFEM.PER_KERNEL_WM) {
         throw new Error(
           'A per-kernel KernelWidgetManager is required to start a new session!'
         );
       }
       let kernel: Kernel.IKernelConnection;
       Private.vpathTojfem.set(vpath, new PromiseDelegate());
+      await IpylabModel.app.serviceManager.ready;
+      await IpylabModel.sessionManager.ready;
       const model = await IpylabModel.sessionManager.findByPath(vpath);
       if (model) {
         kernel = IpylabModel.app.serviceManager.kernels.connectTo({
@@ -169,14 +171,9 @@ export class JupyterFrontEndModel extends IpylabModel {
       const getManager = (KernelWidgetManager as any).getManager;
       const widget_manager: KernelWidgetManager = await getManager(kernel);
       if (!Private.jfems.has(kernel.id)) {
-        // getManager will restore widgets so we only need to do this if the frontend model hasn't been restored.
+        // getManager will restore widgets so we only need to do this if ipylab wasn't imported.
         widget_manager.kernel.requestExecute(
-          {
-            code: `
-            import ipylab
-            ipylab.plugin_manager.hook.start_app(vpath='${vpath}')`,
-            store_history: false
-          },
+          { code: `import ipylab;ipylab.App()` },
           true
         );
       }
@@ -184,7 +181,7 @@ export class JupyterFrontEndModel extends IpylabModel {
     return await new Promise((resolve, reject) => {
       const timeoutID = setTimeout(() => {
         const msg = `Failed to get a JupyterFrontendModel for vpath='${vpath}'`;
-        Private.vpathTojfem.get(vpath).reject(msg);
+        Private.vpathTojfem.get(vpath)?.reject(msg);
         Private.vpathTojfem.delete(vpath);
         reject(msg);
       }, 10000);

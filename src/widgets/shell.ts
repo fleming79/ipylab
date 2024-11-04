@@ -28,11 +28,17 @@ export class ShellModel extends IpylabModel {
    * @param args `ipylabSettings` in 'addToShell'
    */
   static async restoreToShell(args: any) {
-    // Wait for backend to load/reload plugins.
+    const sessions = ShellModel.app.serviceManager.sessions;
+    if (!args.evaluate && !(await sessions.findByPath(args.vpath))) {
+      // Don't create a kernel if a model doesn't exist.
+      return;
+    }
+
     await ShellModel.JFEM.getModelByVpath(args.vpath);
     await new Promise(resolve => {
-      setTimeout(resolve, 5000);
+      setTimeout(resolve, 10000);
       ShellModel.addToShell(args).then(resolve, e => {
+        resolve(null);
         if (args.evaluate) {
           throw e;
         }

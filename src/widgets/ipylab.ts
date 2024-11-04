@@ -33,8 +33,6 @@ import { JupyterFrontEndModel } from './frontend';
 
 // Determine if the per kernel widget manager is available
 
-export const PER_KERNEL_WM = Boolean((KernelWidgetManager as any)?.getManager);
-
 /**
  * Base model for common features
  */
@@ -61,7 +59,7 @@ export class IpylabModel extends WidgetModel {
     this.on('msg:custom', this.onCustomMessage, this);
     IpylabModel.onKernelLost(this.kernel, this.onKernelLost, this);
 
-    if (this.widget_manager.restoredStatus || !PER_KERNEL_WM) {
+    if (this.widget_manager.restoredStatus || !IpylabModel.PER_KERNEL_WM) {
       this._startIpylabInit();
     } else {
       // Defer ipylabInit until widget restoration is finished.
@@ -502,13 +500,11 @@ export class IpylabModel extends WidgetModel {
   }
 
   /**
-   * Will call the callback once the kernel dead or restarted or disposed.
-   *
-   * Use this to close the corresponding frontend objects.
+   * Will call `dispose` once the kernel dead or restarted or disposed.
    */
   static onKernelLost(
     kernel: IKernelConnection,
-    callback: () => any,
+    onKernelLost: () => any,
     thisArg: object
   ) {
     if (!Private.kernelLostCallbacks.has(kernel)) {
@@ -516,7 +512,7 @@ export class IpylabModel extends WidgetModel {
       kernel.disposed.connect(_kernelLost);
       kernel.statusChanged.connect(_onKernelStatusChanged);
     }
-    Private.kernelLostCallbacks.get(kernel).add([callback, thisArg]);
+    Private.kernelLostCallbacks.get(kernel).add([onKernelLost, thisArg]);
   }
 
   static get sessionManager(): Session.IManager {
@@ -542,6 +538,7 @@ export class IpylabModel extends WidgetModel {
   static JFEM: typeof JupyterFrontEndModel;
   static ConnectionModel: typeof ConnectionModel;
   static Notification = Notification;
+  static PER_KERNEL_WM = Boolean((KernelWidgetManager as any)?.getManager);
 }
 
 /**
