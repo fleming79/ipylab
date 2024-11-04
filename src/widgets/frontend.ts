@@ -4,6 +4,7 @@
 import { KernelWidgetManager } from '@jupyter-widgets/jupyterlab-manager';
 import { SessionContext, SessionContextDialogs } from '@jupyterlab/apputils';
 import { ILogger, ILoggerRegistry, IStateChange } from '@jupyterlab/logconsole';
+import { Kernel } from '@jupyterlab/services';
 import { PromiseDelegate } from '@lumino/coreutils';
 import { IpylabModel, PER_KERNEL_WM } from './ipylab';
 
@@ -136,7 +137,7 @@ export class JupyterFrontEndModel extends IpylabModel {
           'A per-kernel KernelWidgetManager is required to start a new session!'
         );
       }
-      let kernel;
+      let kernel: Kernel.IKernelConnection;
       Private.vpathTojfem.set(vpath, new PromiseDelegate());
       const model = await IpylabModel.sessionManager.findByPath(vpath);
       if (model) {
@@ -164,12 +165,12 @@ export class JupyterFrontEndModel extends IpylabModel {
         }
         kernel = sessionContext.session.kernel;
       }
-      const wm = new KernelWidgetManager(kernel, IpylabModel.rendermime);
-      if (!wm.restoredStatus) {
-        await new Promise(resolve => wm.restored.connect(resolve));
-      }
+      // Relies on per-kernel widget manager.
+      const getManager = (KernelWidgetManager as any).getManager;
+      const widget_manager: KernelWidgetManager = await getManager(kernel);
       if (!Private.jfems.has(kernel.id)) {
-        kernel.requestExecute(
+        // getManager will restore widgets so we only need to do this if the frontend model hasn't been restored.
+        widget_manager.kernel.requestExecute(
           {
             code: `
             import ipylab

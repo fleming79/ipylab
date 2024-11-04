@@ -548,7 +548,15 @@ export class IpylabModel extends WidgetModel {
  * React to changes to the kernel status.
  */
 function _onKernelStatusChanged(kernel: Kernel.IKernelConnection) {
-  if (['dead', 'restarting'].includes(kernel.status)) {
+  if (
+    [
+      'dead',
+      'starting',
+      'restarting',
+      'autorestarting',
+      'terminating'
+    ].includes(kernel.status)
+  ) {
     _kernelLost(kernel);
   }
 }
@@ -557,10 +565,13 @@ function _kernelLost(kernel: IKernelConnection) {
   if (!Private.kernelLostCallbacks.has(kernel)) {
     return;
   }
-  Private.kernelLostCallbacks.get(kernel).forEach(cb => cb[0].bind(cb[1])());
-  Private.kernelLostCallbacks.delete(kernel);
-  kernel.statusChanged.disconnect(_kernelLost);
-  kernel.disposed.disconnect(_kernelLost);
+  Private.kernelLostCallbacks.get(kernel)?.forEach(cb => cb[0].bind(cb[1])());
+  Private.kernelLostCallbacks.get(kernel)?.clear();
+  if (kernel.isDisposed) {
+    Private.kernelLostCallbacks.delete(kernel);
+    kernel.statusChanged.disconnect(_kernelLost);
+    kernel.disposed.disconnect(_kernelLost);
+  }
 }
 
 /**

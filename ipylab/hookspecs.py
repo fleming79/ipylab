@@ -36,7 +36,7 @@ def ready(obj: ipylab.Ipylab) -> None | Awaitable[None]:
     """
     Called by `obj` when it is ready.
 
-    Return a coro or awaitable for it to run as a task in the obj.
+    Return a coro or awaitable for it to run as a new task belonging to obj.
     """
 
 
@@ -96,7 +96,7 @@ def opening_console(app: ipylab.App, args: dict, objects: dict, kwgs: IpylabKwgs
     """
     Called when the console is opening.
 
-    Add or remove items from the dicts to alter loading of console.
+    Alter the contents of the dicts as required to adjust the namespace of the console.
 
     Returned awaitables will be awaited prior to proceeding.
 

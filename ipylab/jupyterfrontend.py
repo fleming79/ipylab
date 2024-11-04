@@ -154,10 +154,8 @@ class App(Ipylab):
 
         # plugins
         plugin_results = self.hook.opening_console(app=self, args=args, objects=objects, kwgs=kwgs)
-        for pr in plugin_results:
-            if inspect.isawaitable(pr):
-                await pr
-
+        for result in plugin_results:
+            self.hook.ensure_run(obj=self, aw=result)
         if "ref" not in args and (ref := objects.get("ref")):
             args["ref"] = f"{pack(ref)}.id"
             kwgs["toObject"] = [*kwgs.pop("toObject", []), "args.ref"]
