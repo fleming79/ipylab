@@ -7,6 +7,8 @@ import logging
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Literal, TypedDict
 
+import ipylab
+
 if TYPE_CHECKING:
     from ipywidgets import Widget
 
@@ -95,13 +97,12 @@ LogPayloadType = LogPayloadBase | LogPayloadText | LogPayloadHtml | LogPayloadOu
 
 class IpylabLogHandler(logging.Handler):
     def __init__(self, app: App) -> None:
-        self.app = app
-        self.app.observe(self._observe_app_log_level, "logger_level")
-        super().__init__(LogLevel.to_numeric(self.app.logger_level))
+        app.observe(self._observe_app_log_level, "logger_level")
+        super().__init__(LogLevel.to_numeric(app.logger_level))
 
     def _observe_app_log_level(self, change: dict):
         self.setLevel(LogLevel.to_numeric(change["new"]))
 
     def emit(self, record):
         log = LogPayloadText(type=LogTypes.text, level=LogLevel.to_level(record.levelno), data=self.format(record))
-        self.app.send_log_message(log)
+        ipylab.app.send_log_message(log)

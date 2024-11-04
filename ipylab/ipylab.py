@@ -24,8 +24,6 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Hashable
     from typing import ClassVar, Self, Unpack
 
-    from ipylab import App
-
 
 __all__ = ["Ipylab", "WidgetBase"]
 
@@ -72,7 +70,6 @@ class WidgetBase(Widget):
     _view_module_version = Unicode(_fe.module_version, read_only=True).tag(sync=True)
     _comm = None
     add_traits = None  # type: ignore # Don't support the method HasTraits.add_traits as it creates a new type that isn't a subclass of its origin)
-    app: Instance[App] = Instance("ipylab.App", (), read_only=True)
 
 
 @register
@@ -115,7 +112,7 @@ class Ipylab(WidgetBase):
 
     @default("log")
     def _default_log(self):
-        return self.app.log
+        return ipylab.app.log
 
     def __new__(cls, **kwgs) -> Self:
         model_id = kwgs.get("model_id") or cls._single_map.get(cls._single_key(kwgs)) if cls.SINGLE else None
@@ -292,7 +289,7 @@ class Ipylab(WidgetBase):
         super().close()
 
     async def ready(self):
-        await self.app.ready()
+        await ipylab.app.ready()
         await self._ready_event.wait()
 
     def on_ready(self, callback, remove=False):  # noqa: FBT002

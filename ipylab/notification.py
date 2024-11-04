@@ -10,6 +10,7 @@ import traitlets
 from ipywidgets import TypedTuple, register
 from traitlets import Bool, Container, Dict, Instance, Unicode
 
+import ipylab
 from ipylab import Connection, NotificationType, Transform, pack
 from ipylab._compat.typing import override
 from ipylab.common import Obj, TaskHooks, TransformType
@@ -61,7 +62,7 @@ class NotificationConnection(Connection):
         to_object = ["args.id"]
 
         async def update():
-            async with self.app.notification as n:
+            async with ipylab.app.notification as n:
                 actions_ = [await n._ensure_action(v) for v in actions]  # noqa: SLF001
                 if actions_:
                     args["actions"] = list(map(pack, actions_))  # type: ignore

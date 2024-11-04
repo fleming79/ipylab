@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from ipywidgets import TypedTuple
 from traitlets import Bool, Container, Dict, Instance, Union
 
+import ipylab
 from ipylab._compat.typing import override
 from ipylab.commands import APP_COMMANDS_NAME, CommandConnection, CommandRegistry
 from ipylab.common import Obj, pack
@@ -88,8 +89,8 @@ class RankedMenu(Ipylab):
 
     def activate(self):
         async def activate():
-            await self.app.main_menu.set_property("activeMenu", self, toObject=["value"])
-            await self.app.main_menu.execute_method("openActiveMenu")
+            await ipylab.app.main_menu.set_property("activeMenu", self, toObject=["value"])
+            await ipylab.app.main_menu.execute_method("openActiveMenu")
             return self
 
         return self.to_task(activate())
@@ -131,7 +132,7 @@ class Menu(RankedMenu):
             "add_to_tuple_fwd": [(self, "connections")],
             "close_with_fwd": [self],
         }
-        return self.app.execute_method(
+        return ipylab.app.execute_method(
             "generateMenu",
             f"{pack(self.commands)}.base",
             options,

@@ -117,16 +117,16 @@ class Shell(Ipylab):
         async def add_to_shell() -> ShellConnection:
             if "evaluate" in args:
                 if isinstance(vpath, dict):
-                    result = self.hook.vpath_getter(app=self.app, kwgs=vpath)
+                    result = self.hook.vpath_getter(app=ipylab.app, kwgs=vpath)
                     while inspect.isawaitable(result):
                         result = await result
                     args["vpath"] = result
                 else:
-                    args["vpath"] = vpath or self.app.vpath
-                if args["vpath"] != self.app.vpath:
+                    args["vpath"] = vpath or ipylab.app.vpath
+                if args["vpath"] != ipylab.app.vpath:
                     hooks["trait_add_fwd"] = [("auto_dispose", False)]
             else:
-                args["vpath"] = self.app.vpath
+                args["vpath"] = ipylab.app.vpath
             return await self.operation("addToShell", transform=Transform.connection, args=args)
 
         return self.to_task(add_to_shell(), "Add to shell", hooks=hooks)

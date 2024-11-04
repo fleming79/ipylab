@@ -11,6 +11,7 @@ from ipywidgets import TypedTuple
 from traitlets import Bool, Container, Dict, Instance, Tuple, Unicode
 from traitlets import Callable as CallableTrait
 
+import ipylab
 from ipylab._compat.typing import override
 from ipylab.common import IpylabKwgs, Obj, TaskHooks, TransformType, pack
 from ipylab.connection import Connection
@@ -89,7 +90,9 @@ class CommandConnection(Connection):
         When this link is closed the launcher will be disposed.
         """
 
-        return self.to_task(self.app.launcher.add(self, category, rank=rank, **args), hooks={"close_with_rev": [self]})
+        return self.to_task(
+            ipylab.app.launcher.add(self, category, rank=rank, **args), hooks={"close_with_rev": [self]}
+        )
 
     def add_to_command_pallet(self, category: str, rank=None, args: dict | None = None):
         """Add a pallet item for this command.
@@ -99,7 +102,7 @@ class CommandConnection(Connection):
         When this link is closed the pallet item will be disposed.
         """
         return self.to_task(
-            self.app.command_pallet.add(self, category, rank=rank, args=args), hooks={"close_with_rev": [self]}
+            ipylab.app.command_pallet.add(self, category, rank=rank, args=args), hooks={"close_with_rev": [self]}
         )
 
     def execute(self, args: dict | None = None, **kwgs: Unpack[IpylabKwgs]):
@@ -205,7 +208,7 @@ class CommandRegistry(Ipylab):
             raise TypeError(msg)
         cmd = conn.python_command
         args = conn.args | (payload.get("args") or {}) | {"buffers": buffers}
-        glbls = self.app.get_namespace(conn.namespace_name)
+        glbls = ipylab.app.get_namespace(conn.namespace_name)
         kwgs = {}
         for n, p in inspect.signature(cmd).parameters.items():
             if n in args:

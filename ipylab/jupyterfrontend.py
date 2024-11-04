@@ -129,6 +129,7 @@ class App(Ipylab):
                 return result
             case "open_console":
                 async with ShellConnection(payload["cid"]) as ref:
+                    ref.auto_dispose = False
                     return await self._open_console(
                         args=payload.get("args") or {},
                         namespace_name=payload.get("namespace_name", ""),
@@ -260,7 +261,7 @@ class App(Ipylab):
             * ipywidgets
             * ipw (ipywidgets)
         """
-        return self.app.operation(
+        return ipylab.app.operation(
             "evaluate", evaluate=evaluate, vpath=vpath, name=name, namespace_name=namespace_name, **kwgs
         )
 

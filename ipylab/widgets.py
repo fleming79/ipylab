@@ -10,6 +10,7 @@ from ipywidgets import Box, DOMWidget, TypedTuple, register, widget_serializatio
 from ipywidgets.widgets.trait_types import InstanceDict
 from traitlets import Container, Dict, Instance, Unicode, observe
 
+import ipylab
 import ipylab._frontend as _fe
 from ipylab.common import Area, InsertMode, IpylabKwgs
 from ipylab.connection import ShellConnection
@@ -18,8 +19,6 @@ from ipylab.ipylab import WidgetBase
 if TYPE_CHECKING:
     from asyncio import Task
     from typing import Unpack
-
-    from ipylab import App
 
 
 @register
@@ -55,7 +54,6 @@ class Panel(Box):
     _view_module_version = Unicode(_fe.module_version, read_only=True).tag(sync=True)
     title: Instance[Title] = InstanceDict(Title, ()).tag(sync=True, **widget_serialization)
 
-    app: Instance[App] = Instance("ipylab.App", (), read_only=True)
     connections: Container[tuple[ShellConnection, ...]] = TypedTuple(trait=Instance(ShellConnection))
     console = Instance(ShellConnection, (), allow_none=True, read_only=True)
 
@@ -71,7 +69,7 @@ class Panel(Box):
         **kwgs,
     ) -> Task[ShellConnection]:
         """Add this panel to the shell."""
-        return self.app.shell.add(
+        return ipylab.app.shell.add(
             self,
             area=area,
             mode=mode,
@@ -94,7 +92,7 @@ class Panel(Box):
         namespace_name: str
             An alternate namespace to activate.
         """
-        return self.app.open_console(
+        return ipylab.app.open_console(
             objects={"widget": self, "ref": self.connections[-1] if self.connections else None},
             activate=activate,
             namespace_name=namespace_name,
@@ -129,6 +127,6 @@ class SplitPanel(Panel):
             await asyncio.sleep(0.001)
             self.orientation = orientation
 
-        return self.app.to_task(force_refresh(self.children))
+        return ipylab.app.to_task(force_refresh(self.children))
 
     # ============== End temp fix =============
