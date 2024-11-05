@@ -10,7 +10,7 @@ from traitlets import Container, Instance
 
 from ipylab.commands import CommandConnection, CommandPalletItemConnection, CommandRegistry
 from ipylab.common import Obj, TaskHooks
-from ipylab.connection import Connection
+from ipylab.connection import InfoConnection
 from ipylab.ipylab import Ipylab, IpylabBase, Transform
 
 if TYPE_CHECKING:
@@ -50,6 +50,6 @@ class Launcher(Ipylab):
 
     def remove(self, command: CommandConnection, category: str):
         cid = LauncherConnection.to_cid(command, category)
-        if conn := Connection.get_existing_connection(cid, quiet=True):
+        if conn := InfoConnection.get_existing_connection(cid, quiet=True):
             conn.close()
         return cid

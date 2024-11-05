@@ -21,7 +21,7 @@ from ipylab._compat.typing import override
 from ipylab.commands import CommandPalette, CommandRegistry
 from ipylab.common import InsertMode, IpylabKwgs, Obj, pack
 from ipylab.dialog import Dialog
-from ipylab.ipylab import IpylabBase
+from ipylab.ipylab import IpylabBase, Readonly
 from ipylab.launcher import Launcher
 from ipylab.log import IpylabLogHandler, LogLevel
 from ipylab.menu import ContextMenu, MainMenu
@@ -60,15 +60,16 @@ class App(Ipylab):
     vpath = Unicode(read_only=True).tag(sync=True)
     per_kernel_widget_manager_detected = Bool(read_only=True).tag(sync=True)
 
-    shell = Instance(Shell, (), read_only=True)
-    dialog = Instance(Dialog, (), read_only=True)
-    commands = Instance(CommandRegistry, (), read_only=True)
-    command_pallet = Instance(CommandPalette, (), read_only=True)
-    launcher = Instance(Launcher, (), read_only=True)
-    session_manager = Instance(SessionManager, (), read_only=True)
-    main_menu = Instance(MainMenu, (), read_only=True)
-    context_menu = Instance(ContextMenu, (), read_only=True)
-    notification = Instance(NotificationManager, (), read_only=True)
+    shell = Readonly(Shell)
+    dialog = Readonly(Dialog)
+    commands = Readonly(CommandRegistry)
+    command_pallet = Readonly(CommandPalette)
+    launcher = Readonly(Launcher)
+    session_manager = Readonly(SessionManager)
+    main_menu = Readonly(MainMenu)
+    context_menu = Readonly(ContextMenu)
+    notification = Readonly(NotificationManager)
+
     console = Instance(ShellConnection, allow_none=True, read_only=True)
     logging_handler = Instance(logging.Handler, allow_none=True, read_only=True)
 
@@ -114,7 +115,7 @@ class App(Ipylab):
 
     @override
     async def ready(self):
-        if not self._ready:
+        if not self._ready_event._value:  # type: ignore # noqa: SLF001
             await self._ready_event.wait()
 
     @override

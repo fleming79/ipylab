@@ -53,7 +53,6 @@ class Connection(Ipylab):
     ipylab_base = None
 
     auto_dispose = Bool(False, read_only=True, help="Dispose of the object in frontend when closed.").tag(sync=True)
-    info: Dict | None = None
 
     def __init_subclass__(cls, **kwargs) -> None:
         cls.prefix = f"{cls._PREFIX}{cls.__name__}{cls._SEP}"
@@ -76,8 +75,6 @@ class Connection(Ipylab):
     @property
     @override
     def repr_info(self):
-        if self.info:
-            return {"cid": self.cid, "info": self.info}
         return {"cid": self.cid}
 
     @classmethod
@@ -143,13 +140,25 @@ class Connection(Ipylab):
 Connection._CLASS_DEFINITIONS[Connection.prefix.strip(Connection._SEP)] = Connection  # noqa: SLF001
 
 
+class InfoConnection(Connection):
+    "A connection with info and auto_dispose enabled"
+
+    info = Dict(help="info about the item")
+    auto_dispose = Bool(True).tag(sync=True)
+
+    @property
+    @override
+    def repr_info(self):
+        return {"cid": self.cid, "info": self.info}
+
+
 class ShellConnection(Connection):
     "Provides a connection to a widget loaded in the shell"
 
     _model_name = Unicode("ShellConnectionModel").tag(sync=True)
+    auto_dispose = Bool(True).tag(sync=True)
 
     widget = Instance(Widget, allow_none=True, default_value=None, help="The widget that has the view")
-    auto_dispose = Bool(True).tag(sync=True)
 
     def __del__(self):
         """Object disposal"""

@@ -21,6 +21,7 @@ export class JupyterFrontEndModel extends IpylabModel {
 
   initialize(attributes: any, options: any): void {
     super.initialize(attributes, options);
+    this.kernelId = this.kernel.id;
     this.logger = JFEM.loggerRegistry.getLogger(this.vpath);
     this.logger.stateChanged.connect(this.loggerStateChanged as any, this);
     Private.jfems.set(this.kernel.id, this);
@@ -44,7 +45,7 @@ export class JupyterFrontEndModel extends IpylabModel {
   }
 
   close(comm_closed?: boolean): Promise<void> {
-    Private.jfems.delete(this.kernel.id);
+    Private.jfems.delete(this.kernelId);
     Private.vpathTojfem.delete(this.vpath);
     JFEM.labShell.currentChanged.disconnect(this.updateSessionInfo, this);
     JFEM.labShell.activeChanged.disconnect(this.updateSessionInfo, this);
@@ -57,12 +58,12 @@ export class JupyterFrontEndModel extends IpylabModel {
     let vpath = this.get('vpath');
     if (!vpath) {
       const cs = this.get('current_session');
-      if (cs?.kernel?.id === this.kernel.id) {
+      if (cs?.kernel?.id === this.kernelId) {
         vpath = cs?.path;
       }
       if (!vpath) {
         for (const session of JFEM.sessionManager.running()) {
-          if (session.kernel.id === this.kernel.id) {
+          if (session.kernel.id === this.kernelId) {
             vpath = session.path;
             break;
           }
@@ -171,11 +172,8 @@ export class JupyterFrontEndModel extends IpylabModel {
       const getManager = (KernelWidgetManager as any).getManager;
       const widget_manager: KernelWidgetManager = await getManager(kernel);
       if (!Private.jfems.has(kernel.id)) {
-        // getManager will restore widgets so we only need to do this if ipylab wasn't imported.
-        widget_manager.kernel.requestExecute(
-          { code: `import ipylab;ipylab.App()` },
-          true
-        );
+        const code = 'import ipylab;ipylab.App()';
+        widget_manager.kernel.requestExecute({ code }, true);
       }
     }
     return await new Promise((resolve, reject) => {
@@ -270,7 +268,7 @@ export class JupyterFrontEndModel extends IpylabModel {
     const source = ipylabSettings.vpath;
     JFEM.app.commands.execute('logconsole:open', { source });
   }
-
+  kernelId: string;
   logger: ILogger;
   static loggerRegistry: ILoggerRegistry;
 }

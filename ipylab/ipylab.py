@@ -9,7 +9,7 @@ import logging
 import traceback
 import uuid
 import weakref
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from ipywidgets import Widget, register
 from traitlets import Bool, Container, Dict, HasTraits, Instance, Set, TraitError, TraitType, Unicode, default, observe
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from typing import ClassVar, Self, Unpack
 
 
-__all__ = ["Ipylab", "WidgetBase"]
+__all__ = ["Ipylab", "WidgetBase", "Readonly"]
 
 T = TypeVar("T")
 L = TypeVar("L", bound="Ipylab")
@@ -39,6 +39,22 @@ class IpylabBase(TraitType[tuple[str, str], None]):
         "The 'mapping' to the 'base' in the frontend."
         self._trait = Unicode()
         super().__init__((base, subpath))
+
+
+class Readonly(Generic[T]):
+    __slots__ = ["_instances", "_klass", "_kwgs"]
+
+    def __init__(self, klass: type[T], **kwgs):
+        self._klass = klass
+        self._kwgs = kwgs
+        self._instances = weakref.WeakKeyDictionary()
+
+    def __get__(self, obj, objtype=None) -> T:
+        if obj is None:
+            return self  # type: ignore
+        if obj not in self._instances:
+            self._instances[obj] = self._klass(**self._kwgs)
+        return self._instances[obj]
 
 
 class Response(asyncio.Event):
@@ -82,18 +98,19 @@ class Ipylab(WidgetBase):
     _python_class = Unicode().tag(sync=True)
     ipylab_base = IpylabBase(Obj.this, "").tag(sync=True)
     _ready = Bool(read_only=True, help="Set to by frontend when ready").tag(sync=True)
+
     _on_ready_callbacks: Container[set[Callable]] = Set()
 
     _async_widget_base_init_complete = False
     _single_map: ClassVar[dict[Hashable, str]] = {}  # single_key : model_id
     _single_models: ClassVar[dict[str, Self]] = {}  #  model_id   : Widget
-    _ready_event = Instance(asyncio.Event, ())
+    _ready_event = Readonly(asyncio.Event)
     _comm = None
 
     _pending_operations: Dict[str, Response] = Dict()
     _tasks: Container[set[asyncio.Task]] = Set()
     _has_attrs_mappings: Container[set[tuple[HasTraits, str]]] = Set()
-    close_extras: Container[weakref.WeakSet[Widget]] = Instance(weakref.WeakSet, (), help="extra items to close")  # type: ignore
+    close_extras: Readonly[weakref.WeakSet[Widget]] = Readonly(weakref.WeakSet)
     log = Instance(logging.Logger)
 
     @classmethod
@@ -158,9 +175,9 @@ class Ipylab(WidgetBase):
             for task in self._tasks:
                 task.cancel()
             self._tasks.clear()
-            for item in self.close_extras:
+            for item in list(self.close_extras):
                 item.close()
-            for obj, name in self._has_attrs_mappings:
+            for obj, name in list(self._has_attrs_mappings):
                 if val := getattr(obj, name, None):
                     if val is self:
                         with contextlib.suppress(TraitError):
@@ -276,9 +293,9 @@ class Ipylab(WidgetBase):
         super().close()
 
     async def ready(self):
-        if not ipylab.app._ready:  # noqa: SLF001
+        if not ipylab.app._ready_event._value:  # type: ignore # noqa: SLF001
             await ipylab.app.ready()
-        if not self._ready:
+        if not self._ready_event._value:  # type: ignore  # noqa: SLF001
             await self._ready_event.wait()
 
     def on_ready(self, callback, remove=False):  # noqa: FBT002

@@ -8,12 +8,13 @@ from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict
 
 import traitlets
 from ipywidgets import TypedTuple, register
-from traitlets import Bool, Container, Dict, Instance, Unicode
+from traitlets import Container, Instance, Unicode
 
 import ipylab
-from ipylab import Connection, NotificationType, Transform, pack
+from ipylab import NotificationType, Transform, pack
 from ipylab._compat.typing import override
 from ipylab.common import Obj, TaskHooks, TransformType
+from ipylab.connection import InfoConnection
 from ipylab.ipylab import Ipylab, IpylabBase
 
 if TYPE_CHECKING:
@@ -33,17 +34,12 @@ class NotifyAction(TypedDict):
     caption: NotRequired[str]
 
 
-class ActionConnection(Connection):
+class ActionConnection(InfoConnection):
     callback = traitlets.Callable()
 
-    info = Dict(help="info about the item")
-    auto_dispose = Bool(True).tag(sync=True)
 
-
-class NotificationConnection(Connection):
-    info = Dict(help="info about the item")
+class NotificationConnection(InfoConnection):
     actions: Container[tuple[ActionConnection, ...]] = TypedTuple(trait=Instance(ActionConnection))
-    auto_dispose = Bool(True).tag(sync=True)
 
     def update(
         self,
@@ -86,7 +82,7 @@ class NotificationManager(Ipylab):
     ipylab_base = IpylabBase(Obj.IpylabModel, "Notification.manager").tag(sync=True)
 
     connections: Container[tuple[NotificationConnection | ActionConnection, ...]] = TypedTuple(
-        trait=Instance(Connection)
+        trait=Instance(InfoConnection)
     )
 
     @override

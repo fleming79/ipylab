@@ -6,14 +6,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ipywidgets import TypedTuple
-from traitlets import Bool, Container, Dict, Instance, Union
+from traitlets import Container, Instance, Union
 
 import ipylab
 from ipylab._compat.typing import override
 from ipylab.commands import APP_COMMANDS_NAME, CommandConnection, CommandRegistry
 from ipylab.common import Obj, pack
-from ipylab.connection import Connection
-from ipylab.ipylab import Ipylab, IpylabBase, Transform
+from ipylab.connection import InfoConnection
+from ipylab.ipylab import Ipylab, IpylabBase, Readonly, Transform
 
 if TYPE_CHECKING:
     from asyncio import Task
@@ -25,11 +25,9 @@ if TYPE_CHECKING:
 __all__ = ["MenuItemConnection", "MenuConnection", "MainMenu", "ContextMenu"]
 
 
-class MenuItemConnection(Connection):
+class MenuItemConnection(InfoConnection):
     """A connection to an ipylab menu item."""
 
-    auto_dispose = Bool(True).tag(sync=True)
-    info = Dict()
     menu: Instance[RankedMenu] = Instance("ipylab.menu.RankedMenu")
 
 
@@ -96,11 +94,9 @@ class RankedMenu(Ipylab):
         return self.to_task(activate())
 
 
-class MenuConnection(RankedMenu, Connection):
+class MenuConnection(RankedMenu, InfoConnection):
     """A connection to a custom menu"""
 
-    auto_dispose = Bool(True).tag(sync=True)
-    info = Dict()
     commands = Instance(CommandRegistry)
 
 
@@ -132,7 +128,7 @@ class Menu(RankedMenu):
             "add_to_tuple_fwd": [(self, "connections")],
             "close_with_fwd": [self],
         }
-        return ipylab.app.execute_method(
+        return self.execute_method(
             "generateMenu",
             f"{pack(self.commands)}.base",
             options,
@@ -154,13 +150,13 @@ class MainMenu(Menu):
 
     ipylab_base = IpylabBase(Obj.IpylabModel, "mainMenu").tag(sync=True)
 
-    edit_menu = Instance(RankedMenu, kw={"ipylab_base": (Obj.IpylabModel, "menu.editMenu")})
-    file_menu = Instance(RankedMenu, kw={"basename": (Obj.IpylabModel, "menu.fileMenu")})
-    kernel_menu = Instance(RankedMenu, kw={"basename": (Obj.IpylabModel, "menu.kernelMenu")})
-    run_menu = Instance(RankedMenu, kw={"basename": (Obj.IpylabModel, "menu.runMenu")})
-    settings_menu = Instance(RankedMenu, kw={"basename": (Obj.IpylabModel, "menu.settingsMenu")})
-    view_menu = Instance(RankedMenu, kw={"basename": (Obj.IpylabModel, "menu.viewMenu")})
-    tabs_menu = Instance(RankedMenu, kw={"basename": (Obj.IpylabModel, "menu.tabsMenu")})
+    edit_menu = Readonly(RankedMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.editMenu"))
+    file_menu = Readonly(RankedMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.fileMenu"))
+    kernel_menu = Readonly(RankedMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.kernelMenu"))
+    run_menu = Readonly(RankedMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.runMenu"))
+    settings_menu = Readonly(RankedMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.settingsMenu"))
+    view_menu = Readonly(RankedMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.viewMenu"))
+    tabs_menu = Readonly(RankedMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.tabsMenu"))
 
     @classmethod
     @override

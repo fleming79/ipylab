@@ -40,8 +40,8 @@ def on_error(obj: Ipylab, source: ErrorSource, error: Exception):
         if not task.done():
             return
         task.result().close()
-    a = NotifyAction(label="📝", caption="Toggle log console", callback=obj.app.toggle_log_console, keep_open=True)
-    objects["error_task"] = obj.app.notification.notify(msg, type=ipylab.NotificationType.error, actions=[a])
+    a = NotifyAction(label="📝", caption="Toggle log console", callback=ipylab.app.toggle_log_console, keep_open=True)
+    objects["error_task"] = ipylab.app.notification.notify(msg, type=ipylab.NotificationType.error, actions=[a])
 
 
 @hookimpl

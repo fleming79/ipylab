@@ -8,13 +8,13 @@ import inspect
 from typing import TYPE_CHECKING, Any, ClassVar, NotRequired, TypedDict, Unpack
 
 from ipywidgets import TypedTuple
-from traitlets import Bool, Container, Dict, Instance, Tuple, Unicode
 from traitlets import Callable as CallableTrait
+from traitlets import Container, Dict, Instance, Tuple, Unicode
 
 import ipylab
 from ipylab._compat.typing import override
 from ipylab.common import IpylabKwgs, Obj, TaskHooks, TransformType, pack
-from ipylab.connection import Connection
+from ipylab.connection import InfoConnection
 from ipylab.ipylab import Ipylab, IpylabBase, Transform, register
 from ipylab.widgets import Icon
 
@@ -44,12 +44,9 @@ class CommandOptions(TypedDict):
     usage: NotRequired[str]
 
 
-class CommandConnection(Connection):
+class CommandConnection(InfoConnection):
     """An Ipylab command registered in a command registry."""
 
-    auto_dispose = Bool(True).tag(sync=True)
-
-    info = Dict()
     args = Dict()
     python_command = CallableTrait(allow_none=False)
     namespace_name = Unicode("")
@@ -110,11 +107,9 @@ class CommandConnection(Connection):
         return self.commands.execute(self, args, **kwgs)
 
 
-class CommandPalletItemConnection(Connection):
+class CommandPalletItemConnection(InfoConnection):
     """An Ipylab command palette item."""
 
-    auto_dispose = Bool(True).tag(sync=True)
-    info = Dict()
     command = Instance(CommandConnection, ())
 
     @override
@@ -167,7 +162,7 @@ class CommandPalette(Ipylab):
 class CommandRegistry(Ipylab):
     _model_name = Unicode("CommandRegistryModel").tag(sync=True)
     ipylab_base = IpylabBase(Obj.IpylabModel, "").tag(sync=True)
-    name = Unicode(APP_COMMANDS_NAME, read_only=True, help="Use the default registry").tag(sync=True)
+    name = Unicode(APP_COMMANDS_NAME, read_only=True).tag(sync=True)
     all_commands = Tuple(read_only=True).tag(sync=True)
     connections: Container[tuple[CommandConnection, ...]] = TypedTuple(trait=Instance(CommandConnection))
 
@@ -202,7 +197,7 @@ class CommandRegistry(Ipylab):
         return await super()._do_operation_for_frontend(operation, payload, buffers)
 
     async def _execute_for_frontend(self, payload: dict, buffers: list):
-        conn = Connection.get_existing_connection(payload["id"], quiet=True)
+        conn = InfoConnection.get_existing_connection(payload["id"], quiet=True)
         if not isinstance(conn, CommandConnection):
             msg = f'Invalid command "{payload["id"]} {conn=}"'
             raise TypeError(msg)
@@ -273,7 +268,7 @@ class CommandRegistry(Ipylab):
 
     def remove_command(self, command: str | CommandConnection):
         cid = command.cid if isinstance(command, CommandConnection) else CommandConnection.to_cid(self.name, command)
-        if conn := Connection.get_existing_connection(cid, quiet=True):
+        if conn := InfoConnection.get_existing_connection(cid, quiet=True):
             conn.close()
         return cid
 
