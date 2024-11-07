@@ -10,7 +10,6 @@ from traitlets import Container, Instance
 
 from ipylab.commands import CommandConnection, CommandPalletItemConnection, CommandRegistry
 from ipylab.common import Obj, TaskHooks
-from ipylab.connection import InfoConnection
 from ipylab.ipylab import Ipylab, IpylabBase, Transform
 
 if TYPE_CHECKING:
@@ -42,14 +41,8 @@ class Launcher(Ipylab):
 
         ref: https://jupyterlab.readthedocs.io/en/latest/api/interfaces/launcher.ILauncher.IItemOptions.html
         """
-        cid = self.remove(cmd, category)
+        cid = LauncherConnection.to_cid(cmd, category)
         CommandRegistry._check_belongs_to_application_registry(cid)  # noqa: SLF001
         hooks: TaskHooks = {"close_with_fwd": [cmd], "add_to_tuple_fwd": [(self, "connections")]}
         args = {"command": str(cmd), "category": category, "rank": rank, "args": args}
         return self.execute_method("add", args, transform={"transform": Transform.connection, "cid": cid}, hooks=hooks)
-
-    def remove(self, command: CommandConnection, category: str):
-        cid = LauncherConnection.to_cid(command, category)
-        if conn := InfoConnection.get_existing_connection(cid, quiet=True):
-            conn.close()
-        return cid

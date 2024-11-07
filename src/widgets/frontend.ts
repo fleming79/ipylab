@@ -172,8 +172,7 @@ export class JupyterFrontEndModel extends IpylabModel {
       const getManager = (KernelWidgetManager as any).getManager;
       const widget_manager: KernelWidgetManager = await getManager(kernel);
       if (!Private.jfems.has(kernel.id)) {
-        const code = 'import ipylab;ipylab.App()';
-        widget_manager.kernel.requestExecute({ code }, true);
+        widget_manager.kernel.requestExecute({ code: 'import ipylab' }, true);
       }
     }
     return await new Promise((resolve, reject) => {

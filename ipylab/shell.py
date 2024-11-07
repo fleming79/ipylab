@@ -6,7 +6,7 @@ from __future__ import annotations
 import inspect
 from typing import TYPE_CHECKING
 
-from ipywidgets import TypedTuple, Widget
+from ipywidgets import DOMWidget, TypedTuple, Widget
 from traitlets import Container, Instance, Unicode
 
 import ipylab
@@ -72,9 +72,6 @@ class Shell(Ipylab):
             The result (payload) of evaluate must be a Widget with a view and NOT a ShellConnection.
 
 
-        options: dict
-            mode: InsertMode
-
         Basic example
         -------------
 
@@ -111,6 +108,8 @@ class Shell(Ipylab):
             if isinstance(obj, ipylab.Panel):
                 hooks["add_to_tuple_fwd"].append((obj, "connections"))
             args["ipy_model"] = obj.model_id
+            if isinstance(obj, DOMWidget):
+                obj.add_class(ipylab.app.selector.removeprefix("."))
         else:
             args["evaluate"] = pack(obj)
 
@@ -127,6 +126,7 @@ class Shell(Ipylab):
                     hooks["trait_add_fwd"] = [("auto_dispose", False)]
             else:
                 args["vpath"] = ipylab.app.vpath
+
             return await self.operation("addToShell", transform=Transform.connection, args=args)
 
         return self.to_task(add_to_shell(), "Add to shell", hooks=hooks)

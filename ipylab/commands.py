@@ -14,7 +14,7 @@ from traitlets import Container, Dict, Instance, Tuple, Unicode
 import ipylab
 from ipylab._compat.typing import override
 from ipylab.common import IpylabKwgs, Obj, TaskHooks, TransformType, pack
-from ipylab.connection import InfoConnection
+from ipylab.connection import InfoConnection, ShellConnection
 from ipylab.ipylab import Ipylab, IpylabBase, Transform, register
 from ipylab.widgets import Icon
 
@@ -53,14 +53,12 @@ class CommandConnection(InfoConnection):
 
     _config_options: ClassVar = tuple(CommandOptions.__annotations__)
 
+    commands: Instance[CommandRegistry] = Instance("ipylab.commands.CommandRegistry")
+
     @override
     @classmethod
-    def to_cid(cls, commands_name: str, name: str):
-        return super().to_cid(commands_name, name)
-
-    @property
-    def commands(self):
-        return CommandRegistry(name=self.cid.split(self._SEP)[1])
+    def to_cid(cls, command_registry: str, vpath: str, name: str):
+        return super().to_cid(command_registry, vpath, name)
 
     @property
     def repr_info(self):
@@ -79,38 +77,11 @@ class CommandConnection(InfoConnection):
 
         return self.to_task(configure())
 
-    def add_launcher(self, category: str, rank=None, **args):
-        """Add a launcher for this command.
-
-        **args are used when calling the command.
-
-        When this link is closed the launcher will be disposed.
-        """
-
-        return self.to_task(
-            ipylab.app.launcher.add(self, category, rank=rank, **args), hooks={"close_with_rev": [self]}
-        )
-
-    def add_to_command_pallet(self, category: str, rank=None, args: dict | None = None):
-        """Add a pallet item for this command.
-
-        **args are used when calling the command.
-
-        When this link is closed the pallet item will be disposed.
-        """
-        return self.to_task(
-            ipylab.app.command_pallet.add(self, category, rank=rank, args=args), hooks={"close_with_rev": [self]}
-        )
-
-    def execute(self, args: dict | None = None, **kwgs: Unpack[IpylabKwgs]):
-        "Execute this command via the frontend. TIP: you can also call python_command directly."
-        return self.commands.execute(self, args, **kwgs)
-
 
 class CommandPalletItemConnection(InfoConnection):
     """An Ipylab command palette item."""
 
-    command = Instance(CommandConnection, ())
+    command = Instance(CommandConnection)
 
     @override
     @classmethod
@@ -139,8 +110,32 @@ class CommandPalette(Ipylab):
         """Add a command to the command pallet (must be registered in this kernel).
 
         **args are used when calling the command.
+
+        Special args
+        ------------
+
+        * active_widget: ShellConnection
+        * ref: ShellConnection
+
+        Include in the argument list of the function to have the value provided when the command
+        is called.
+
+        active_widget:
+            This is a ShellConnection to the Jupyterlab defined active widget.
+            For the command to appear in the context menu non-ipylab widgets, the appropriate selector
+            should be used. see: https://jupyterlab.readthedocs.io/en/stable/developer/css.html#commonly-used-css-selectors
+            Selectors:
+                * Notebook: '.jp-Notebook'
+                * Main area: '.jp-Activity'
+
+        ref:
+            This is a ShellConnection to the Ipylab active widget.
+            The associated widget/panel is then accessible by `ref.widget`.
+
+        Tip: This is can be used in context menus to perform actions specific to the active widget
+        in the shell.
         """
-        cid = self.remove(command, category)
+        cid = CommandPalletItemConnection.to_cid(command, category)
         CommandRegistry._check_belongs_to_application_registry(cid)  # noqa: SLF001
         info = {"args": args, "category": category, "command": str(command), "rank": rank}
         transform: TransformType = {"transform": Transform.connection, "cid": cid}
@@ -151,15 +146,11 @@ class CommandPalette(Ipylab):
         }
         return self.execute_method("addItem", info, transform=transform, hooks=hooks)
 
-    def remove(self, command: CommandConnection, category: str):
-        cid = CommandPalletItemConnection.to_cid(command, category)
-        if conn := CommandPalletItemConnection.get_existing_connection(cid, quiet=True):
-            conn.close()
-        return cid
-
 
 @register
 class CommandRegistry(Ipylab):
+    SINGLE = True
+
     _model_name = Unicode("CommandRegistryModel").tag(sync=True)
     ipylab_base = IpylabBase(Obj.IpylabModel, "").tag(sync=True)
     name = Unicode(APP_COMMANDS_NAME, read_only=True).tag(sync=True)
@@ -203,10 +194,17 @@ class CommandRegistry(Ipylab):
             raise TypeError(msg)
         cmd = conn.python_command
         args = conn.args | (payload.get("args") or {}) | {"buffers": buffers}
+
+        # Shell connections
+        cids = {"active_widget": payload["cid1"], "ref": payload["cid2"]}
+
         glbls = ipylab.app.get_namespace(conn.namespace_name)
         kwgs = {}
         for n, p in inspect.signature(cmd).parameters.items():
-            if n in args:
+            if n in ["active_widget", "ref"] and cids[n]:
+                kwgs[n] = ShellConnection(cids[n])
+                await kwgs[n].ready()
+            elif n in args:
                 kwgs[n] = args[n]
             elif n in glbls:
                 kwgs[n] = glbls[n]
@@ -237,8 +235,17 @@ class CommandRegistry(Ipylab):
     ) -> Task[CommandConnection]:
         """Add a python command that can be executed by Jupyterlab.
 
+        The `id` in the command registry is the `cid` of the CommnadConnection.
+        The `cid` is constructed from:
+        1. registry name: The name of this command registry [Jupyterlab]
+        2. vpath: The virtual 'path' of the app.
+        3. name:
+
+        If a cid (id) already exists, the existing CommandConnection will be closed prior
+        to adding the new command.
+
         name: str
-            The suffix for the 'id'.
+            A name to use in the id to identify the command.
         execute:
 
         args: dict | None
@@ -248,29 +255,35 @@ class CommandRegistry(Ipylab):
 
         ref: https://lumino.readthedocs.io/en/latest/api/interfaces/commands.CommandRegistry.ICommandOptions.html
         """
-        cid = self.remove_command(name)
         hooks: TaskHooks = {
+            "close_with_fwd": [self],
             "add_to_tuple_fwd": [(self, "connections")],
-            "trait_add_fwd": [("namespace_name", namespace_name), ("python_command", execute), ("args", args or {})],
+            "trait_add_fwd": [
+                ("commands", self),
+                ("namespace_name", namespace_name),
+                ("python_command", execute),
+                ("args", args or {}),
+            ],
         }
-        return self.operation(
-            "addCommand",
-            id=cid,
-            caption=caption,
-            label=label or name,
-            iconClass=icon_class,
-            transform={"transform": Transform.connection, "cid": cid},
-            icon=f"{pack(icon)}.labIcon" if isinstance(icon, Icon) else None,
-            toObject=["icon"] if isinstance(icon, Icon) else [],
-            hooks=hooks,
-            **kwgs,
-        )
 
-    def remove_command(self, command: str | CommandConnection):
-        cid = command.cid if isinstance(command, CommandConnection) else CommandConnection.to_cid(self.name, command)
-        if conn := InfoConnection.get_existing_connection(cid, quiet=True):
-            conn.close()
-        return cid
+        async def add_command():
+            cid = CommandConnection.to_cid(self.name, ipylab.app.vpath, name)
+            if cmd := CommandConnection.get_existing_connection(cid, quiet=True):
+                await cmd.ready()
+                cmd.close()
+            return await self.operation(
+                "addCommand",
+                id=cid,
+                caption=caption,
+                label=label or name,
+                iconClass=icon_class,
+                transform={"transform": Transform.connection, "cid": cid},
+                icon=f"{pack(icon)}.labIcon" if isinstance(icon, Icon) else None,
+                toObject=["icon"] if isinstance(icon, Icon) else [],
+                **kwgs,
+            )
+
+        return self.to_task(add_command(), hooks=hooks)
 
     def execute(self, command_id: str | CommandConnection, args: dict | None = None, **kwgs: Unpack[IpylabKwgs]):
         """Execute a command in the registry.
@@ -284,7 +297,7 @@ class CommandRegistry(Ipylab):
         async def execute_command():
             id_ = str(command_id)
             if id_ not in self.all_commands:
-                id_ = CommandConnection.to_cid(self.name, id_)
+                id_ = CommandConnection.to_cid(self.name, ipylab.app.vpath, id_)
                 if id_ not in self.all_commands:
                     msg = f"Command '{command_id}' not registered!"
                     raise ValueError(msg)

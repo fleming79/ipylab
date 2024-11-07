@@ -12,7 +12,6 @@ import ipylab
 if TYPE_CHECKING:
     from ipywidgets import Widget
 
-    from ipylab import App
 
 __all__ = ["LogLevel", "LogTypes", "LogPayloadType", "LogPayloadText", "LogPayloadHtml", "LogPayloadOutput"]
 
@@ -96,9 +95,9 @@ LogPayloadType = LogPayloadBase | LogPayloadText | LogPayloadHtml | LogPayloadOu
 
 
 class IpylabLogHandler(logging.Handler):
-    def __init__(self, app: App) -> None:
-        app.observe(self._observe_app_log_level, "logger_level")
-        super().__init__(LogLevel.to_numeric(app.logger_level))
+    def __init__(self) -> None:
+        ipylab.app.observe(self._observe_app_log_level, "logger_level")
+        super().__init__(LogLevel.to_numeric(ipylab.app.logger_level))
 
     def _observe_app_log_level(self, change: dict):
         self.setLevel(LogLevel.to_numeric(change["new"]))

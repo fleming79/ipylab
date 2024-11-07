@@ -18,7 +18,7 @@ import ipylab
 import ipylab.hookspecs
 from ipylab import Ipylab, ShellConnection, Transform
 from ipylab._compat.typing import override
-from ipylab.commands import CommandPalette, CommandRegistry
+from ipylab.commands import APP_COMMANDS_NAME, CommandPalette, CommandRegistry
 from ipylab.common import InsertMode, IpylabKwgs, Obj, pack
 from ipylab.dialog import Dialog
 from ipylab.ipylab import IpylabBase, Readonly
@@ -62,24 +62,30 @@ class App(Ipylab):
 
     shell = Readonly(Shell)
     dialog = Readonly(Dialog)
-    commands = Readonly(CommandRegistry)
-    command_pallet = Readonly(CommandPalette)
-    launcher = Readonly(Launcher)
-    session_manager = Readonly(SessionManager)
-    main_menu = Readonly(MainMenu)
-    context_menu = Readonly(ContextMenu)
     notification = Readonly(NotificationManager)
+    commands = Readonly(CommandRegistry, name=APP_COMMANDS_NAME)
+    launcher = Readonly(Launcher)
+    main_menu = Readonly(MainMenu)
+    command_pallet = Readonly(CommandPalette)
+    context_menu = Readonly(ContextMenu, sub_attrs=["commands"], commands=lambda app: app.commands)
+    session_manager = Readonly(SessionManager)
 
     console = Instance(ShellConnection, allow_none=True, read_only=True)
     logging_handler = Instance(logging.Handler, allow_none=True, read_only=True)
 
     active_namespace = Unicode("", read_only=True, help="name of the current namespace")
+    selector = Unicode("", read_only=True, help="Selector class for context menus (css)")
 
     namespace_names: Container[tuple[str, ...]] = Tuple(read_only=True).tag(sync=True)
     _namespaces: Container[dict[str, LastUpdatedDict]] = Dict(read_only=True)  # type: ignore
 
     _ipy_shell = get_ipython()
     _ipy_default_namespace: ClassVar = getattr(_ipy_shell, "user_ns", {})
+
+    @classmethod
+    @override
+    def _single_key(cls, kwgs: dict):  # noqa: ARG003
+        return "app"
 
     def close(self):
         "Cannot close"
@@ -93,7 +99,7 @@ class App(Ipylab):
 
     @default("logging_handler")
     def _default_logging_handler(self):
-        handler = IpylabLogHandler(self)
+        handler = IpylabLogHandler()
         fmt = f"{self.vpath}: " + "{name}:{message}"
         handler.setFormatter(logging.Formatter(fmt, style="{"))
         return handler
@@ -101,6 +107,8 @@ class App(Ipylab):
     @observe("_ready")
     def _app_observe_ready(self, _):
         if self._ready:
+            suffix = "-".join("".join(filter(str.isascii, self.vpath.replace(".", "-"))).split())
+            self.set_trait("selector", f".ipylab-{suffix}")
             ipylab.plugin_manager.hook.autostart._call_history.clear()  # type: ignore  # noqa: SLF001
             ipylab.plugin_manager.hook.autostart.call_historic(
                 kwargs={"app": self}, result_callback=self._autostart_callback

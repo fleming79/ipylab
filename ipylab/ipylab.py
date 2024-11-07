@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import inspect
 import json
 import logging
 import traceback
@@ -42,18 +43,43 @@ class IpylabBase(TraitType[tuple[str, str], None]):
 
 
 class Readonly(Generic[T]):
-    __slots__ = ["_instances", "_klass", "_kwgs"]
+    __slots__ = ["_instances", "_klass", "_kwgs", "_sub_attrs"]
 
-    def __init__(self, klass: type[T], **kwgs):
+    def __init__(self, klass: type[T], sub_attrs: list[str] | None = None, **kwgs):
+        """
+        Set `klass` as a read only property on obj.
+
+        Provide kwgs necessary for the creation of the instance. Use `obj_kwgs`
+        to provide mappings to attributes to retrieve from obj (the object that
+        has the property).
+
+        sub_attrs: list[str]:
+            A list of keys in kwgs that has a callable that accepts `obj` to substitute.
+            Use 'self' to set obj as an attribute instead of attempting to
+            access the attribute on obj.
+
+            This allows to cross-reference between related objects, but without
+            interfering with garbage collection.
+        """
+        if sub_attrs:
+            for k in sub_attrs:
+                if not callable(kwgs[k]) or len(inspect.signature(kwgs[k]).parameters) != 1:
+                    msg = f"Argument'{k}' must a callable that accepts one argument."
+                    raise ValueError(msg)
         self._klass = klass
         self._kwgs = kwgs
+        self._sub_attrs = sub_attrs
         self._instances = weakref.WeakKeyDictionary()
 
     def __get__(self, obj, objtype=None) -> T:
         if obj is None:
             return self  # type: ignore
         if obj not in self._instances:
-            self._instances[obj] = self._klass(**self._kwgs)
+            kwgs = self._kwgs.copy()
+            if self._sub_attrs:
+                for k in self._sub_attrs:
+                    kwgs[k] = kwgs[k](obj)
+            self._instances[obj] = self._klass(**kwgs)
         return self._instances[obj]
 
 

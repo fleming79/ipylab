@@ -10,7 +10,7 @@ from traitlets import Container, Instance, Union
 
 import ipylab
 from ipylab._compat.typing import override
-from ipylab.commands import APP_COMMANDS_NAME, CommandConnection, CommandRegistry
+from ipylab.commands import APP_COMMANDS_NAME, CommandRegistry
 from ipylab.common import Obj, pack
 from ipylab.connection import InfoConnection
 from ipylab.ipylab import Ipylab, IpylabBase, Readonly, Transform
@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from asyncio import Task
     from typing import Literal
 
+    from ipylab.commands import CommandConnection
     from ipylab.common import TaskHooks, TransformType
 
 
@@ -89,9 +90,15 @@ class RankedMenu(Ipylab):
         async def activate():
             await ipylab.app.main_menu.set_property("activeMenu", self, toObject=["value"])
             await ipylab.app.main_menu.execute_method("openActiveMenu")
-            return self
 
         return self.to_task(activate())
+
+
+class BuiltinMenu(RankedMenu):
+    @override
+    def activate(self):
+        name = self.ipylab_base[-1].removeprefix("mainMenu.").lower()
+        return ipylab.app.commands.execute(f"{name}:open")
 
 
 class MenuConnection(RankedMenu, InfoConnection):
@@ -150,13 +157,14 @@ class MainMenu(Menu):
 
     ipylab_base = IpylabBase(Obj.IpylabModel, "mainMenu").tag(sync=True)
 
-    edit_menu = Readonly(RankedMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.editMenu"))
-    file_menu = Readonly(RankedMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.fileMenu"))
-    kernel_menu = Readonly(RankedMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.kernelMenu"))
-    run_menu = Readonly(RankedMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.runMenu"))
-    settings_menu = Readonly(RankedMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.settingsMenu"))
-    view_menu = Readonly(RankedMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.viewMenu"))
-    tabs_menu = Readonly(RankedMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.tabsMenu"))
+    file_menu = Readonly(BuiltinMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.fileMenu"))
+    edit_menu = Readonly(BuiltinMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.editMenu"))
+    view_menu = Readonly(BuiltinMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.viewMenu"))
+    run_menu = Readonly(BuiltinMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.runMenu"))
+    kernel_menu = Readonly(BuiltinMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.kernelMenu"))
+    tabs_menu = Readonly(BuiltinMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.tabsMenu"))
+    settings_menu = Readonly(BuiltinMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.settingsMenu"))
+    help_menu = Readonly(BuiltinMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.helpMenu"))
 
     @classmethod
     @override
@@ -164,8 +172,6 @@ class MainMenu(Menu):
         return cls
 
     def __init__(self):
-        if self._async_widget_base_init_complete:
-            return
         super().__init__(commands=CommandRegistry(name=APP_COMMANDS_NAME))
 
     def add_menu(self, menu: MenuConnection, *, update=True, rank: int = 500) -> Task[None]:
@@ -175,6 +181,10 @@ class MainMenu(Menu):
         """
         options = {"rank": rank}
         return self.execute_method("addMenu", menu, update, options, toObject=["args[0]"])
+
+    @override
+    def activate(self):
+        "Does nothing. Instead you should activate a submenu."
 
 
 class ContextMenu(Menu):
@@ -186,19 +196,11 @@ class ContextMenu(Menu):
 
     ipylab_base = IpylabBase(Obj.IpylabModel, "app.contextMenu").tag(sync=True)
 
-    @classmethod
-    @override
-    def _single_key(cls, kwgs: dict):  # noqa: ARG003
-        return cls
-
-    def __init__(self):
-        super().__init__(commands=CommandRegistry(name=APP_COMMANDS_NAME))
-
     def add_item(
         self,
         *,
         command: str | CommandConnection = "",
-        selector=".ipylab-MainArea",
+        selector="",
         submenu: MenuConnection | None = None,
         rank=None,
         type: Literal["command", "submenu", "separator"] = "command",  # noqa: A002
@@ -209,8 +211,20 @@ class ContextMenu(Menu):
 
         ref: https://jupyterlab.readthedocs.io/en/stable/extension/extension_points.html#context-menu
         """
-        return super().add_item(command=command, selector=selector, submenu=submenu, rank=rank, type=type, **args)
+        add_item_ = super().add_item
+
+        async def add_item():
+            return await add_item_(
+                command=command,
+                selector=selector or ipylab.app.selector,
+                submenu=submenu,
+                rank=rank,
+                type=type,
+                **args,
+            )
+
+        return self.to_task(add_item())
 
     @override
     def activate(self):
-        raise NotImplementedError
+        "Does nothing for a context menu"

@@ -9,7 +9,7 @@
 
 Control JupyterLab from Python notebooks.
 
-The goal is to provide access to most of the JupyterLab environment from Python notebooks. For example:
+The goal is to provide access to most of the JupyterLab environment from the Python kernel. For example:
 
 - Adding widgets to the main area `DockPanel`, left, right or top area
 - Build more advanced interfaces leveraging `SplitPanel`, `Toolbar` and other Lumino widgets
