@@ -137,7 +137,7 @@ class Ipylab(WidgetBase):
     _tasks: Container[set[asyncio.Task]] = Set()
     _has_attrs_mappings: Container[set[tuple[HasTraits, str]]] = Set()
     close_extras: Readonly[weakref.WeakSet[Widget]] = Readonly(weakref.WeakSet)
-    log = Instance(logging.Logger)
+    log = Instance(logging.LoggerAdapter)
 
     @classmethod
     def _single_key(cls, kwgs: dict) -> Hashable:  # noqa: ARG003
@@ -309,10 +309,9 @@ class Ipylab(WidgetBase):
         """Perform an operation for a custom message with an ipylab_FE uuid."""
         raise NotImplementedError(operation)
 
-    def _obj_operation(self, base: Obj, subpath: str, operation: str, ipl_kwgs: IpylabKwgs, **kwgs):
-        return self.operation(
-            "genericOperation", genericOperation=operation, basename=base, subpath=subpath, **ipl_kwgs, **kwgs
-        )
+    def _obj_operation(self, base: Obj, subpath: str, operation: str, kwgs, kwargs: IpylabKwgs):
+        kwgs |= {"genericOperation": operation, "basename": base, "subpath": subpath}
+        return self.operation("genericOperation", kwgs, **kwargs)
 
     def close(self):
         self.send({"close": True})
@@ -383,12 +382,12 @@ class Ipylab(WidgetBase):
     def operation(
         self,
         operation: str,
+        kwgs: dict | None = None,
         *,
         transform: TransformType = Transform.auto,
         toLuminoWidget: list[str] | None = None,
         toObject: list[str] | None = None,
         hooks: TaskHookType = None,
-        **kwgs,
     ) -> Task[Any]:
         """Create a new task requesting an operation to be performed in the frontend.
 
@@ -419,7 +418,7 @@ class Ipylab(WidgetBase):
         content = {
             "ipylab_PY": ipylab_PY,
             "operation": operation,
-            "kwgs": kwgs,
+            "kwgs": dict(kwgs) if kwgs else {},
             "transform": Transform.validate(transform),
         }
         if toLuminoWidget:
@@ -436,19 +435,19 @@ class Ipylab(WidgetBase):
 
         return self.to_task(_operation(content), name=ipylab_PY, hooks=hooks)
 
-    def execute_method(self, subpath: str, *args, obj=Obj.base, **kwgs: Unpack[IpylabKwgs]):
-        return self._obj_operation(obj, subpath, "executeMethod", kwgs, args=args)
+    def execute_method(self, subpath: str, *args, obj=Obj.base, **kwargs: Unpack[IpylabKwgs]):
+        return self._obj_operation(obj, subpath, "executeMethod", {"args": args}, kwargs)
 
-    def get_property(self, subpath: str, *, obj=Obj.base, null_if_missing=False, **kwgs: Unpack[IpylabKwgs]):
-        return self._obj_operation(obj, subpath, "getProperty", kwgs, null_if_missing=null_if_missing)
+    def get_property(self, subpath: str, *, obj=Obj.base, null_if_missing=False, **kwargs: Unpack[IpylabKwgs]):
+        return self._obj_operation(obj, subpath, "getProperty", {"null_if_missing": null_if_missing}, kwargs)
 
-    def set_property(self, subpath: str, value, *, obj=Obj.base, **kwgs: Unpack[IpylabKwgs]):
-        return self._obj_operation(obj, subpath, "setProperty", kwgs, value=value)
+    def set_property(self, subpath: str, value, *, obj=Obj.base, **kwargs: Unpack[IpylabKwgs]):
+        return self._obj_operation(obj, subpath, "setProperty", {"value": value}, kwargs)
 
-    def update_property(self, subpath: str, value: dict[str, Any], *, obj=Obj.base, **kwgs: Unpack[IpylabKwgs]):
-        return self._obj_operation(obj, subpath, "updateProperty", kwgs, value=value)
+    def update_property(self, subpath: str, value: dict[str, Any], *, obj=Obj.base, **kwargs: Unpack[IpylabKwgs]):
+        return self._obj_operation(obj, subpath, "updateProperty", {"value": value}, kwargs)
 
     def list_properties(
-        self, subpath="", *, obj=Obj.base, depth=3, skip_hidden=True, **kwgs: Unpack[IpylabKwgs]
+        self, subpath="", *, obj=Obj.base, depth=3, skip_hidden=True, **kwargs: Unpack[IpylabKwgs]
     ) -> Task[dict]:
-        return self._obj_operation(obj, subpath, "listProperties", kwgs, depth=depth, omitHidden=skip_hidden)
+        return self._obj_operation(obj, subpath, "listProperties", {"depth": depth, "omitHidden": skip_hidden}, kwargs)

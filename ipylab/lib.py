@@ -45,6 +45,14 @@ def on_error(obj: Ipylab, source: ErrorSource, error: Exception):
 
 
 @hookimpl
+async def autostart(app: ipylab.App) -> None | Awaitable[None]:
+    # Register some default context menu items for Ipylab
+    cmd = await app.commands.add_command("Open console", app._context_open_console)  # noqa: SLF001
+    await app.context_menu.add_item(command=cmd, rank=20)
+    await app.context_menu.add_item(command="logconsole:open", rank=21)
+
+
+@hookimpl
 def ensure_run(obj: ipylab.Ipylab, aw: Callable | Awaitable | None):
     try:
         if callable(aw):

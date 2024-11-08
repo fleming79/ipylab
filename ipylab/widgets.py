@@ -55,7 +55,7 @@ class Panel(Box):
     title: Instance[Title] = InstanceDict(Title, ()).tag(sync=True, **widget_serialization)
 
     connections: Container[tuple[ShellConnection, ...]] = TypedTuple(trait=Instance(ShellConnection))
-    console = Instance(ShellConnection, (), allow_none=True, read_only=True)
+    console = Instance(ShellConnection, allow_none=True, read_only=True)
 
     def add_to_shell(
         self,
@@ -86,18 +86,20 @@ class Panel(Box):
         insertMode=InsertMode.split_bottom,
         namespace_name="",
         activate=True,
-        **kwgs: Unpack[IpylabKwgs],
+        **kwargs: Unpack[IpylabKwgs],
     ) -> Task[ShellConnection]:
         """Open a console and activate the namespace.
         namespace_name: str
             An alternate namespace to activate.
         """
+        hooks = kwargs.pop("hooks", None) or {}
+        hooks["trait_add_rev"] = [*hooks.pop("trait_add_rev", ()), (self, "console")]
+        kwargs["hooks"] = hooks
         return ipylab.app.open_console(
-            objects={"widget": self, "ref": self.connections[-1] if self.connections else None},
             activate=activate,
             namespace_name=namespace_name,
             insertMode=InsertMode(insertMode),
-            **kwgs,
+            **kwargs,
         )
 
 

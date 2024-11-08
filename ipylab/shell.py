@@ -89,7 +89,8 @@ class Shell(Ipylab):
             "ref": f"{pack(ref)}.id" if isinstance(ref, ShellConnection) else None,
         } | (options or {})
         args["area"] = area
-
+        if "asDocument" not in args:
+            args["asDocument"] = area in [Area.left, Area.main, Area.right, Area.down]
         if isinstance(obj, ShellConnection):
             if "cid" in args and args["cid"] != obj.cid:
                 msg = f"The provided {args['cid']=} does not match {obj.cid=}"
@@ -127,7 +128,7 @@ class Shell(Ipylab):
             else:
                 args["vpath"] = ipylab.app.vpath
 
-            return await self.operation("addToShell", transform=Transform.connection, args=args)
+            return await self.operation("addToShell", {"args": args}, transform=Transform.connection)
 
         return self.to_task(add_to_shell(), "Add to shell", hooks=hooks)
 

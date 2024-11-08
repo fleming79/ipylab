@@ -13,7 +13,7 @@ from traitlets import Container, Dict, Instance, Tuple, Unicode
 
 import ipylab
 from ipylab._compat.typing import override
-from ipylab.common import IpylabKwgs, Obj, TaskHooks, TransformType, pack
+from ipylab.common import IpylabKwgs, Obj, TaskHooks, TaskHookType, TransformType, pack
 from ipylab.connection import InfoConnection, ShellConnection
 from ipylab.ipylab import Ipylab, IpylabBase, Transform, register
 from ipylab.widgets import Icon
@@ -21,6 +21,8 @@ from ipylab.widgets import Icon
 if TYPE_CHECKING:
     from asyncio import Task
     from collections.abc import Callable, Coroutine
+
+    from ipylab.menu import MenuConnection
 
 
 __all__ = ["CommandConnection", "CommandPalletItemConnection", "CommandRegistry"]
@@ -155,7 +157,7 @@ class CommandRegistry(Ipylab):
     ipylab_base = IpylabBase(Obj.IpylabModel, "").tag(sync=True)
     name = Unicode(APP_COMMANDS_NAME, read_only=True).tag(sync=True)
     all_commands = Tuple(read_only=True).tag(sync=True)
-    connections: Container[tuple[CommandConnection, ...]] = TypedTuple(trait=Instance(CommandConnection))
+    connections: Container[tuple[InfoConnection, ...]] = TypedTuple(trait=Instance(InfoConnection))
 
     @classmethod
     @override
@@ -231,6 +233,7 @@ class CommandRegistry(Ipylab):
         icon: Icon | None = None,
         args: dict | None = None,
         namespace_name="",
+        hooks: TaskHookType = None,
         **kwgs,
     ) -> Task[CommandConnection]:
         """Add a python command that can be executed by Jupyterlab.
@@ -255,37 +258,43 @@ class CommandRegistry(Ipylab):
 
         ref: https://lumino.readthedocs.io/en/latest/api/interfaces/commands.CommandRegistry.ICommandOptions.html
         """
-        hooks: TaskHooks = {
-            "close_with_fwd": [self],
-            "add_to_tuple_fwd": [(self, "connections")],
-            "trait_add_fwd": [
-                ("commands", self),
-                ("namespace_name", namespace_name),
-                ("python_command", execute),
-                ("args", args or {}),
-            ],
-        }
 
         async def add_command():
             cid = CommandConnection.to_cid(self.name, ipylab.app.vpath, name)
             if cmd := CommandConnection.get_existing_connection(cid, quiet=True):
                 await cmd.ready()
                 cmd.close()
+            kwgs_ = kwgs | {
+                "id": cid,
+                "cid": cid,
+                "caption": caption,
+                "label": label or name,
+                "iconClass": icon_class,
+                "icon": f"{pack(icon)}.labIcon" if isinstance(icon, Icon) else None,
+            }
+            hooks: TaskHooks = {
+                "close_with_fwd": [self],
+                "add_to_tuple_fwd": [(self, "connections")],
+                "trait_add_fwd": [
+                    ("commands", self),
+                    ("namespace_name", namespace_name),
+                    ("python_command", execute),
+                    ("args", args or {}),
+                    ("info", kwgs_),
+                ],
+            }
+
             return await self.operation(
                 "addCommand",
-                id=cid,
-                caption=caption,
-                label=label or name,
-                iconClass=icon_class,
+                kwgs_,
+                hooks=hooks,
                 transform={"transform": Transform.connection, "cid": cid},
-                icon=f"{pack(icon)}.labIcon" if isinstance(icon, Icon) else None,
                 toObject=["icon"] if isinstance(icon, Icon) else [],
-                **kwgs,
             )
 
         return self.to_task(add_command(), hooks=hooks)
 
-    def execute(self, command_id: str | CommandConnection, args: dict | None = None, **kwgs: Unpack[IpylabKwgs]):
+    def execute(self, command_id: str | CommandConnection, args: dict | None = None, **kwargs: Unpack[IpylabKwgs]):
         """Execute a command in the registry.
 
         `args` are passed to the command.
@@ -301,6 +310,26 @@ class CommandRegistry(Ipylab):
                 if id_ not in self.all_commands:
                     msg = f"Command '{command_id}' not registered!"
                     raise ValueError(msg)
-            return await self.operation("execute", id=id_, args=args or {}, **kwgs)
+            return await self.operation("execute", {"id": id_, "args": args or {}}, **kwargs)
 
         return self.to_task(execute_command())
+
+    def create_menu(self, label: str, rank: int = 500) -> Task[MenuConnection]:
+        "Make a new menu that can be used where a menu is required."
+        cid = ipylab.menu.MenuConnection.to_cid()
+        options = {"id": cid, "label": label, "rank": int(rank)}
+        hooks: TaskHooks = {
+            "trait_add_fwd": [("info", options), ("commands", self)],
+            "add_to_tuple_fwd": [(self, "connections")],
+            "close_with_fwd": [self],
+        }
+        return self.execute_method(
+            "generateMenu",
+            f"{pack(self)}.base",
+            options,
+            (Obj.this, "translator"),
+            obj=Obj.MainMenu,
+            toObject=["args[0]", "args[2]"],
+            transform={"transform": Transform.connection, "cid": cid},
+            hooks=hooks,
+        )

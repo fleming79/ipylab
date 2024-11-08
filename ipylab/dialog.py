@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Unpack
 
 from ipywidgets import Widget
 from traitlets import Unicode
@@ -14,44 +14,58 @@ if TYPE_CHECKING:
     from asyncio import Task
     from typing import Any
 
+    from ipylab.common import IpylabKwgs
+
+
+def _combine(options: dict | None, **kwgs):
+    if options:
+        kwgs.update(options)
+    return kwgs
+
 
 class Dialog(Ipylab):
     _model_name = Unicode("DialogModel", help="Name of the model.", read_only=True).tag(sync=True)
 
-    def get_boolean(self, title: str) -> Task[bool]:
+    def get_boolean(self, title: str, options: dict | None = None, **kwgs: Unpack[IpylabKwgs]) -> Task[bool]:
         """Jupyter dialog to get a boolean value.
-        see: https://jupyterlab.readthedocs.io/en/stable/extension/ui_helpers.html#input-dialogs
+        see: https://jupyterlab.readthedocs.io/en/stable/api/functions/apputils.InputDialog.getBoolean.html
         """
-        return self.operation("getBoolean", title=title)
+        return self.operation("getBoolean", _combine(options, title=title), **kwgs)
 
-    def get_item(self, title: str, items: tuple | list) -> Task[str]:
+    def get_item(
+        self, title: str, items: tuple | list, *, options: dict | None = None, **kwgs: Unpack[IpylabKwgs]
+    ) -> Task[str]:
         """Jupyter dialog to get an item from a list value.
 
         note: will always return a string representation of the selected item.
-        see: https://jupyterlab.readthedocs.io/en/stable/extension/ui_helpers.html#input-dialogs
+        see: https://jupyterlab.readthedocs.io/en/stable/api/functions/apputils.InputDialog.getItem.html
         """
-        return self.operation("getItem", title=title, items=tuple(items))
+        return self.operation("getItem", _combine(options, title=title, items=tuple(items)), **kwgs)
 
-    def get_number(self, title: str) -> Task[float]:
+    def get_number(self, title: str, options: dict | None = None, **kwgs: Unpack[IpylabKwgs]) -> Task[float]:
         """Jupyter dialog to get a number.
-        see: https://jupyterlab.readthedocs.io/en/stable/extension/ui_helpers.html#input-dialogs
+        see: https://jupyterlab.readthedocs.io/en/stable/api/functions/apputils.InputDialog.getNumber.html
         """
-        return self.operation("getNumber", title=title)
+        return self.operation("getNumber", _combine(options, title=title), **kwgs)
 
-    def get_text(self, title: str) -> Task[str]:
+    def get_text(self, title: str, options: dict | None = None, **kwgs: Unpack[IpylabKwgs]) -> Task[str]:
         """Jupyter dialog to get a string.
-        see: https://jupyterlab.readthedocs.io/en/stable/extension/ui_helpers.html#input-dialogs
+        see: https://jupyterlab.readthedocs.io/en/stable/api/functions/apputils.InputDialog.getText.html
         """
-        return self.operation("getText", title=title)
+        return self.operation("getText", _combine(options, title=title), **kwgs)
 
-    def get_password(self, title: str) -> Task[str]:
+    def get_password(self, title: str, options: dict | None = None, **kwgs: Unpack[IpylabKwgs]) -> Task[str]:
         """Jupyter dialog to get a number.
-        see: https://jupyterlab.readthedocs.io/en/stable/extension/ui_helpers.html#input-dialogs
+        see: https://jupyterlab.readthedocs.io/en/stable/api/functions/apputils.InputDialog.getPassword.html
         """
-        return self.operation("getPassword", title=title)
+        return self.operation("getPassword", _combine(options, title=title), **kwgs)
 
     def show_dialog(
-        self, title: str = "", body: str | Widget = "", host: None | Widget = None, **kwgs
+        self,
+        title: str = "",
+        body: str | Widget = "",
+        options: dict | None = None,
+        **kwgs: Unpack[IpylabKwgs],
     ) -> Task[dict[str, Any]]:
         """Jupyter dialog to get user response with custom buttons and checkbox.
 
@@ -61,7 +75,6 @@ class Dialog(Ipylab):
 
             title: 'Dialog title', // Can be text or a react element
             body: 'Dialog body', // Can be text, a widget or a react element
-            host: document.body, // Parent element for rendering the dialog
             specify kwgs passed as below.
             buttons: [ // List of buttons
             buttons=[
@@ -101,20 +114,14 @@ class Dialog(Ipylab):
             hasClose: false, // Whether to display a close button or not
             renderer: undefined // To define customized dialog structure
 
-
+            see: https://jupyterlab.readthedocs.io/en/stable/api/functions/apputils.showDialog.html
             source: https://jupyterlab.readthedocs.io/en/stable/extension/ui_helpers.html#generic-dialog
         """
-        return self.operation(
-            "showDialog",
-            title=title,
-            body=body,
-            host=host,
-            toLuminoWidget=["body"] if isinstance(body, Widget) else None,
-            **kwgs,
-        )
+        kwgs["toLuminoWidget"] = ["body"] if isinstance(body, Widget) else []
+        return self.operation("showDialog", _combine(options, title=title, body=body), **kwgs)
 
     def show_error_message(
-        self, title: str, error: str, buttons: None | list[dict[str, str | list[str]]] = None
+        self, title: str, error: str, options: dict | None = None, **kwgs: Unpack[IpylabKwgs]
     ) -> Task[None]:
         """Jupyter error message.
 
@@ -134,17 +141,17 @@ class Dialog(Ipylab):
 
         https://jupyterlab.readthedocs.io/en/stable/api/functions/apputils.showErrorMessage.html#showErrorMessage
         """
-        return self.operation("showErrorMessage", title=title, error=error, buttons=buttons)
+        return self.operation("showErrorMessage", _combine(options, title=title, error=error), **kwgs)
 
-    def get_open_files(self, **kwgs) -> Task[list[str]]:
+    def get_open_files(self, options: dict | None = None, **kwgs: Unpack[IpylabKwgs]) -> Task[list[str]]:
         """Get a list of files
 
         https://jupyterlab.readthedocs.io/en/latest/api/functions/filebrowser.FileDialog.getOpenFiles.html#getOpenFiles
         """
-        return self.operation("getOpenFiles", **kwgs)
+        return self.operation("getOpenFiles", options, **kwgs)
 
-    def get_existing_directory(self, **kwgs) -> Task[str]:
+    def get_existing_directory(self, options: dict | None = None, **kwgs: Unpack[IpylabKwgs]) -> Task[str]:
         """
         https://jupyterlab.readthedocs.io/en/latest/api/functions/filebrowser.FileDialog.getExistingDirectory.html#getExistingDirectory
         """
-        return self.operation("getExistingDirectory", **kwgs)
+        return self.operation("getExistingDirectory", options, **kwgs)

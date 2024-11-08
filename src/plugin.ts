@@ -80,25 +80,6 @@ const extension: JupyterFrontEndPlugin<void> = {
       exports
     });
 
-    app.commands.addCommand(CommandIDs.openConsole, {
-      execute: exports.JupyterFrontEndModel.openConsole,
-      label: 'Open console'
-    });
-    app.commands.addCommand(CommandIDs.toggleLogConsole, {
-      execute: exports.JupyterFrontEndModel.toggleLogConsole,
-      label: 'Toggle log console'
-    });
-    app.contextMenu.addItem({
-      command: CommandIDs.openConsole,
-      selector: '.ipylab-shell',
-      rank: 1
-    });
-    app.contextMenu.addItem({
-      command: CommandIDs.toggleLogConsole,
-      selector: '.ipylab-shell',
-      rank: 2
-    });
-
     let when;
     if (exports.IpylabModel.PER_KERNEL_WM) {
       app.commands.addCommand(CommandIDs.restore, {

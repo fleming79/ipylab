@@ -6,6 +6,7 @@ import { SessionContext, SessionContextDialogs } from '@jupyterlab/apputils';
 import { ILogger, ILoggerRegistry, IStateChange } from '@jupyterlab/logconsole';
 import { Kernel } from '@jupyterlab/services';
 import { PromiseDelegate } from '@lumino/coreutils';
+import { Signal } from '@lumino/signaling';
 import { IpylabModel } from './ipylab';
 
 /**
@@ -267,6 +268,7 @@ export class JupyterFrontEndModel extends IpylabModel {
     const source = ipylabSettings.vpath;
     JFEM.app.commands.execute('logconsole:open', { source });
   }
+  context = new IpylabContext(this.vpath);
   kernelId: string;
   logger: ILogger;
   static loggerRegistry: ILoggerRegistry;
@@ -274,6 +276,21 @@ export class JupyterFrontEndModel extends IpylabModel {
 
 IpylabModel.JFEM = JupyterFrontEndModel;
 const JFEM = JupyterFrontEndModel;
+
+/**
+ * Provide minimal context necessary to create a DocumentWidget.
+ */
+class IpylabContext {
+  constructor(path: string) {
+    this.path = path;
+    // this.contentsModel.path = path;
+  }
+  readonly path: string;
+  ready = new Promise(resolve => resolve(null));
+  pathChanged = new Signal(this);
+  model: object = { stateChanged: new Signal(this) };
+  localPath = '';
+}
 
 /**
  * A namespace for private data

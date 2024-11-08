@@ -11,7 +11,7 @@ from traitlets import Container, Instance, Union
 import ipylab
 from ipylab._compat.typing import override
 from ipylab.commands import APP_COMMANDS_NAME, CommandRegistry
-from ipylab.common import Obj, pack
+from ipylab.common import Obj
 from ipylab.connection import InfoConnection
 from ipylab.ipylab import Ipylab, IpylabBase, Readonly, Transform
 
@@ -45,20 +45,29 @@ class RankedMenu(Ipylab):
         *,
         command: str | CommandConnection = "",
         submenu: MenuConnection | None = None,
-        rank=None,
+        rank: float | None = None,
         type: Literal["command", "submenu", "separator"] = "command",  # noqa: A002
-        **args,
+        args: dict | None = None,
     ) -> Task[MenuItemConnection]:
         """Add command, subitem or separator.
         **args are 'defaults' used with command only.
 
         ref: https://jupyterlab.readthedocs.io/en/4.0.x/api/classes/ui_components.RankedMenu.html#addItem.addItem-1
         """
-        if isinstance(self, ContextMenu):
-            selector = args.pop("selector")
-            info = {"rank": rank, "args": args, "type": type, "selector": selector}
-        else:
-            info = {"rank": rank, "args": args, "type": type}
+        return self._add_item(command, submenu, rank, type, args)
+
+    def _add_item(
+        self,
+        command: str | CommandConnection,
+        submenu: MenuConnection | None,
+        rank,
+        type: Literal["command", "submenu", "separator"],  # noqa: A002
+        args: dict | None,
+        selector=None,
+    ):
+        info = {"rank": rank, "args": args, "type": type}
+        if selector:
+            info["selector"] = selector
         to_object = []
         match type:
             case "command":
@@ -71,7 +80,7 @@ class RankedMenu(Ipylab):
                 pass
             case "submenu":
                 if not isinstance(submenu, MenuConnection):
-                    msg = "`submenu` must be an instance of MenuItemConnection"
+                    msg = f"'submenu' must be an instance of 'MenuConnection' not {submenu.__class__}"
                     raise TypeError(msg)
                 info["submenu"] = submenu
                 to_object = ["args[0].submenu"]
@@ -126,26 +135,6 @@ class Menu(RankedMenu):
         commands.close_extras.add(self)
         super().__init__(commands=commands, **kwgs)
 
-    def create_menu(self, label: str, rank: int = 500) -> Task[MenuConnection]:
-        "Make a new menu that can be used where a menu is required."
-        cid = MenuConnection.to_cid()
-        options = {"id": cid, "label": label, "rank": int(rank)}
-        hooks: TaskHooks = {
-            "trait_add_fwd": [("info", options), ("commands", self.commands)],
-            "add_to_tuple_fwd": [(self, "connections")],
-            "close_with_fwd": [self],
-        }
-        return self.execute_method(
-            "generateMenu",
-            f"{pack(self.commands)}.base",
-            options,
-            (Obj.this, "translator"),
-            obj=Obj.MainMenu,
-            toObject=["args[0]", "args[2]"],
-            transform={"transform": Transform.connection, "cid": cid},
-            hooks=hooks,
-        )
-
 
 class MainMenu(Menu):
     """Direct access to the Jupyterlab main menu.
@@ -196,34 +185,23 @@ class ContextMenu(Menu):
 
     ipylab_base = IpylabBase(Obj.IpylabModel, "app.contextMenu").tag(sync=True)
 
+    @override
     def add_item(
         self,
         *,
         command: str | CommandConnection = "",
         selector="",
         submenu: MenuConnection | None = None,
-        rank=None,
+        rank: float | None = None,
         type: Literal["command", "submenu", "separator"] = "command",  # noqa: A002
-        **args,
+        args: dict | None = None,
     ) -> Task[MenuItemConnection]:
         """Add command, subitem or separator.
-        **args are 'defaults' used with command only.
+        args are used when calling the command only.
 
         ref: https://jupyterlab.readthedocs.io/en/stable/extension/extension_points.html#context-menu
         """
-        add_item_ = super().add_item
-
-        async def add_item():
-            return await add_item_(
-                command=command,
-                selector=selector or ipylab.app.selector,
-                submenu=submenu,
-                rank=rank,
-                type=type,
-                **args,
-            )
-
-        return self.to_task(add_item())
+        return self._add_item(command, submenu, rank, type, args, selector or ipylab.app.selector)
 
     @override
     def activate(self):

@@ -125,10 +125,10 @@ class NotificationManager(Ipylab):
         """
 
         options = {"autoClose": auto_close}
-        info = {"type": NotificationType(type), "message": message, "options": options}
+        kwgs = {"type": NotificationType(type), "message": message, "options": options}
         hooks: TaskHooks = {
             "add_to_tuple_fwd": [(self, "connections")],
-            "trait_add_fwd": [("info", info)],
+            "trait_add_fwd": [("info", kwgs)],
         }
 
         async def notify():
@@ -138,9 +138,7 @@ class NotificationManager(Ipylab):
             cid = NotificationConnection.to_cid()
             notification: NotificationConnection = await self.operation(
                 "notification",
-                message=message,
-                type=NotificationType(type) if type else None,
-                options=options,
+                kwgs,
                 transform={"transform": Transform.connection, "cid": cid},
                 toObject=[f"options.actions[{i}]" for i in range(len(actions_))] if actions_ else [],
             )
@@ -159,11 +157,11 @@ class NotificationManager(Ipylab):
     ) -> Task[ActionConnection]:
         "Create an action to use in a notification."
         cid = ActionConnection.to_cid()
-        info = {"label": label, "displayType": display_type, "keep_open": keep_open, "caption": caption}
+        kwgs = {"label": label, "displayType": display_type, "keep_open": keep_open, "caption": caption, "cid": cid}
         transform: TransformType = {"transform": Transform.connection, "cid": cid}
         hooks: TaskHooks = {
-            "trait_add_fwd": [("callback", callback), ("info", info)],
+            "trait_add_fwd": [("callback", callback), ("info", kwgs)],
             "add_to_tuple_fwd": [(self, "connections")],
             "close_with_fwd": [self],
         }
-        return self.operation("createAction", cid=cid, transform=transform, hooks=hooks, **info)
+        return self.operation("createAction", kwgs, transform=transform, hooks=hooks)

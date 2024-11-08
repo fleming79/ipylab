@@ -58,7 +58,6 @@ export class IpylabModel extends WidgetModel {
     this.save_changes();
     this.on('msg:custom', this.onCustomMessage, this);
     IpylabModel.onKernelLost(this.kernel, this.onKernelLost, this);
-
     if (this.widget_manager.restoredStatus || !IpylabModel.PER_KERNEL_WM) {
       this._startIpylabInit();
     } else {
@@ -500,16 +499,21 @@ export class IpylabModel extends WidgetModel {
   }
 
   /**
-   * Will call `dispose` once the kernel dead or restarted or disposed.
+   * Will call `onKernelLost` when the kernel is dead or restarted.
+   * Only required for non PER_KERNEL_WM
    */
   static onKernelLost(
     kernel: IKernelConnection,
     onKernelLost: () => any,
     thisArg: object
   ) {
+    if (IpylabModel.PER_KERNEL_WM) {
+      // The model and view will now close as needed in ipywidgets.
+      return;
+    }
+
     if (!Private.kernelLostCallbacks.has(kernel)) {
       Private.kernelLostCallbacks.set(kernel, new Set());
-      kernel.disposed.connect(_kernelLost);
       kernel.statusChanged.connect(_onKernelStatusChanged);
     }
     Private.kernelLostCallbacks.get(kernel).add([onKernelLost, thisArg]);
@@ -567,7 +571,6 @@ function _kernelLost(kernel: IKernelConnection) {
   if (kernel.isDisposed) {
     Private.kernelLostCallbacks.delete(kernel);
     kernel.statusChanged.disconnect(_kernelLost);
-    kernel.disposed.disconnect(_kernelLost);
   }
 }
 

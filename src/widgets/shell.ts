@@ -1,10 +1,10 @@
 // Copyright (c) ipylab contributors
 // Distributed under the terms of the Modified BSD License.
-
 import { MainAreaWidget } from '@jupyterlab/apputils';
+import { DocumentWidget } from '@jupyterlab/docregistry';
 import { UUID } from '@lumino/coreutils';
-import { IpylabModel } from './ipylab';
 import { Widget } from '@lumino/widgets';
+import { IpylabModel } from './ipylab';
 
 export class ShellModel extends IpylabModel {
   /**
@@ -76,14 +76,11 @@ export class ShellModel extends IpylabModel {
         throw e;
       }
     }
-    if (
-      (args.area === 'main' && !(widget instanceof MainAreaWidget)) ||
-      typeof widget.title === 'undefined'
-    ) {
-      // Wrap the widget with a MainAreaWidget
-      const w = (widget = new MainAreaWidget({ content: widget }));
+    if (args.asDocument && !(widget instanceof DocumentWidget)) {
+      const jfem = await IpylabModel.JFEM.getModelByVpath(args.vpath);
+      const context = jfem.context as any;
+      const w = (widget = new DocumentWidget({ context, content: widget }));
       w.node.removeChild(w.toolbar.node);
-      w.addClass('ipylab-MainArea');
     }
     args.cid =
       args.cid || IpylabModel.ConnectionModel.new_cid('ShellConnection');
@@ -94,7 +91,6 @@ export class ShellModel extends IpylabModel {
 
     // Register widgets originating from IpyWidgets
     if (args.ipy_model) {
-      widget.addClass('ipylab-shell');
       if (!IpylabModel.tracker.has(widget)) {
         (widget as any).ipylabSettings = args;
         IpylabModel.tracker.add(widget);

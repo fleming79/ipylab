@@ -19,11 +19,11 @@ import ipylab.hookspecs
 from ipylab import Ipylab, ShellConnection, Transform
 from ipylab._compat.typing import override
 from ipylab.commands import APP_COMMANDS_NAME, CommandPalette, CommandRegistry
-from ipylab.common import InsertMode, IpylabKwgs, Obj, pack
+from ipylab.common import InsertMode, IpylabKwgs, Obj
 from ipylab.dialog import Dialog
 from ipylab.ipylab import IpylabBase, Readonly
 from ipylab.launcher import Launcher
-from ipylab.log import IpylabLogHandler, LogLevel
+from ipylab.log import IpylabLoggerAdapter, IpylabLogHandler, LogLevel
 from ipylab.menu import ContextMenu, MainMenu
 from ipylab.notification import NotificationManager
 from ipylab.sessions import SessionManager
@@ -92,10 +92,10 @@ class App(Ipylab):
 
     @default("log")
     def _default_log(self):
-        logger = logging.getLogger("ipylab")
+        log = IpylabLoggerAdapter(logging.getLogger("ipylab"))
         if isinstance(self.logging_handler, logging.Handler):
-            logger.addHandler(self.logging_handler)
-        return logger
+            log.logger.addHandler(self.logging_handler)
+        return log
 
     @default("logging_handler")
     def _default_logging_handler(self):
@@ -139,37 +139,7 @@ class App(Ipylab):
                     raise TypeError(msg)
                 result["payload"] = await self.shell.add(widget, **payload)
                 return result
-            case "open_console":
-                ref = ShellConnection(payload["cid"])
-                await ref.ready()
-                return await self._open_console(
-                    args=payload.get("args") or {},
-                    namespace_name=payload.get("namespace_name", ""),
-                    objects={"widget": ref.widget, "ref": ref},
-                )
         return await super()._do_operation_for_frontend(operation, payload, buffers)
-
-    async def _open_console(self, args: dict, objects: dict, namespace_name: str, **kwgs: Unpack[IpylabKwgs]):
-        args = {"path": self.vpath, "insertMode": InsertMode.split_bottom} | args
-        kwgs["transform"] = {"transform": Transform.connection}
-        kwgs["namespace_name"] = namespace_name  # type: ignore
-
-        # plugins
-        plugin_results = ipylab.plugin_manager.hook.opening_console(app=self, args=args, objects=objects, kwgs=kwgs)
-        for result in plugin_results:
-            ipylab.plugin_manager.hook.ensure_run(obj=self, aw=result)
-        if "ref" not in args and (ref := objects.get("ref")):
-            args["ref"] = f"{pack(ref)}.id"
-            kwgs["toObject"] = [*kwgs.pop("toObject", []), "args.ref"]
-
-        if (namespace_name := kwgs.pop("namespace_name", "")) is not None:  # type: ignore
-            self.activate_namespace(namespace_name, objects=objects)
-
-        conn: ShellConnection = await self.commands.execute("console:open", args, **kwgs)
-        conn.add_as_trait(self, "console")
-        if isinstance((widget := objects.get("widget")), ipylab.Panel):
-            conn.add_as_trait(widget, "console")
-        return conn
 
     async def _evaluate(self, options: dict, buffers: list):
         """Evaluate code corresponding to a call from 'evaluate'.
@@ -206,6 +176,10 @@ class App(Ipylab):
             self.get_namespace(namespace_name, glbls)
         return {"payload": glbls.get("payload"), "buffers": buffers}
 
+    def _context_open_console(self, ref: ShellConnection, active_widget: ShellConnection):
+        "This command is provided for the 'autostart' context menu."
+        return self.open_console(objects={"ref": ref, "active_widget": active_widget})
+
     def open_console(
         self,
         *,
@@ -213,15 +187,37 @@ class App(Ipylab):
         namespace_name="",
         activate=True,
         objects: dict | None = None,
-        **kwgs: Unpack[IpylabKwgs],
+        **kwargs: Unpack[IpylabKwgs],
     ) -> Task[ShellConnection]:
         """Open a console and activate the namespace.
         namespace_name: str
             An alternate namespace to load into the console.
         """
-        args = {"activate": activate, "insertMode": InsertMode(insertMode)}
-        coro = self._open_console(args, objects=objects or {}, namespace_name=namespace_name, **kwgs)
-        return self.to_task(coro, "Open console")
+
+        async def _open_console():
+            args = {
+                "path": self.vpath,
+                "insertMode": insertMode,
+                "activate": activate,
+                "namespace_name": namespace_name,
+            }
+            kwargs["transform"] = {"transform": Transform.connection}
+
+            # plugins
+            plugin_results = ipylab.plugin_manager.hook.opening_console(
+                app=self, args=args, objects=objects, kwgs=kwargs
+            )
+            for result in plugin_results:
+                ipylab.plugin_manager.hook.ensure_run(obj=self, aw=result)
+            self.activate_namespace(args.pop("namespace_name", ""), objects=objects)
+
+            conn: ShellConnection = await self.commands.execute("console:open", args, **kwargs)
+            conn.add_as_trait(self, "console")
+            if objects and (ref := objects.get("ref")) and isinstance(ref.widget, ipylab.Panel):
+                conn.add_as_trait(ref.widget, "console")
+            return conn
+
+        return self.to_task(_open_console(), "Open console")
 
     def toggle_log_console(self) -> Task[ShellConnection]:
         # How can we check if the log console is open?
@@ -229,11 +225,11 @@ class App(Ipylab):
 
     def shutdown_kernel(self, vpath: str | None = None):
         "Shutdown the kernel"
-        return self.operation("shutdownKernel", vpath=vpath)
+        return self.operation("shutdownKernel", {"vpath": vpath})
 
     def start_iyplab_python_kernel(self, *, restart=False):
         "Start the 'ipylab' Python kernel."
-        return self.operation("startIyplabKernel", restart=restart)
+        return self.operation("startIyplabKernel", {"restart": restart})
 
     def evaluate(
         self,
@@ -242,7 +238,7 @@ class App(Ipylab):
         vpath="",
         name="",
         namespace_name="",
-        **kwgs: Unpack[IpylabKwgs],
+        **kwargs: Unpack[IpylabKwgs],
     ):
         """Evaluate code in a Python kernel.
 
@@ -274,7 +270,7 @@ class App(Ipylab):
             * ipw (ipywidgets)
         """
         return ipylab.app.operation(
-            "evaluate", evaluate=evaluate, vpath=vpath, name=name, namespace_name=namespace_name, **kwgs
+            "evaluate", evaluate=evaluate, vpath=vpath, name=name, namespace_name=namespace_name, **kwargs
         )
 
     def get_namespace(self, name="", objects: dict | None = None):

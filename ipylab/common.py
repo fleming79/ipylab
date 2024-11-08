@@ -13,7 +13,7 @@ from ipywidgets import Widget, widget_serialization
 
 import ipylab
 
-__all__ = ["Area", "Obj", "InsertMode", "Transform", "TransformType", "hookimpl", "pack", "IpylabKwgs"]
+__all__ = ["Area", "Obj", "InsertMode", "Transform", "TransformType", "hookimpl", "pack", "IpylabKwgs", "TaskHookType"]
 
 hookimpl = pluggy.HookimplMarker("ipylab")  # Used for plugins
 
@@ -212,8 +212,8 @@ TransformType = Transform | TransformDictAdvanced | TransformDictFunction | Tran
 
 class IpylabKwgs(TypedDict):
     transform: NotRequired[TransformType]
-    toLuminoWidget: NotRequired[list[str]]
-    toObject: NotRequired[list[str]]
+    toLuminoWidget: NotRequired[list[str] | None]
+    toObject: NotRequired[list[str] | None]
     hooks: NotRequired[TaskHookType]
 
 

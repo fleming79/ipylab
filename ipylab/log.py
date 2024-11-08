@@ -105,3 +105,13 @@ class IpylabLogHandler(logging.Handler):
     def emit(self, record):
         log = LogPayloadText(type=LogTypes.text, level=LogLevel.to_level(record.levelno), data=self.format(record))
         ipylab.app.send_log_message(log)
+
+
+class IpylabLoggerAdapter(logging.LoggerAdapter):
+    def __init__(self, logger: logging.Logger, extra=None):
+        logger.setLevel(LogLevel.to_numeric(ipylab.app.logger_level))
+        ipylab.app.observe(self._observe_app_log_level, "logger_level")
+        super().__init__(logger, extra)
+
+    def _observe_app_log_level(self, change: dict):
+        self.setLevel(LogLevel.to_numeric(change["new"]))
