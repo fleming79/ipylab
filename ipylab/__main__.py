@@ -3,11 +3,7 @@
 
 from __future__ import annotations
 
-import sys
+import ipylab
 
 if __name__ == "__main__":
-    if not sys.argv:
-        sys.argv = ["--ServerApp.token=''"]
-    from ipylab.scripts import launch_jupyterlab
-
-    launch_jupyterlab()
+    ipylab.plugin_manager.hook.launch_jupyterlab()

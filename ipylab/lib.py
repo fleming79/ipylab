@@ -31,6 +31,17 @@ def trait_tuple_add(owner: HasTraits, name: str, value: Any):
 
 
 @hookimpl
+def launch_jupyterlab():
+    import sys
+
+    from jupyterlab.labapp import LabApp
+
+    if not sys.argv:
+        sys.argv = ["--ServerApp.token=''"]
+    sys.exit(LabApp.launch_instance())
+
+
+@hookimpl
 def on_error(obj: Ipylab, source: ErrorSource, error: Exception):
     msg = f"{source} {error}"
     obj.log.exception(msg, extra={"source": source, "error": error})

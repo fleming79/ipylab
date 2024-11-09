@@ -40,7 +40,7 @@ dev = ["hatch", "ruff", "pre-commit"]
 test = ["pytest"]
 
 [project.scripts]
-ipylab = "ipylab:scripts.launch_jupyterlab"
+ipylab = "ipylab:plugin_manager.hook.launch_jupyterlab"
 
 [tool.hatch.version]
 source = "nodejs"

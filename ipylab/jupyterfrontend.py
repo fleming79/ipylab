@@ -68,7 +68,7 @@ class App(Ipylab):
     main_menu = Readonly(MainMenu)
     command_pallet = Readonly(CommandPalette)
     context_menu = Readonly(ContextMenu, sub_attrs=["commands"], commands=lambda app: app.commands)
-    session_manager = Readonly(SessionManager)
+    sessions = Readonly(SessionManager)
 
     console = Instance(ShellConnection, allow_none=True, read_only=True)
     logging_handler = Instance(logging.Handler, allow_none=True, read_only=True)
@@ -107,12 +107,17 @@ class App(Ipylab):
     @observe("_ready")
     def _app_observe_ready(self, _):
         if self._ready:
-            suffix = "-".join("".join(filter(str.isascii, self.vpath.replace(".", "-"))).split())
-            self.set_trait("selector", f".ipylab-{suffix}")
+            self.set_trait("selector", self.to_selector(self.vpath))
             ipylab.plugin_manager.hook.autostart._call_history.clear()  # type: ignore  # noqa: SLF001
             ipylab.plugin_manager.hook.autostart.call_historic(
                 kwargs={"app": self}, result_callback=self._autostart_callback
             )
+
+    @staticmethod
+    def to_selector(vpath: str):
+        suffix = "-".join("".join(vpath).split())
+        suffix = "".join(s for s in suffix.replace(".", "-") if s.isnumeric() or s.isalpha() or s in "_-")
+        return f".ipylab-{suffix}"
 
     def _autostart_callback(self, result):
         ipylab.plugin_manager.hook.ensure_run(obj=self, aw=result)

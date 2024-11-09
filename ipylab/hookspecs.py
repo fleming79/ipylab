@@ -16,6 +16,11 @@ if TYPE_CHECKING:
     from ipylab.common import ErrorSource, IpylabKwgs
 
 
+@hookspec(firstresult=True)
+def launch_jupyterlab():
+    "Start Jupyterlab"
+
+
 @hookspec()
 def ready(obj: ipylab.Ipylab) -> None | Awaitable[None]:
     """
