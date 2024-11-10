@@ -6,18 +6,15 @@
 .ipylab-Panel {
   box-sizing: border-box;
   display: flex;
-  height: 100%;
-  width: 100%;
+  margin: 0;
   flex-direction: column;
   overflow: auto;
 }
 
 .ipylab-SplitPanel {
   box-sizing: border-box;
+  margin: 0;
   display: flex;
-  height: 100%;
-  width: 100%;
-  overflow: hidden;
 }
 
 /* Default Split Handle Color */
@@ -25,8 +22,7 @@
   background-color: var(--jp-border-color2);
 }
 
-.ipylab-MainArea {
-  box-sizing: border-box;
-  display: flex;
-  margin: 0;
+.ipylab-Document {
+  height: 100%;
+  width: 100%;
 }

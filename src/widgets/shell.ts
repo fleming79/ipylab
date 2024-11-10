@@ -79,6 +79,7 @@ export class ShellModel extends IpylabModel {
     if (args.asDocument && !(widget instanceof DocumentWidget)) {
       const jfem = await IpylabModel.JFEM.getModelByVpath(args.vpath);
       const context = jfem.context as any;
+      widget.addClass('ipylab-Document');
       const w = (widget = new DocumentWidget({ context, content: widget }));
       w.node.removeChild(w.toolbar.node);
     }

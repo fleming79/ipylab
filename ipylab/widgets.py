@@ -6,7 +6,7 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 
-from ipywidgets import Box, DOMWidget, TypedTuple, register, widget_serialization
+from ipywidgets import Box, DOMWidget, Layout, TypedTuple, register, widget_serialization
 from ipywidgets.widgets.trait_types import InstanceDict
 from traitlets import Container, Dict, Instance, Unicode, observe
 
@@ -108,6 +108,9 @@ class SplitPanel(Panel):
     _model_name = Unicode("SplitPanelModel").tag(sync=True)
     _view_name = Unicode("SplitPanelView").tag(sync=True)
     orientation = Unicode("vertical").tag(sync=True)
+    layout = InstanceDict(Layout, kw={"width": "100%", "height": "100%", "overflow": "hidden"}).tag(
+        sync=True, **widget_serialization
+    )
     _force_update_in_progress = False
 
     # ============== Start temp fix =============
