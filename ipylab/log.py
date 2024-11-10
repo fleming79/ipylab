@@ -109,7 +109,7 @@ LogPayloadType = LogPayloadBase | LogPayloadText | LogPayloadHtml | LogPayloadOu
 
 
 class IpylabLogHandler(logging.Handler):
-    loggers: ClassVar[weakref.WeakSet[logging.Logger]] = weakref.WeakSet()
+    _loggers: ClassVar[weakref.WeakSet[logging.Logger]] = weakref.WeakSet()
 
     def __init__(self) -> None:
         ipylab.app.observe(self._observe_app_log_level, "logger_level")
@@ -118,34 +118,30 @@ class IpylabLogHandler(logging.Handler):
     def _observe_app_log_level(self, change: dict):
         level = LogLevel.to_numeric(change["new"])
         self.setLevel(level)
-        for log in self.loggers:
+        for log in self._loggers:
             log.setLevel(level)
 
     def emit(self, record):
-        log = LogPayloadOutput(
-            type=LogTypes.output, level=LogLevel.to_level(record.levelno), data=self.parse_record(record)
-        )
+        msg = self.format(record)
+        data = OutputStream(output_type="stream", type="stdout", text=msg)
+        log = LogPayloadOutput(type=LogTypes.output, level=LogLevel.to_level(record.levelno), data=data)
         ipylab.app.send_log_message(log)
 
-    def parse_record(self, record) -> OutputTypes:
-        msg = self.format(record)
-        if record.levelno <= log_name_mappings[LogLevel.warning]:
-            return OutputStream(output_type="stream", type="stdout", text=msg)
-        if record.exc_info and record.exc_info[2]:
-            (etype, value, tb) = record.exc_info
-            stb = ipylab.app._ipy_shell.InteractiveTB.structured_traceback(etype, value, tb)  # type: ignore # noqa: SLF001
-        else:
-            value, stb = "", None
-        return OutputError(output_type="error", ename=str(value), evalue=msg, traceback=stb)
-
-
-class IpylabLoggerAdapter(logging.LoggerAdapter):
-    def __init__(self, logger: logging.Logger, extra=None):
-        logger.setLevel(LogLevel.to_numeric(ipylab.app.logger_level))
-        IpylabLogHandler.loggers.add(logger)
-        super().__init__(logger, extra)
+    def set_as_handler(self, log: logging.Logger):
+        "Set this handler as a handler for log and keep the level in sync."
+        if log not in self._loggers:
+            log.addHandler(self)
+            log.setLevel(self.level)
+            self._loggers.add(log)
 
 
 class IpylabLogFormatter(logging.Formatter):
-    def formatException(self, ei) -> str:  # noqa: ARG002, N802
-        return ""
+    def formatException(self, ei) -> str:  # noqa: N802
+        (etype, value, tb) = ei
+        sh = ipylab.app._ipy_shell  # noqa: SLF001
+        if not sh:
+            return super().formatException(ei)
+        itb = sh.InteractiveTB
+        itb.verbose if ipylab.app.logging_handler.level <= log_name_mappings[LogLevel.debug] else itb.minimal
+        stb = itb.structured_traceback(etype, value, tb)  # type: ignore
+        return itb.stb2text(stb)

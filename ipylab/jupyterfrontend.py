@@ -23,7 +23,7 @@ from ipylab.common import InsertMode, IpylabKwgs, Obj, to_selector
 from ipylab.dialog import Dialog
 from ipylab.ipylab import IpylabBase, Readonly
 from ipylab.launcher import Launcher
-from ipylab.log import IpylabLogFormatter, IpylabLoggerAdapter, IpylabLogHandler, LogLevel
+from ipylab.log import IpylabLogFormatter, IpylabLogHandler, LogLevel
 from ipylab.menu import ContextMenu, MainMenu
 from ipylab.notification import NotificationManager
 from ipylab.sessions import SessionManager
@@ -71,7 +71,7 @@ class App(Ipylab):
     sessions = Readonly(SessionManager)
 
     console = Instance(ShellConnection, allow_none=True, read_only=True)
-    logging_handler = Instance(logging.Handler, allow_none=True, read_only=True)
+    logging_handler = Instance(IpylabLogHandler, read_only=True)
 
     active_namespace = Unicode("", read_only=True, help="name of the current namespace")
     selector = Unicode("", read_only=True, help="Selector class for context menus (css)")
@@ -92,10 +92,9 @@ class App(Ipylab):
 
     @default("log")
     def _default_log(self):
-        log = IpylabLoggerAdapter(logging.getLogger("ipylab"))
-        if isinstance(self.logging_handler, logging.Handler):
-            log.logger.addHandler(self.logging_handler)
-        return log
+        log = logging.getLogger("ipylab")
+        self.logging_handler.set_as_handler(log)
+        return logging.LoggerAdapter(log)
 
     @default("logging_handler")
     def _default_logging_handler(self):
@@ -217,10 +216,6 @@ class App(Ipylab):
             return conn
 
         return self.to_task(_open_console(), "Open console")
-
-    def toggle_log_console(self) -> Task[ShellConnection]:
-        # How can we check if the log console is open?
-        return self.commands.execute("logconsole:open", {"source": self.vpath})
 
     def shutdown_kernel(self, vpath: str | None = None):
         "Shutdown the kernel"

@@ -43,15 +43,18 @@ def launch_jupyterlab():
 
 @hookimpl
 def on_error(obj: Ipylab, source: ErrorSource, error: Exception):
-    msg = f"{source} {error}"
-    obj.log.exception(msg, extra={"source": source}, exc_info=error)
+    obj.log.exception(str(source), exc_info=error)
     task = objects.get("error_task")
     if isinstance(task, Task):
         # Try to minimize the number of notifications.
         if not task.done():
             return
         task.result().close()
-    a = NotifyAction(label="📝", caption="Toggle log console", callback=ipylab.app.toggle_log_console, keep_open=True)
+    msg = f"{ipylab.app} {source} {error} {obj=}"
+    if isinstance(obj, ipylab.ShellConnection):
+        a = NotifyAction(label="👀", caption="Activate", callback=obj.activate, keep_open=True)
+    else:
+        a = NotifyAction(label="📝", caption="Open console", callback=ipylab.app.open_console, keep_open=True)
     objects["error_task"] = ipylab.app.notification.notify(msg, type=ipylab.NotificationType.error, actions=[a])
 
 
