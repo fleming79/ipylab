@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 from ipywidgets import Widget
 
 import ipylab
-from ipylab.common import ErrorSource, IpylabKwgs, TaskHooks, hookimpl
+from ipylab.common import ErrorSource, IpylabFrontendError, IpylabKwgs, TaskHooks, hookimpl
 from ipylab.ipylab import Ipylab
 from ipylab.notification import NotifyAction
 
@@ -44,7 +44,7 @@ def launch_jupyterlab():
 @hookimpl
 def on_error(obj: Ipylab, source: ErrorSource, error: Exception):
     msg = f"{source} {error}"
-    obj.log.exception(msg, extra={"source": source, "error": error})
+    obj.log.exception(msg, extra={"source": source}, exc_info=error)
     task = objects.get("error_task")
     if isinstance(task, Task):
         # Try to minimize the number of notifications.
@@ -144,3 +144,17 @@ def vpath_getter(app: App, kwgs: dict) -> Awaitable[str] | str:
 @hookimpl
 def ready(obj: Ipylab):
     "Pass through"
+
+
+@hookimpl
+def to_frontend_error(obj: ipylab.Ipylab, content: dict) -> IpylabFrontendError:
+    error = content["error"]
+    operation = content.get("operation")
+    max_chars = 40
+    if operation:
+        s = str(obj)
+        if len(s) > max_chars:
+            s = s[0:max_chars] + "…"
+        msg = f'{s} operation "{operation}" failed with the message "{error}"'
+        return IpylabFrontendError(msg)
+    return IpylabFrontendError(error)

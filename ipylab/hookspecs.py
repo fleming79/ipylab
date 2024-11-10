@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
     import ipylab
-    from ipylab.common import ErrorSource, IpylabKwgs
+    from ipylab.common import ErrorSource, IpylabFrontendError, IpylabKwgs
 
 
 @hookspec(firstresult=True)
@@ -127,3 +127,8 @@ def task_result(obj: ipylab.Ipylab, result, aw: Awaitable, hooks: dict):
     Called with the result of a task.
 
     This is used by ipylab to provide `TaskHooks` to set traits between related objects."""
+
+
+@hookspec(firstresult=True)
+def to_frontend_error(obj: ipylab.Ipylab, content: dict) -> IpylabFrontendError:  # type: ignore
+    "Make a new IpylabFrontendError"

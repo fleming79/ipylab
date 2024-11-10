@@ -19,11 +19,11 @@ import ipylab.hookspecs
 from ipylab import Ipylab, ShellConnection, Transform
 from ipylab._compat.typing import override
 from ipylab.commands import APP_COMMANDS_NAME, CommandPalette, CommandRegistry
-from ipylab.common import InsertMode, IpylabKwgs, Obj
+from ipylab.common import InsertMode, IpylabKwgs, Obj, to_selector
 from ipylab.dialog import Dialog
 from ipylab.ipylab import IpylabBase, Readonly
 from ipylab.launcher import Launcher
-from ipylab.log import IpylabLoggerAdapter, IpylabLogHandler, LogLevel
+from ipylab.log import IpylabLogFormatter, IpylabLoggerAdapter, IpylabLogHandler, LogLevel
 from ipylab.menu import ContextMenu, MainMenu
 from ipylab.notification import NotificationManager
 from ipylab.sessions import SessionManager
@@ -100,24 +100,18 @@ class App(Ipylab):
     @default("logging_handler")
     def _default_logging_handler(self):
         handler = IpylabLogHandler()
-        fmt = f"{self.vpath}: " + "{name}:{message}"
-        handler.setFormatter(logging.Formatter(fmt, style="{"))
+        fmt = f"ipylab {self.vpath}: " + "{message}"
+        handler.setFormatter(IpylabLogFormatter(fmt, style="{"))
         return handler
 
     @observe("_ready")
     def _app_observe_ready(self, _):
         if self._ready:
-            self.set_trait("selector", self.to_selector(self.vpath))
+            self.set_trait("selector", to_selector(self.vpath))
             ipylab.plugin_manager.hook.autostart._call_history.clear()  # type: ignore  # noqa: SLF001
             ipylab.plugin_manager.hook.autostart.call_historic(
                 kwargs={"app": self}, result_callback=self._autostart_callback
             )
-
-    @staticmethod
-    def to_selector(vpath: str):
-        suffix = "-".join("".join(vpath).split())
-        suffix = "".join(s for s in suffix.replace(".", "-") if s.isnumeric() or s.isalpha() or s in "_-")
-        return f".ipylab-{suffix}"
 
     def _autostart_callback(self, result):
         ipylab.plugin_manager.hook.ensure_run(obj=self, aw=result)
@@ -274,9 +268,8 @@ class App(Ipylab):
             * ipywidgets
             * ipw (ipywidgets)
         """
-        return ipylab.app.operation(
-            "evaluate", evaluate=evaluate, vpath=vpath, name=name, namespace_name=namespace_name, **kwargs
-        )
+        kwgs = {"evaluate": evaluate, "vpath": vpath, "name": name, "namespace_name": namespace_name}
+        return self.operation("evaluate", kwgs, **kwargs)
 
     def get_namespace(self, name="", objects: dict | None = None):
         "Get the 'globals' namespace stored for name."

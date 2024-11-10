@@ -7,7 +7,6 @@ import contextlib
 import inspect
 import json
 import logging
-import traceback
 import uuid
 import weakref
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
@@ -18,12 +17,13 @@ from traitlets import Bool, Container, Dict, HasTraits, Instance, Set, TraitErro
 import ipylab
 import ipylab._frontend as _fe
 from ipylab.common import ErrorSource, IpylabKwgs, Obj, TaskHookType, Transform, TransformType, pack
-from ipylab.log import LogPayloadType, LogTypes
 
 if TYPE_CHECKING:
     from asyncio import Task
     from collections.abc import Awaitable, Callable, Hashable
     from typing import ClassVar, Self, Unpack
+
+    from ipylab.log import LogPayloadType
 
 
 __all__ = ["Ipylab", "WidgetBase", "Readonly"]
@@ -98,10 +98,6 @@ class Response(asyncio.Event):
         if self.error:
             raise self.error
         return self.payload
-
-
-class IpylabFrontendError(IOError):
-    pass
 
 
 class WidgetBase(Widget):
@@ -254,37 +250,24 @@ class Ipylab(WidgetBase):
         # Unfortunately it looks like Javascript Promises can't be cancelled.
         # https://stackoverflow.com/questions/30233302/promise-is-it-possible-to-force-cancel-a-promise#30235261
 
-    def _to_error(self, content: dict) -> IpylabFrontendError | None:
-        error = content["error"]
-        operation = content.get("operation")
-        if operation:
-            msg = (
-                f'{self.__class__.__name__} operation "{operation}" failed with message "{error}"'
-                "\nNote: Additional information may be available in the browser console (press `F12`)"
-            )
-            return IpylabFrontendError(msg)
-        return IpylabFrontendError(f'{self.__class__.__name__} failed with message "{error}"')
-
     def _on_custom_msg(self, _, msg: str, buffers: list):
         if not isinstance(msg, str):
             return
         try:
-            content = json.loads(msg)
-            error = self._to_error(content) if "error" in content else None
-            if "operation" in content:
-                if "ipylab_PY" in content:
-                    self._pending_operations.pop(content["ipylab_PY"]).set(content.get("payload"), error)
-                elif "ipylab_FE" in content:
-                    self.to_task(self._do_operation_for_fe(buffers=buffers, **content))
-            elif "closed" in content:
+            c = json.loads(msg)
+            if "ipylab_PY" in c:
+                error = ipylab.plugin_manager.hook.to_frontend_error(obj=self, content=c) if "error" in c else None
+                self._pending_operations.pop(c["ipylab_PY"]).set(c.get("payload"), error)
+            elif "ipylab_FE" in c:
+                self.to_task(self._do_operation_for_fe(c["ipylab_FE"], c["operation"], c["payload"], buffers))
+            elif "closed" in c:
                 self.close()
-            if error:
-                self.on_error(ErrorSource.FrontendError, error)
+            else:
+                raise NotImplementedError(msg)  # noqa: TRY301
         except Exception as e:
             self.on_error(ErrorSource.MessageError, e)
-            raise e from None
 
-    async def _do_operation_for_fe(self, *, ipylab_FE: str, operation: str, payload: dict, buffers: list):
+    async def _do_operation_for_fe(self, ipylab_FE: str, operation: str, payload: dict, buffers: list):
         """Handle operation requests from the frontend and reply with a result."""
         content: dict[str, Any] = {"ipylab_FE": ipylab_FE}
         buffers = []
@@ -297,10 +280,7 @@ class Ipylab(WidgetBase):
         except asyncio.CancelledError:
             content["error"] = "Cancelled"
         except Exception as e:
-            content["error"] = {
-                "repr": repr(e).replace("'", '"'),
-                "traceback": traceback.format_tb(e.__traceback__),
-            }
+            content["error"] = str(e)
             self.on_error(ErrorSource.OperationForFrontendError, e)
         finally:
             self.send(content, buffers)
@@ -356,7 +336,7 @@ class Ipylab(WidgetBase):
             raise e from None
 
     def send_log_message(self, log: LogPayloadType):
-        self.send({"log": LogTypes.parse(log)})
+        self.send({"log": log})
 
     def to_task(self, aw: Awaitable[T], name: str | None = None, *, hooks: TaskHookType = None) -> Task[T]:
         """Run aw in a task.

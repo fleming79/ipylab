@@ -38,6 +38,7 @@ export class JupyterFrontEndModel extends IpylabModel {
       this.updateSessionInfo();
     }
     this.updateAllSessions();
+    this.set('logger_level', this.logger.level);
     await super.ipylabInit(base);
     if (!Private.vpathTojfem.has(this.vpath)) {
       Private.vpathTojfem.set(this.vpath, new PromiseDelegate());

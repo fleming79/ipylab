@@ -45,6 +45,16 @@ def pack(obj):
     return obj
 
 
+def to_selector(*args, prefix="ipylab"):
+    "Create a canonical selector from args."
+    suffix = ("".join((" ".join(map(str, args))).split())).replace(".", "-")
+    suffix = "".join(s if s.isnumeric() or s.isalpha() or s in "_-" else "-" for s in suffix)
+    while "--" in suffix:
+        suffix = suffix.replace("--", "-")
+    suffix = suffix.strip(" -")
+    return f".{prefix}-{suffix}"
+
+
 class Obj(StrEnum):
     "The objects available to use as 'obj' in the Frontend."
 
@@ -239,3 +249,7 @@ class TaskHooks(TypedDict):
 
 
 TaskHookType = TaskHooks | None
+
+
+class IpylabFrontendError(IOError):
+    pass
