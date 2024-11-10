@@ -79,7 +79,7 @@ class OutputError(OutputBase):
     output_type: Literal["error"]
     ename: str
     evalue: str
-    traceback: list[str]
+    traceback: list[str] | None
 
 
 OutputTypes = OutputDisplayData | OutputStream | OutputError
