@@ -117,7 +117,8 @@ class Dialog(Ipylab):
             see: https://jupyterlab.readthedocs.io/en/stable/api/functions/apputils.showDialog.html
             source: https://jupyterlab.readthedocs.io/en/stable/extension/ui_helpers.html#generic-dialog
         """
-        kwgs["toLuminoWidget"] = ["body"] if isinstance(body, Widget) else []
+        if isinstance(body, Widget) and "toLuminoWidget" not in kwgs:
+            kwgs["toLuminoWidget"] = ["body"]
         return self.operation("showDialog", _combine(options, title=title, body=body), **kwgs)
 
     def show_error_message(

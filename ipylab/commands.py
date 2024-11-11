@@ -116,14 +116,14 @@ class CommandPalette(Ipylab):
         Special args
         ------------
 
-        * active_widget: ShellConnection
+        * current_widget: ShellConnection
         * ref: ShellConnection
 
         Include in the argument list of the function to have the value provided when the command
         is called.
 
-        active_widget:
-            This is a ShellConnection to the Jupyterlab defined active widget.
+        current_widget:
+            This is a ShellConnection to the Jupyterlab defined current widget.
             For the command to appear in the context menu non-ipylab widgets, the appropriate selector
             should be used. see: https://jupyterlab.readthedocs.io/en/stable/developer/css.html#commonly-used-css-selectors
             Selectors:
@@ -131,10 +131,10 @@ class CommandPalette(Ipylab):
                 * Main area: '.jp-Activity'
 
         ref:
-            This is a ShellConnection to the Ipylab active widget.
+            This is a ShellConnection to the Ipylab current widget.
             The associated widget/panel is then accessible by `ref.widget`.
 
-        Tip: This is can be used in context menus to perform actions specific to the active widget
+        Tip: This is can be used in context menus to perform actions specific to the current widget
         in the shell.
         """
         cid = CommandPalletItemConnection.to_cid(command, category)
@@ -198,12 +198,12 @@ class CommandRegistry(Ipylab):
         args = conn.args | (payload.get("args") or {}) | {"buffers": buffers}
 
         # Shell connections
-        cids = {"active_widget": payload["cid1"], "ref": payload["cid2"]}
+        cids = {"current_widget": payload["cid1"], "ref": payload["cid2"]}
 
         glbls = ipylab.app.get_namespace(conn.namespace_name)
         kwgs = {}
         for n, p in inspect.signature(cmd).parameters.items():
-            if n in ["active_widget", "ref"] and cids[n]:
+            if n in ["current_widget", "ref"] and cids[n]:
                 kwgs[n] = ShellConnection(cids[n])
                 await kwgs[n].ready()
             elif n in args:

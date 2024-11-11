@@ -29,12 +29,13 @@ import {
 } from '../utils';
 import { MODULE_NAME, MODULE_VERSION } from '../version';
 import type { ConnectionModel } from './connection';
-import { JupyterFrontEndModel } from './frontend';
-
-// Determine if the per kernel widget manager is available
+import type { JupyterFrontEndModel } from './frontend';
+import type { ShellModel } from './shell';
 
 /**
- * Base model for common features
+ * Base model for Ipylab.
+ *
+ * Subclass as required but can also be used directly.
  */
 export class IpylabModel extends WidgetModel {
   /**
@@ -371,6 +372,9 @@ export class IpylabModel extends WidgetModel {
         if (obj?.dispose) {
           return { cid: IpylabModel.ConnectionModel.get_cid(obj, true) };
         }
+        if (typeof obj?.iterator === 'function') {
+          return Array.from(obj);
+        }
         return await obj;
       case 'null':
         return null;
@@ -541,6 +545,7 @@ export class IpylabModel extends WidgetModel {
   static tracker = new WidgetTracker<Widget>({ namespace: 'ipylab' });
   static JFEM: typeof JupyterFrontEndModel;
   static ConnectionModel: typeof ConnectionModel;
+  static ShellModel: typeof ShellModel;
   static Notification = Notification;
   static PER_KERNEL_WM = Boolean((KernelWidgetManager as any)?.getManager);
 }

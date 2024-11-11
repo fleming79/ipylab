@@ -6,19 +6,12 @@ import { Signal } from '@lumino/signaling';
 import { IpylabModel } from './ipylab';
 import { IObservableDisposable } from '@lumino/disposable';
 import { Widget } from '@lumino/widgets';
-import { ILabShell } from '@jupyterlab/application';
+
 /**
- * Provides a connection to an object using a unique 'cid'.
+ * ConnectionModel provides a connection to an object using a unique 'cid'.
  *
- *
- * An object must be registered static method `ConnectionModel.registerConnection`
- * to establish the connection. The base class expects the object to be
- * register before it is created. Subclasses can indicate
- * by using a 'pending' promise. The
- * The 'cid' can generated in Python first, or generated in the Frontend if a 'cid'
- * isn't provided.
- *
- * The object is set to `this.base`.
+ * The object to be referenced must first be registered static method
+ * `ConnectionModel.registerConnection`.
  */
 export class ConnectionModel extends IpylabModel {
   /**
@@ -141,7 +134,7 @@ export class ConnectionModel extends IpylabModel {
       const cls =
         obj instanceof Widget &&
         obj.id &&
-        ConnectionModel.getLuminoWidgetFromShell(obj.id)
+        ConnectionModel.ShellModel.getLuminoWidgetFromShell(obj.id)
           ? 'ShellConnection'
           : 'Connection';
       const cid = ConnectionModel.new_cid(cls);
@@ -155,29 +148,14 @@ export class ConnectionModel extends IpylabModel {
   }
 
   /**
-   * Get the lumino widget from the shell using its id.
-   *
-   * @param id
-   * @returns
+   * Get the session associated with the lumino widget if it has one.
    */
-  static getLuminoWidgetFromShell(id: string): Widget | null {
-    for (const area of [
-      'main',
-      'header',
-      'top',
-      'menu',
-      'left',
-      'right',
-      'bottom'
-    ]) {
-      for (const widget of IpylabModel.labShell.widgets(
-        area as ILabShell.Area
-      )) {
-        if (widget.id === id) {
-          return widget;
-        }
-      }
+  static async getSession(widget: Widget) {
+    const path = (widget as any)?.ipylabSettings?.vpath;
+    if (path) {
+      return await ConnectionModel.sessionManager.findByPath(path);
     }
+    return (widget as any)?.sessionContext?.session?.model ?? {};
   }
 
   static new_cid(cls: string): string {
@@ -186,13 +164,14 @@ export class ConnectionModel extends IpylabModel {
 
     return `${_PREFIX}${cls}${_SEP}${UUID.uuid4()}`;
   }
+
   // 'cid' is used by BackboneJS so we use cid_ here.
   cid_: string;
   readonly isConnectionModel = true;
 }
 
 /**
- * A connection for widgets in the Shell.
+ * A connection to widgets in the Shell.
  */
 export class ShellConnectionModel extends ConnectionModel {
   /*
@@ -223,6 +202,8 @@ export class ShellConnectionModel extends ConnectionModel {
     switch (op) {
       case 'activate':
         return IpylabModel.app.shell.activateById(this.base.id);
+      case 'getSession':
+        return ShellConnectionModel.getSession(this.base);
       default:
         return await super.operation(op, payload);
     }

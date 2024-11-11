@@ -31,13 +31,6 @@ export class JupyterFrontEndModel extends IpylabModel {
   async ipylabInit(base: any = null) {
     this.set('version', JFEM.app.version);
     this.set('per_kernel_widget_manager_detected', JFEM.PER_KERNEL_WM);
-    JFEM.sessionManager.runningChanged.connect(this.updateAllSessions, this);
-    if (JFEM.labShell) {
-      JFEM.labShell.currentChanged.connect(this.updateSessionInfo, this);
-      JFEM.labShell.activeChanged.connect(this.updateSessionInfo, this);
-      this.updateSessionInfo();
-    }
-    this.updateAllSessions();
     this.set('logger_level', this.logger.level);
     await super.ipylabInit(base);
     if (!Private.vpathTojfem.has(this.vpath)) {
@@ -49,9 +42,6 @@ export class JupyterFrontEndModel extends IpylabModel {
   close(comm_closed?: boolean): Promise<void> {
     Private.jfems.delete(this.kernelId);
     Private.vpathTojfem.delete(this.vpath);
-    JFEM.labShell.currentChanged.disconnect(this.updateSessionInfo, this);
-    JFEM.labShell.activeChanged.disconnect(this.updateSessionInfo, this);
-    JFEM.sessionManager.runningChanged.disconnect(this.updateAllSessions, this);
     this.logger.stateChanged.disconnect(this.loggerStateChanged as any, this);
     return super.close(comm_closed);
   }
@@ -75,20 +65,6 @@ export class JupyterFrontEndModel extends IpylabModel {
       this.save_changes();
     }
     return vpath;
-  }
-
-  private updateSessionInfo(): void {
-    const currentWidget = JFEM.app.shell.currentWidget as any;
-    const current_session = currentWidget?.sessionContext?.session?.model ?? {};
-    if (this.get('current_widget_id') !== currentWidget?.id) {
-      this.set('current_widget_id', currentWidget?.id ?? '');
-      this.set('current_session', current_session);
-      this.save_changes();
-    }
-  }
-  private updateAllSessions(): void {
-    this.set('all_sessions', Array.from(JFEM.sessionManager.running()));
-    this.save_changes();
   }
 
   private loggerStateChanged(sender: ILogger, change: IStateChange): void {
@@ -142,32 +118,14 @@ export class JupyterFrontEndModel extends IpylabModel {
       }
       let kernel: Kernel.IKernelConnection;
       Private.vpathTojfem.set(vpath, new PromiseDelegate());
-      await IpylabModel.app.serviceManager.ready;
-      await IpylabModel.sessionManager.ready;
+      await IpylabModel.sessionManager.refreshRunning();
       const model = await IpylabModel.sessionManager.findByPath(vpath);
       if (model) {
         kernel = IpylabModel.app.serviceManager.kernels.connectTo({
           model: model.kernel
         });
       } else {
-        const sessionContext = new SessionContext({
-          sessionManager: IpylabModel.sessionManager,
-          specsManager: IpylabModel.app.serviceManager.kernelspecs,
-          path: vpath,
-          name: vpath,
-          type: 'console',
-          kernelPreference: { language: 'python' }
-        });
-        await sessionContext.initialize();
-        if (!sessionContext.isReady) {
-          await new SessionContextDialogs({
-            translator: IpylabModel.translator
-          }).selectKernel(sessionContext!);
-        }
-        if (!sessionContext.isReady) {
-          sessionContext.dispose();
-          throw new Error('Cancelling because a kernel was not provided');
-        }
+        const sessionContext = await JFEM.newSessionContext(vpath);
         kernel = sessionContext.session.kernel;
       }
       // Relies on per-kernel widget manager.
@@ -189,6 +147,34 @@ export class JupyterFrontEndModel extends IpylabModel {
         resolve(jfem);
       });
     });
+  }
+
+  /**
+   * Create a new session context for vpath.
+   *
+   * This will automatically starting a new kernel if a session path matching
+   * vpath isn't found.
+   */
+  static async newSessionContext(vpath: string) {
+    const sessionContext = new SessionContext({
+      sessionManager: IpylabModel.sessionManager,
+      specsManager: IpylabModel.app.serviceManager.kernelspecs,
+      path: vpath,
+      name: vpath,
+      type: 'console',
+      kernelPreference: { language: 'python' }
+    });
+    await sessionContext.initialize();
+    if (!sessionContext.isReady) {
+      await new SessionContextDialogs({
+        translator: IpylabModel.translator
+      }).selectKernel(sessionContext!);
+    }
+    if (!sessionContext.isReady) {
+      sessionContext.dispose();
+      throw new Error('Cancelling because a kernel was not provided');
+    }
+    return sessionContext;
   }
 
   /**
@@ -287,10 +273,11 @@ class IpylabContext {
     // this.contentsModel.path = path;
   }
   readonly path: string;
-  ready = new Promise(resolve => resolve(null));
-  pathChanged = new Signal(this);
+  ready = new Promise<void>(resolve => resolve(null));
+  pathChanged: Signal<IpylabContext, string> = new Signal(this);
   model: object = { stateChanged: new Signal(this) };
   localPath = '';
+  async rename(newName: string) {}
 }
 
 /**

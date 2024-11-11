@@ -4,14 +4,14 @@
 from __future__ import annotations
 
 import inspect
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Unpack
 
 from ipywidgets import DOMWidget, TypedTuple, Widget
 from traitlets import Container, Instance, Unicode
 
 import ipylab
 from ipylab import Area, InsertMode, Ipylab, ShellConnection, Transform, pack
-from ipylab.common import Obj
+from ipylab.common import IpylabKwgs, Obj, TaskHookType
 from ipylab.ipylab import IpylabBase
 
 if TYPE_CHECKING:
@@ -39,6 +39,7 @@ class Shell(Ipylab):
 
     _model_name = Unicode("ShellModel", help="Name of the model.", read_only=True).tag(sync=True)
     ipylab_base = IpylabBase(Obj.IpylabModel, "app.shell").tag(sync=True)
+    current_widget_id = Unicode(read_only=True).tag(sync=True)
 
     connections: Container[tuple[ShellConnection, ...]] = TypedTuple(trait=Instance(ShellConnection))
 
@@ -53,10 +54,11 @@ class Shell(Ipylab):
         ref: ShellConnection | None = None,
         options: dict | None = None,
         vpath: str | dict[Literal["title"], str] = "",
+        hooks: TaskHookType = None,
         **args,
     ) -> Task[ShellConnection]:
         """
-        Add a widget or evaluation to the shell.
+        Add a widget to the shell.
 
         obj
         ---
@@ -66,7 +68,8 @@ class Shell(Ipylab):
                 **Only relevant for 'evaluate'**
                 The 'virtual' path for the app. A new kernel will be created if a session
                 doesn't exist with the same path.
-                If a dict is provided, a text_dialog will be used to obtain the vpath.
+                If a dict is provided, a text_dialog will be used to obtain the vpath with the
+                hook `vpath_getter`.
 
             Note:
             The result (payload) of evaluate must be a Widget with a view and NOT a ShellConnection.
@@ -81,7 +84,7 @@ class Shell(Ipylab):
         app.shell.add("ipylab.Panel([ipw.HTML('<h1>Test')])", vpath="test")
         ```
         """
-        hooks: TaskHooks = {"add_to_tuple_fwd": [(self, "connections")]}
+        hooks_: TaskHooks = {"add_to_tuple_fwd": [(self, "connections")]}
         args["options"] = {
             "activate": activate,
             "mode": InsertMode(mode),
@@ -105,9 +108,9 @@ class Shell(Ipylab):
                     if c.widget is obj:
                         args["cid"] = c.cid
                         break
-            hooks["trait_add_fwd"] = [("widget", obj)]
+            hooks_["trait_add_fwd"] = [("widget", obj)]
             if isinstance(obj, ipylab.Panel):
-                hooks["add_to_tuple_fwd"].append((obj, "connections"))
+                hooks_["add_to_tuple_fwd"].append((obj, "connections"))
             args["ipy_model"] = obj.model_id
             if isinstance(obj, DOMWidget):
                 obj.add_class(ipylab.app.selector.removeprefix("."))
@@ -124,11 +127,11 @@ class Shell(Ipylab):
                 else:
                     args["vpath"] = vpath or ipylab.app.vpath
                 if args["vpath"] != ipylab.app.vpath:
-                    hooks["trait_add_fwd"] = [("auto_dispose", False)]
+                    hooks_["trait_add_fwd"] = [("auto_dispose", False)]
             else:
                 args["vpath"] = ipylab.app.vpath
 
-            return await self.operation("addToShell", {"args": args}, transform=Transform.connection)
+            return await self.operation("addToShell", {"args": args}, transform=Transform.connection, hooks=hooks_)
 
         return self.to_task(add_to_shell(), "Add to shell", hooks=hooks)
 
@@ -143,3 +146,12 @@ class Shell(Ipylab):
 
     def collapse_right(self):
         return self.execute_method("collapseRight")
+
+    def connect_to_widget(self, widget_id="", **kwgs: Unpack[IpylabKwgs]) -> Task[ShellConnection]:
+        "Make a connection to a widget in the shell (see also `get_widget_ids`)."
+        kwgs["transform"] = Transform.connection
+        return self.operation("getWidget", {"id": widget_id}, **kwgs)
+
+    def list_widget_ids(self, **kwgs: Unpack[IpylabKwgs]) -> Task[dict[Area, list[str]]]:
+        "Get a mapping of Areas to a list of widget ids in that area in the shell."
+        return self.operation("getWidgetIds", **kwgs)

@@ -14,6 +14,7 @@ from ipylab._compat.typing import override
 from ipylab.ipylab import Ipylab
 
 if TYPE_CHECKING:
+    from asyncio import Task
     from collections.abc import Generator
     from typing import Literal, Self, overload
 
@@ -169,3 +170,7 @@ class ShellConnection(Connection):
         "Activate the connected widget in the shell."
 
         return self.operation("activate")
+
+    def get_session(self) -> Task[dict]:
+        """Get the session of the connected widget."""
+        return self.operation("getSession")

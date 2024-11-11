@@ -53,10 +53,7 @@ class App(Ipylab):
     _model_name = Unicode("JupyterFrontEndModel").tag(sync=True)
     ipylab_base = IpylabBase(Obj.IpylabModel, "app").tag(sync=True)
     version = Unicode(read_only=True).tag(sync=True)
-    current_widget_id = Unicode(read_only=True).tag(sync=True)
     logger_level = UseEnum(LogLevel, read_only=True, default_value=LogLevel.warning).tag(sync=True)
-    current_session = Dict(read_only=True).tag(sync=True)
-    all_sessions = Tuple(read_only=True).tag(sync=True)
     vpath = Unicode(read_only=True).tag(sync=True)
     per_kernel_widget_manager_detected = Bool(read_only=True).tag(sync=True)
 
@@ -174,9 +171,9 @@ class App(Ipylab):
             self.get_namespace(namespace_name, glbls)
         return {"payload": glbls.get("payload"), "buffers": buffers}
 
-    def _context_open_console(self, ref: ShellConnection, active_widget: ShellConnection):
+    def _context_open_console(self, ref: ShellConnection, current_widget: ShellConnection):
         "This command is provided for the 'autostart' context menu."
-        return self.open_console(objects={"ref": ref, "active_widget": active_widget})
+        return self.open_console(objects={"ref": ref, "current_widget": current_widget})
 
     def open_console(
         self,
