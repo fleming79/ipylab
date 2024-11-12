@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any, Unpack
 import ipywidgets
 from IPython.core.getipython import get_ipython
 from ipywidgets import Widget, register
-from traitlets import Bool, Container, Dict, Instance, Tuple, Unicode, UseEnum, default, observe
+from traitlets import Bool, Container, Dict, Instance, Unicode, UseEnum, default, observe
 
 import ipylab
 import ipylab.hookspecs
@@ -73,8 +73,7 @@ class App(Ipylab):
     active_namespace = Unicode("", read_only=True, help="name of the current namespace")
     selector = Unicode("", read_only=True, help="Selector class for context menus (css)")
 
-    namespace_names: Container[tuple[str, ...]] = Tuple(read_only=True).tag(sync=True)
-    _namespaces: Container[dict[str, LastUpdatedDict]] = Dict(read_only=True)  # type: ignore
+    namespaces: Container[dict[str, LastUpdatedDict]] = Dict(read_only=True)  # type: ignore
 
     _ipy_shell = get_ipython()
     _ipy_default_namespace: ClassVar = getattr(_ipy_shell, "user_ns", {})
@@ -266,16 +265,16 @@ class App(Ipylab):
     def get_namespace(self, name="", objects: dict | None = None):
         "Get the 'globals' namespace stored for name."
         if self._ipy_shell:
-            if "" not in self._namespaces:
-                self._namespaces[""] = LastUpdatedDict(self._ipy_shell.user_ns)
+            if "" not in self.namespaces:
+                self.namespaces[""] = LastUpdatedDict(self._ipy_shell.user_ns)
             if self.active_namespace == name:
-                self._namespaces.update(self._ipy_shell.user_ns)
-        if name not in self._namespaces:
-            self._namespaces[name] = LastUpdatedDict(self._ipy_default_namespace)
+                self.namespaces.update(self._ipy_shell.user_ns)
+        if name not in self.namespaces:
+            self.namespaces[name] = LastUpdatedDict(self._ipy_default_namespace)
         objects = {"ipylab": ipylab, "ipywidgets": ipywidgets, "ipw": ipywidgets, "app": self} | (objects or {})
         ipylab.plugin_manager.hook.namespace_objects(objects=objects, namespace_name=name, app=self)
-        self._namespaces[name].update(objects)
-        return self._namespaces[name]
+        self.namespaces[name].update(objects)
+        return self.namespaces[name]
 
     def activate_namespace(self, name="", objects: dict | None = None):
         "Sets the ipython/console namespace."
@@ -289,6 +288,6 @@ class App(Ipylab):
 
     def reset_namespace(self, name: str, *, activate=True, objects: dict | None = None):
         "Reset the namespace to default. If activate is False it won't be created."
-        self._namespaces.pop(name, None)
+        self.namespaces.pop(name, None)
         if activate:
             self.activate_namespace(name, objects)

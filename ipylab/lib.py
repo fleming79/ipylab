@@ -4,10 +4,11 @@
 from __future__ import annotations
 
 import inspect
+import weakref
 from asyncio import Task
 from typing import TYPE_CHECKING, Any
 
-from ipywidgets import Widget
+from ipywidgets import Button, Combobox, HBox, SelectMultiple, VBox, Widget
 
 import ipylab
 from ipylab.common import ErrorSource, IpylabFrontendError, IpylabKwgs, TaskHooks, hookimpl
@@ -44,18 +45,58 @@ def launch_jupyterlab():
 @hookimpl
 def on_error(obj: Ipylab, source: ErrorSource, error: Exception):
     obj.log.exception(str(source), exc_info=error)
+    if "error_objects" not in objects:
+        objects["error objects"] = weakref.WeakValueDictionary()
+    msg = f"{ipylab.app} {source} {error} {obj=}"
+    objects["error objects"][msg] = obj
     task = objects.get("error_task")
     if isinstance(task, Task):
         # Try to minimize the number of notifications.
         if not task.done():
             return
         task.result().close()
-    msg = f"{ipylab.app} {source} {error} {obj=}"
-    if isinstance(obj, ipylab.ShellConnection):
-        a = NotifyAction(label="👀", caption="Activate", callback=obj.activate, keep_open=True)
-    else:
-        a = NotifyAction(label="📝", caption="Open console", callback=ipylab.app.open_console, keep_open=True)
+    a = NotifyAction(
+        label="📄", caption="Show error panel with access to log panel.", callback=show_error_panel, keep_open=True
+    )
     objects["error_task"] = ipylab.app.notification.notify(msg, type=ipylab.NotificationType.error, actions=[a])
+
+
+def show_error_panel():
+    "Show an error panel making it possible to view the log and then add an object to the console."
+    if "error_panel" not in objects:
+        select_objs = objects["select_objects"] = SelectMultiple(
+            layout={"width": "max-content", "min_width": "500px", "flex": "1 0 auto"},
+        )
+        obj_name = Combobox(
+            placeholder="Name to use in console",
+            options=[f"ojb_{i}" for i in range(10)],
+            layout={"flex": "1 0 auto"},
+        )
+        objects["namespace"] = namespace = Combobox(
+            placeholder="Namespace",
+            layout={"flex": "1 0 auto"},
+        )
+        button_add_to_console = Button(
+            description="Add to console",
+            tooltip="Add an object to the console.\nTip: use the context menu of this pane to access log console.",
+            layout={"width": "auto"},
+        )
+        objects["error_panel"] = error_panel = ipylab.Panel(
+            [VBox([select_objs, HBox([obj_name, namespace, button_add_to_console])])],
+            layout={"justify_content": "center", "align_items": "center"},
+        )
+        error_panel.title.label = "Error objects"
+
+        def on_click(_):
+            if obj := objects["error objects"].get(select_objs.value):
+                ipylab.app.open_console(objects={obj_name.value: obj}, namespace_name=namespace.value)
+            else:
+                show_error_panel()
+
+        button_add_to_console.on_click(on_click)
+    objects["select_objects"].options = tuple(reversed(list(objects.get("error objects", []))))
+    objects["namespace"].options = tuple(ipylab.app.namespaces)
+    objects["error_panel"].add_to_shell(mode=ipylab.InsertMode.split_bottom)
 
 
 @hookimpl
@@ -63,7 +104,7 @@ async def autostart(app: ipylab.App) -> None | Awaitable[None]:
     # Register some default context menu items for Ipylab
     cmd = await app.commands.add_command("Open console", app._context_open_console)  # noqa: SLF001
     await app.context_menu.add_item(command=cmd, rank=20)
-    await app.context_menu.add_item(command="logconsole:open", rank=21)
+    await app.context_menu.add_item(command="logconsole:open", args={"source": app.vpath}, rank=21)
 
 
 @hookimpl

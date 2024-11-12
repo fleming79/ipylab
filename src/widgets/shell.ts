@@ -121,7 +121,8 @@ export class ShellModel extends IpylabModel {
       const context = jfem.context as any;
       const label = widget?.title?.label || args.vpath;
       const w = (widget = new DocumentWidget({ context, content: widget }));
-      w.node.removeChild(w.toolbar.node);
+      w.toolbar.dispose();
+      w.contentHeader.dispose();
       w.id = args.cid;
       // Disconnect the following callback which overwrites the `title.label`.
       w.title.changed.disconnect((w as any)._onTitleChanged, w);
