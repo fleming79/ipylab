@@ -5,16 +5,34 @@ from __future__ import annotations
 
 import logging
 import weakref
+from asyncio import Task
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Literal, TypedDict
 
+from ipywidgets import HTML, Button, Combobox, HBox, Select, dlink
+
 import ipylab
+from ipylab.common import truncated_repr
+from ipylab.notification import NotifyAction
 
 if TYPE_CHECKING:
     from typing import ClassVar
 
 
-__all__ = ["LogLevel", "LogTypes", "LogPayloadType", "LogPayloadText", "LogPayloadHtml", "LogPayloadOutput"]
+__all__ = [
+    "LogLevel",
+    "LogTypes",
+    "LogPayloadType",
+    "LogPayloadText",
+    "LogPayloadHtml",
+    "LogPayloadOutput",
+    "IpylabLogHandler",
+    "log_name_mappings",
+    "notify_error",
+    "show_error_panel",
+]
+
+objects = {}
 
 
 class LogLevel(StrEnum):
@@ -145,3 +163,71 @@ class IpylabLogFormatter(logging.Formatter):
         itb.verbose if ipylab.app.logging_handler.level <= log_name_mappings[LogLevel.debug] else itb.minimal
         stb = itb.structured_traceback(etype, value, tb)  # type: ignore
         return itb.stb2text(stb)
+
+    def format(self, record: logging.LogRecord) -> str:
+        msg = super().format(record)
+        if record.exc_info and (e := record.exc_info[1]) and (obj := getattr(record, "obj", None)):
+            notify_error(obj, e, msg)
+        return msg
+
+
+def notify_error(obj: ipylab.Ipylab, error: BaseException, msg: str):
+    "Create a notification that an error occurred."
+    if "error_objects" not in objects:
+        objects["error objects"] = weakref.WeakValueDictionary()
+    message = f"{truncated_repr(ipylab.app.vpath)}: {truncated_repr(error, 100)} "
+    objects["error objects"][f'{truncated_repr(obj)}→{truncated_repr(msg, 60)} {truncated_repr(error, 100)} "'] = obj
+    task = objects.get("error_task")
+    if isinstance(task, Task):
+        # Limit to one notification.
+        if not task.done():
+            return
+        task.result().close()
+    a = NotifyAction(label="📄", caption="Show error panel.", callback=show_error_panel, keep_open=True)
+    objects["error_task"] = ipylab.app.notification.notify(message, type=ipylab.NotificationType.error, actions=[a])
+
+
+def show_error_panel():
+    "Show an error panel making it possible to view the `log console` and push objects to the `console`."
+    if "error_panel" not in objects:
+        header = HTML(
+            f"<h3>Vpath: {ipylab.app.vpath}</h3>",
+            tooltip="Use this panel to access the log console from either\n"
+            "1. The icon in the status bar, or,\n"
+            "2. The context menu (right click).\n"
+            "The controls below are provided to put an object into a console.\n"
+            "Note: Jupyterlab loads a different 'log console'  for the 'console'.",
+        )
+        select_objs = objects["select_objects"] = Select(layout={"width": "auto", "height": "80%"})
+        obj_name = Combobox(
+            placeholder="Name to use in console ['obj'])",
+            options=[f"ojb_{i}" for i in range(10)],
+            layout={"flex": "1 0 auto"},
+        )
+        objects["namespace"] = namespace = Combobox(
+            placeholder="Namespace ['']",
+            layout={"flex": "1 0 auto"},
+        )
+        button_add_to_console = Button(
+            description="Add to console",
+            tooltip="Add an object to the console.\nTip: use the context menu of this pane to access log console.",
+            layout={"width": "auto"},
+        )
+        controls = HBox([obj_name, namespace, button_add_to_console], layout={"height": "80px"})
+        objects["error_panel"] = error_panel = ipylab.Panel(
+            [header, select_objs, controls],
+            layout={"justify_content": "space-between", "padding": "20px"},
+        )
+        error_panel.title.label = "Error panel"
+        dlink((obj_name, "value"), (button_add_to_console, "disabled"), transform=lambda value: not value)
+
+        def on_click(_):
+            if obj := objects["error objects"].get(select_objs.value):
+                ipylab.app.open_console(objects={obj_name.value or "obj": obj}, namespace_name=namespace.value)
+            else:
+                show_error_panel()
+
+        button_add_to_console.on_click(on_click)
+        objects["select_objects"].options = tuple(reversed(list(objects.get("error objects", []))))
+    objects["namespace"].options = tuple(ipylab.app.namespaces)
+    objects["error_panel"].add_to_shell(mode=ipylab.InsertMode.split_bottom)

@@ -16,7 +16,18 @@ from traitlets import Bool, Container, Dict, HasTraits, Instance, Set, TraitErro
 
 import ipylab
 import ipylab._frontend as _fe
-from ipylab.common import ErrorSource, IpylabKwgs, Obj, TaskHookType, Transform, TransformType, pack
+from ipylab.common import (
+    ErrorSource,
+    IpylabKwgs,
+    Obj,
+    TaskHooks,
+    TaskHookType,
+    Transform,
+    TransformType,
+    pack,
+    trait_tuple_add,
+    truncated_repr,
+)
 
 if TYPE_CHECKING:
     from asyncio import Task
@@ -98,6 +109,10 @@ class Response(asyncio.Event):
         if self.error:
             raise self.error
         return self.payload
+
+
+class IpylabFrontendError(IOError):
+    pass
 
 
 class WidgetBase(Widget):
@@ -213,9 +228,9 @@ class Ipylab(WidgetBase):
             if self._ready:
                 self._ready_event.set()
                 for cb in ipylab.plugin_manager.hook.ready(obj=self):
-                    ipylab.plugin_manager.hook.ensure_run(obj=self, aw=cb)
+                    self.ensure_run(cb)
                 for cb in self._on_ready_callbacks:
-                    ipylab.plugin_manager.hook.ensure_run(obj=self, aw=cb)
+                    self.ensure_run(cb)
 
             else:
                 self._ready_event.clear()
@@ -232,7 +247,7 @@ class Ipylab(WidgetBase):
                 return await aw
             result = await aw
             try:
-                ipylab.plugin_manager.hook.task_result(obj=self, aw=aw, result=result, hooks=hooks)
+                self._task_result(result, hooks)
             except Exception as e:
                 self.on_error(e, ErrorSource.TaskError)
                 raise e from None
@@ -243,6 +258,51 @@ class Ipylab(WidgetBase):
                 raise e
         else:
             return result
+
+    def _task_result(self: Ipylab, result: Any, hooks: TaskHooks):
+        # close with
+        for owner in hooks.pop("close_with_fwd", ()):
+            # Close result with each item.
+            if isinstance(owner, Ipylab) and isinstance(result, Widget):
+                if not owner.comm:
+                    result.close()
+                    raise RuntimeError(str(owner))
+                owner.close_extras.add(result)
+        for obj_ in hooks.pop("close_with_rev", ()):
+            # Close each item with the result.
+            if isinstance(result, Ipylab):
+                result.close_extras.add(obj_)
+        # tuple add
+        for owner, name in hooks.pop("add_to_tuple_fwd", ()):
+            # Add each item of to tuple of result.
+            if isinstance(result, Ipylab):
+                result.add_to_tuple(owner, name)
+            else:
+                trait_tuple_add(owner, name, result)
+        for name, value in hooks.pop("add_to_tuple_rev", ()):
+            # Add the result the the tuple with 'name' for each item.
+            if isinstance(value, Ipylab):
+                value.add_to_tuple(result, name)
+            else:
+                trait_tuple_add(result, name, value)
+        # trait add
+        for name, value in hooks.pop("trait_add_fwd", ()):
+            # Set each trait of result with value.
+            if isinstance(value, Ipylab):
+                value.add_as_trait(result, name)
+            else:
+                result.set_trait(name, value)
+        for owner, name in hooks.pop("trait_add_rev", ()):
+            # Set set trait of each value with result.
+            if isinstance(result, Ipylab):
+                result.add_as_trait(owner, name)
+            else:
+                owner.set_trait(name, result)
+        for cb in hooks.pop("callbacks", ()):
+            self.ensure_run(cb(result))
+        if hooks:
+            msg = f"Invalid hooks detected: {hooks}"
+            raise ValueError(msg)
 
     def _task_done_callback(self, task: Task):
         self._tasks.discard(task)
@@ -256,7 +316,7 @@ class Ipylab(WidgetBase):
         try:
             c = json.loads(msg)
             if "ipylab_PY" in c:
-                error = ipylab.plugin_manager.hook.to_frontend_error(obj=self, content=c) if "error" in c else None
+                error = self._to_frontend_error(c) if "error" in c else None
                 self._pending_operations.pop(c["ipylab_PY"]).set(c.get("payload"), error)
             elif "ipylab_FE" in c:
                 self.to_task(self._do_operation_for_fe(c["ipylab_FE"], c["operation"], c["payload"], buffers))
@@ -266,6 +326,14 @@ class Ipylab(WidgetBase):
                 raise NotImplementedError(msg)  # noqa: TRY301
         except Exception as e:
             self.on_error(e, ErrorSource.MessageError)
+
+    def _to_frontend_error(self, content):
+        error = content["error"]
+        operation = content.get("operation")
+        if operation:
+            msg = f'{truncated_repr(self, 40)} operation "{operation}" failed with the message "{error}"'
+            return IpylabFrontendError(msg)
+        return IpylabFrontendError(error)
 
     async def _do_operation_for_fe(self, ipylab_FE: str, operation: str, payload: dict, buffers: list):
         """Handle operation requests from the frontend and reply with a result."""
@@ -297,6 +365,24 @@ class Ipylab(WidgetBase):
         self.send({"close": True})
         super().close()
 
+    def ensure_run(self, aw: Callable | Awaitable | None) -> None:
+        """Ensure the aw is run.
+
+        aw: Callable | Awaitable | None
+            `aw` can be a function that accepts either no arguments or one keyword argument 'obj'.
+        """
+        try:
+            if callable(aw):
+                try:
+                    aw = aw(obj=self)
+                except TypeError:
+                    aw = aw()
+            if inspect.iscoroutine(aw):
+                self.to_task(aw, f"Ensure run {aw}")
+        except Exception as e:
+            self.on_error(e, ErrorSource.EnsureRun)
+            raise
+
     async def ready(self):
         if not ipylab.app._ready_event._value:  # type: ignore # noqa: SLF001
             await ipylab.app.ready()
@@ -309,9 +395,9 @@ class Ipylab(WidgetBase):
         else:
             self._on_ready_callbacks.add(callback)
 
-    def on_error(self, error: Exception, msg: ErrorSource | str = "", *, obj: Any = None):
+    def on_error(self, error: Exception, msg: str = "", *, obj: Any = None):
         "Pass errors to this method to have it logged."
-        ipylab.plugin_manager.hook.on_error(obj=obj or self, error=error, msg=str(msg))
+        self.log.exception(msg, extra={"obj": obj or self}, exc_info=error)
 
     def add_to_tuple(self, owner: HasTraits, name: str):
         """Add self to the tuple of obj."""

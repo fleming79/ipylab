@@ -3,17 +3,17 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 import pluggy
 
 hookspec = pluggy.HookspecMarker("ipylab")
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable
+    from collections.abc import Awaitable
 
     import ipylab
-    from ipylab.common import IpylabFrontendError, IpylabKwgs
+    from ipylab.common import IpylabKwgs
 
 
 @hookspec(firstresult=True)
@@ -44,41 +44,11 @@ async def autostart(app: ipylab.App) -> None | Awaitable[None]:
 
 
 @hookspec(firstresult=True)
-def ensure_run(obj: ipylab.Ipylab, aw: Callable | Awaitable | None) -> None | Literal[True]:
-    """
-    Used by ipylab to ensure 'aw' has been run.
-
-    see lib.ensure_run for further detail.
-    """
-
-
-@hookspec(firstresult=True)
 def namespace_objects(objects: dict, namespace_name: str, app: ipylab.App) -> None:
     """
     Called when loading a namespace.
 
     You can use this to customise the objects available in the namespace."""
-
-
-@hookspec(firstresult=True)
-def on_error(obj: ipylab.Ipylab, error: Exception, msg: str):
-    """
-    Intercept an error message for logging purposes.
-
-    Fired when an exception occurs trying to process a message from the frontend.
-
-    Args
-    ----
-
-    obj: ipylab.Ipylab
-        The object from where the error.
-
-    error: Exception
-        The exception.
-
-    msg: str
-        The message for logging the exception.
-    """
 
 
 @hookspec
@@ -119,16 +89,3 @@ def vpath_getter(app: ipylab.App, kwgs: dict) -> Awaitable[str] | str:  # type: 
 
     vpath is the 'virtual path' for a session.
     """
-
-
-@hookspec
-def task_result(obj: ipylab.Ipylab, result, aw: Awaitable, hooks: dict):
-    """
-    Called with the result of a task.
-
-    This is used by ipylab to provide `TaskHooks` to set traits between related objects."""
-
-
-@hookspec(firstresult=True)
-def to_frontend_error(obj: ipylab.Ipylab, content: dict) -> IpylabFrontendError:  # type: ignore
-    "Make a new IpylabFrontendError"

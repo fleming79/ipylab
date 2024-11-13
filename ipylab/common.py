@@ -5,11 +5,13 @@ from __future__ import annotations
 
 import inspect
 import typing
+from collections.abc import Awaitable, Callable
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict
 
 import pluggy
 from ipywidgets import Widget, widget_serialization
+from traitlets import HasTraits
 
 import ipylab
 
@@ -251,5 +253,16 @@ class TaskHooks(TypedDict):
 TaskHookType = TaskHooks | None
 
 
-class IpylabFrontendError(IOError):
-    pass
+def trait_tuple_add(owner: HasTraits, name: str, value: Any):
+    "Add value to a tuple trait of owner if it already isn't in the tuple."
+    items = getattr(owner, name)
+    if value not in items:
+        owner.set_trait(name, (*items, value))
+
+
+def truncated_repr(obj: Any, maxlen=40, tail="…") -> str:
+    "Do truncated string representation of obj."
+    rep = repr(obj)
+    if len(rep) > maxlen:
+        return rep[0 : maxlen - len(tail)] + tail
+    return rep

@@ -109,7 +109,7 @@ class App(Ipylab):
             )
 
     def _autostart_callback(self, result):
-        ipylab.plugin_manager.hook.ensure_run(obj=self, aw=result)
+        self.ensure_run(result)
 
     @property
     def repr_info(self):
@@ -202,7 +202,7 @@ class App(Ipylab):
                 app=self, args=args, objects=objects, kwgs=kwargs
             )
             for result in plugin_results:
-                ipylab.plugin_manager.hook.ensure_run(obj=self, aw=result)
+                self.ensure_run(result)
             self.activate_namespace(args.pop("namespace_name", ""), objects=objects)
 
             conn: ShellConnection = await self.commands.execute("console:open", args, **kwargs)
