@@ -8,7 +8,7 @@ import weakref
 from asyncio import Task
 from typing import TYPE_CHECKING, Any
 
-from ipywidgets import Button, Combobox, HBox, SelectMultiple, VBox, Widget
+from ipywidgets import HTML, Button, Combobox, HBox, Select, Widget, dlink
 
 import ipylab
 from ipylab.common import ErrorSource, IpylabFrontendError, IpylabKwgs, TaskHooks, hookimpl
@@ -42,38 +42,50 @@ def launch_jupyterlab():
     sys.exit(LabApp.launch_instance())
 
 
+def truncated(obj: Any, maxlen=40) -> str:
+    "Do string representation of ob truncated to maxlen."
+    rep = repr(obj)
+    if len(rep) > maxlen:
+        return rep[0:maxlen] + "…"
+    return rep
+
+
 @hookimpl
-def on_error(obj: Ipylab, source: ErrorSource, error: Exception):
-    obj.log.exception(str(source), exc_info=error)
+def on_error(obj: ipylab.Ipylab, error: Exception, msg: str):
+    obj.log.exception(str(msg), exc_info=error)
     if "error_objects" not in objects:
         objects["error objects"] = weakref.WeakValueDictionary()
-    msg = f"{ipylab.app} {source} {error} {obj=}"
-    objects["error objects"][msg] = obj
+    message = f"{truncated(ipylab.app.vpath)}: {truncated(error, 100)} "
+    objects["error objects"][f'{truncated(obj)}→{truncated(msg, 60)} {truncated(error, 100)} "'] = obj
     task = objects.get("error_task")
     if isinstance(task, Task):
-        # Try to minimize the number of notifications.
+        # Limit to one notification.
         if not task.done():
             return
         task.result().close()
-    a = NotifyAction(
-        label="📄", caption="Show error panel with access to log panel.", callback=show_error_panel, keep_open=True
-    )
-    objects["error_task"] = ipylab.app.notification.notify(msg, type=ipylab.NotificationType.error, actions=[a])
+    a = NotifyAction(label="📄", caption="Show error panel.", callback=show_error_panel, keep_open=True)
+    objects["error_task"] = ipylab.app.notification.notify(message, type=ipylab.NotificationType.error, actions=[a])
 
 
 def show_error_panel():
     "Show an error panel making it possible to view the log and then add an object to the console."
     if "error_panel" not in objects:
-        select_objs = objects["select_objects"] = SelectMultiple(
-            layout={"width": "max-content", "min_width": "500px", "flex": "1 0 auto"},
+        header = HTML(
+            f"<h3>Vpath: {ipylab.app.vpath}</h3>",
+            tooltip="Use this panel to access the log console from either\n"
+            "1. The icon in the status bar, or,\n"
+            "2. The context menu (right click).\n"
+            "The controls below are provided to put an object into a console.\n"
+            "Note: Jupyterlab loads a different 'log console'  for the 'console'.",
         )
+        select_objs = objects["select_objects"] = Select(layout={"width": "auto", "height": "80%"})
         obj_name = Combobox(
-            placeholder="Name to use in console",
+            placeholder="Name to use in console ['obj'])",
             options=[f"ojb_{i}" for i in range(10)],
             layout={"flex": "1 0 auto"},
         )
         objects["namespace"] = namespace = Combobox(
-            placeholder="Namespace",
+            placeholder="Namespace ['']",
             layout={"flex": "1 0 auto"},
         )
         button_add_to_console = Button(
@@ -81,20 +93,22 @@ def show_error_panel():
             tooltip="Add an object to the console.\nTip: use the context menu of this pane to access log console.",
             layout={"width": "auto"},
         )
+        controls = HBox([obj_name, namespace, button_add_to_console], layout={"height": "80px"})
         objects["error_panel"] = error_panel = ipylab.Panel(
-            [VBox([select_objs, HBox([obj_name, namespace, button_add_to_console])])],
-            layout={"justify_content": "center", "align_items": "center"},
+            [header, select_objs, controls],
+            layout={"justify_content": "space-between", "padding": "20px"},
         )
-        error_panel.title.label = "Error objects"
+        error_panel.title.label = "Error panel"
+        dlink((obj_name, "value"), (button_add_to_console, "disabled"), transform=lambda value: not value)
 
         def on_click(_):
             if obj := objects["error objects"].get(select_objs.value):
-                ipylab.app.open_console(objects={obj_name.value: obj}, namespace_name=namespace.value)
+                ipylab.app.open_console(objects={obj_name.value or "obj": obj}, namespace_name=namespace.value)
             else:
                 show_error_panel()
 
         button_add_to_console.on_click(on_click)
-    objects["select_objects"].options = tuple(reversed(list(objects.get("error objects", []))))
+        objects["select_objects"].options = tuple(reversed(list(objects.get("error objects", []))))
     objects["namespace"].options = tuple(ipylab.app.namespaces)
     objects["error_panel"].add_to_shell(mode=ipylab.InsertMode.split_bottom)
 
@@ -118,7 +132,7 @@ def ensure_run(obj: ipylab.Ipylab, aw: Callable | Awaitable | None):
         if inspect.iscoroutine(aw):
             obj.to_task(aw, f"Ensure run {aw}")
     except Exception as e:
-        obj.on_error(ErrorSource.EnsureRun, e)
+        obj.on_error(e, ErrorSource.EnsureRun)
         raise
     else:
         return True

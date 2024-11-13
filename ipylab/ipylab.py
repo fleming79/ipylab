@@ -234,11 +234,11 @@ class Ipylab(WidgetBase):
             try:
                 ipylab.plugin_manager.hook.task_result(obj=self, aw=aw, result=result, hooks=hooks)
             except Exception as e:
-                self.on_error(ErrorSource.TaskError, e)
+                self.on_error(e, ErrorSource.TaskError)
                 raise e from None
         except Exception as e:
             try:
-                self.on_error(ErrorSource.TaskError, e)
+                self.on_error(e, ErrorSource.TaskError)
             finally:
                 raise e
         else:
@@ -265,7 +265,7 @@ class Ipylab(WidgetBase):
             else:
                 raise NotImplementedError(msg)  # noqa: TRY301
         except Exception as e:
-            self.on_error(ErrorSource.MessageError, e)
+            self.on_error(e, ErrorSource.MessageError)
 
     async def _do_operation_for_fe(self, ipylab_FE: str, operation: str, payload: dict, buffers: list):
         """Handle operation requests from the frontend and reply with a result."""
@@ -281,7 +281,7 @@ class Ipylab(WidgetBase):
             content["error"] = "Cancelled"
         except Exception as e:
             content["error"] = str(e)
-            self.on_error(ErrorSource.OperationForFrontendError, e)
+            self.on_error(e, ErrorSource.OperationForFrontendError)
         finally:
             self.send(content, buffers)
 
@@ -309,8 +309,9 @@ class Ipylab(WidgetBase):
         else:
             self._on_ready_callbacks.add(callback)
 
-    def on_error(self, source: ErrorSource, error: Exception):
-        ipylab.plugin_manager.hook.on_error(obj=self, source=source, error=error)
+    def on_error(self, error: Exception, msg: ErrorSource | str = "", *, obj: Any = None):
+        "Pass errors to this method to have it logged."
+        ipylab.plugin_manager.hook.on_error(obj=obj or self, error=error, msg=str(msg))
 
     def add_to_tuple(self, owner: HasTraits, name: str):
         """Add self to the tuple of obj."""
@@ -332,7 +333,7 @@ class Ipylab(WidgetBase):
         try:
             super().send(json.dumps(content, default=pack), buffers)
         except Exception as e:
-            self.on_error(ErrorSource.SendError, e)
+            self.on_error(e, ErrorSource.SendError)
             raise e from None
 
     def send_log_message(self, log: LogPayloadType):

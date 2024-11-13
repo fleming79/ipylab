@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
     import ipylab
-    from ipylab.common import ErrorSource, IpylabFrontendError, IpylabKwgs
+    from ipylab.common import IpylabFrontendError, IpylabKwgs
 
 
 @hookspec(firstresult=True)
@@ -61,7 +61,7 @@ def namespace_objects(objects: dict, namespace_name: str, app: ipylab.App) -> No
 
 
 @hookspec(firstresult=True)
-def on_error(obj: ipylab.Ipylab, source: ErrorSource, error: Exception):
+def on_error(obj: ipylab.Ipylab, error: Exception, msg: str):
     """
     Intercept an error message for logging purposes.
 
@@ -73,11 +73,11 @@ def on_error(obj: ipylab.Ipylab, source: ErrorSource, error: Exception):
     obj: ipylab.Ipylab
         The object from where the error.
 
-    aw: Awaitable
-        The awaitable object running in the task.
-
     error: Exception
         The exception.
+
+    msg: str
+        The message for logging the exception.
     """
 
 

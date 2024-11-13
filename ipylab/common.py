@@ -98,7 +98,6 @@ class ErrorSource(StrEnum):
     MessageError = "Message processing error"
     OperationForFrontendError = "Operation for frontend error"
     EnsureRun = "Ensure run"
-    Other = ""
 
 
 class Transform(StrEnum):
