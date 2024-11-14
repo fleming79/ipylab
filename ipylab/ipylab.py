@@ -6,18 +6,16 @@ import asyncio
 import contextlib
 import inspect
 import json
-import logging
 import uuid
 import weakref
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from ipywidgets import Widget, register
-from traitlets import Bool, Container, Dict, HasTraits, Instance, Set, TraitError, TraitType, Unicode, default, observe
+from traitlets import Bool, Container, Dict, HasTraits, Set, TraitError, TraitType, Unicode, default, observe
 
 import ipylab
 import ipylab._frontend as _fe
 from ipylab.common import (
-    ErrorSource,
     IpylabKwgs,
     Obj,
     TaskHooks,
@@ -28,6 +26,7 @@ from ipylab.common import (
     trait_tuple_add,
     truncated_repr,
 )
+from ipylab.log import LogLevel
 
 if TYPE_CHECKING:
     from asyncio import Task
@@ -148,7 +147,6 @@ class Ipylab(WidgetBase):
     _tasks: Container[set[asyncio.Task]] = Set()
     _has_attrs_mappings: Container[set[tuple[HasTraits, str]]] = Set()
     close_extras: Readonly[weakref.WeakSet[Widget]] = Readonly(weakref.WeakSet)
-    log = Instance(logging.LoggerAdapter)
 
     @classmethod
     def _single_key(cls, kwgs: dict) -> Hashable:  # noqa: ARG003
@@ -249,11 +247,12 @@ class Ipylab(WidgetBase):
             try:
                 self._task_result(result, hooks)
             except Exception as e:
-                self.on_error(e, ErrorSource.TaskError)
+                obj = {"result": result, "hooks": hooks, "aw": aw}
+                self.log_object(LogLevel.error, "TaskHook error", error=e, obj=obj)
                 raise e from None
         except Exception as e:
             try:
-                self.on_error(e, ErrorSource.TaskError)
+                self.log_object(LogLevel.error, "Task error", error=e, obj=aw)
             finally:
                 raise e
         else:
@@ -325,7 +324,7 @@ class Ipylab(WidgetBase):
             else:
                 raise NotImplementedError(msg)  # noqa: TRY301
         except Exception as e:
-            self.on_error(e, ErrorSource.MessageError)
+            self.log_object(LogLevel.error, "Message processing error {obj}", error=e, obj=msg)
 
     def _to_frontend_error(self, content):
         error = content["error"]
@@ -349,7 +348,7 @@ class Ipylab(WidgetBase):
             content["error"] = "Cancelled"
         except Exception as e:
             content["error"] = str(e)
-            self.on_error(e, ErrorSource.OperationForFrontendError)
+            self.log_object(LogLevel.error, "Operation for frontend error", error=e)
         finally:
             self.send(content, buffers)
 
@@ -380,7 +379,7 @@ class Ipylab(WidgetBase):
             if inspect.iscoroutine(aw):
                 self.to_task(aw, f"Ensure run {aw}")
         except Exception as e:
-            self.on_error(e, ErrorSource.EnsureRun)
+            self.log_object(LogLevel.error, "Ensure run", error=e)
             raise
 
     async def ready(self):
@@ -395,9 +394,15 @@ class Ipylab(WidgetBase):
         else:
             self._on_ready_callbacks.add(callback)
 
-    def on_error(self, error: Exception, msg: str = "", *, obj: Any = None):
-        "Pass errors to this method to have it logged."
-        self.log.exception(msg, extra={"obj": obj or self}, exc_info=error)
+    def log_object(self, level: LogLevel, msg: str = "", *, error: BaseException | None = None, obj: Any = None):
+        "Pass a message to have it logged mapped to obj."
+        match LogLevel(level):
+            case LogLevel.error:
+                self.log.exception(msg, extra={"owner": self, "obj": obj}, exc_info=error)
+            case LogLevel.critical:
+                self.log.exception(msg, extra={"owner": self, "obj": obj}, exc_info=error)
+            case _:
+                getattr(self.log, level)(msg, extra={"owner": self, "obj": obj})
 
     def add_to_tuple(self, owner: HasTraits, name: str):
         """Add self to the tuple of obj."""
@@ -419,7 +424,7 @@ class Ipylab(WidgetBase):
         try:
             super().send(json.dumps(content, default=pack), buffers)
         except Exception as e:
-            self.on_error(e, ErrorSource.SendError)
+            self.log_object(LogLevel.error, "Send error", error=e)
             raise e from None
 
     def send_log_message(self, log: LogPayloadType):

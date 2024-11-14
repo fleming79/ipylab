@@ -4,11 +4,12 @@
 from __future__ import annotations  # noqa: I001
 
 from ipylab._frontend import module_version as __version__
-from ipylab.common import Area, InsertMode, NotificationType, Obj, Transform, hookimpl, pack, to_selector
+from ipylab.common import Area, InsertMode, Obj, Transform, hookimpl, pack, to_selector
 from ipylab.ipylab import Ipylab
 from ipylab.connection import Connection, ShellConnection
 from ipylab import menu
 from ipylab.jupyterfrontend import App
+from ipylab.notification import NotificationType, NotifyAction
 from ipylab.widgets import Icon, Panel, SplitPanel
 
 __all__ = [
@@ -20,6 +21,7 @@ __all__ = [
     "Icon",
     "Area",
     "NotificationType",
+    "NotifyAction",
     "InsertMode",
     "hookimpl",
     "Transform",

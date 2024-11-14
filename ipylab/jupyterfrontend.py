@@ -90,12 +90,12 @@ class App(Ipylab):
     def _default_log(self):
         log = logging.getLogger("ipylab")
         self.logging_handler.set_as_handler(log)
-        return logging.LoggerAdapter(log)
+        return log
 
     @default("logging_handler")
     def _default_logging_handler(self):
         handler = IpylabLogHandler()
-        fmt = f"ipylab {self.vpath}: " + "{message}"
+        fmt = "{owner} {obj} {message}"
         handler.setFormatter(IpylabLogFormatter(fmt, style="{"))
         return handler
 

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import inspect
+from enum import StrEnum
 from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict
 
 import traitlets
@@ -11,7 +12,7 @@ from ipywidgets import TypedTuple, register
 from traitlets import Container, Instance, Unicode
 
 import ipylab
-from ipylab import NotificationType, Transform, pack
+from ipylab import Transform, pack
 from ipylab._compat.typing import override
 from ipylab.common import Obj, TaskHooks, TransformType
 from ipylab.connection import InfoConnection
@@ -24,6 +25,15 @@ if TYPE_CHECKING:
 
 
 __all__ = ["NotificationManager"]
+
+
+class NotificationType(StrEnum):
+    info = "info"
+    progress = "in-progress"
+    success = "success"
+    warning = "warning"
+    error = "error"
+    default = "default"
 
 
 class NotifyAction(TypedDict):

@@ -93,15 +93,6 @@ class InsertMode(StrEnum):
     tab_after = "tab-after"
 
 
-class ErrorSource(StrEnum):
-    FrontendError = "Frontend error"
-    TaskError = "Task error"
-    SendError = "Send error"
-    MessageError = "Message processing error"
-    OperationForFrontendError = "Operation for frontend error"
-    EnsureRun = "Ensure run"
-
-
 class Transform(StrEnum):
     """An eumeration of transformations to apply to the result of an operation
     performed on the Frontend prior to returning to Python and transformation
@@ -193,15 +184,6 @@ class Transform(StrEnum):
                 conn._check_closed()  # noqa: SLF001
                 return conn
         return payload
-
-
-class NotificationType(StrEnum):
-    info = "info"
-    progress = "in-progress"
-    success = "success"
-    warning = "warning"
-    error = "error"
-    default = "default"
 
 
 class TransformDictFunction(TypedDict):
