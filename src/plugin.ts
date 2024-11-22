@@ -11,7 +11,6 @@ import {
 import { ICommandPalette } from '@jupyterlab/apputils';
 import { IDefaultFileBrowser } from '@jupyterlab/filebrowser';
 import { ILauncher } from '@jupyterlab/launcher';
-import { ILoggerRegistry } from '@jupyterlab/logconsole';
 import { IMainMenu } from '@jupyterlab/mainmenu';
 import { IRenderMimeRegistry } from '@jupyterlab/rendermime';
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
@@ -26,8 +25,6 @@ const PLUGIN_ID = 'ipylab:settings';
 namespace CommandIDs {
   export const restore = 'ipylab:restore';
   export const checkStartKernel = 'ipylab:check-start-kernel';
-  export const openConsole = 'ipylab:open-console';
-  export const toggleLogConsole = 'ipylab:toggle-log-console';
 }
 
 /**
@@ -44,8 +41,7 @@ const extension: JupyterFrontEndPlugin<void> = {
     IDefaultFileBrowser,
     ILauncher,
     ITranslator,
-    IMainMenu,
-    ILoggerRegistry
+    IMainMenu
   ],
   activate: async (
     app: JupyterFrontEnd,
@@ -58,8 +54,7 @@ const extension: JupyterFrontEndPlugin<void> = {
     defaultBrowser: IDefaultFileBrowser | null,
     launcher: ILauncher | null,
     translator: ITranslator | null,
-    mainMenu: IMainMenu | null,
-    loggerRegistry: ILoggerRegistry | null
+    mainMenu: IMainMenu | null
   ) => {
     // add globals
     const exports = await import('./widget');
@@ -72,7 +67,6 @@ const extension: JupyterFrontEndPlugin<void> = {
     exports.IpylabModel.translator = translator;
     exports.IpylabModel.launcher = launcher;
     exports.IpylabModel.mainMenu = mainMenu;
-    exports.JupyterFrontEndModel.loggerRegistry = loggerRegistry;
 
     registry.registerWidget({
       name: MODULE_NAME,

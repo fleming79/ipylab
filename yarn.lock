@@ -978,7 +978,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@jupyterlab/logconsole@npm:^3.0.0 || ^4.0.0, @jupyterlab/logconsole@npm:^4.2.5":
+"@jupyterlab/logconsole@npm:^3.0.0 || ^4.0.0":
   version: 4.2.5
   resolution: "@jupyterlab/logconsole@npm:4.2.5"
   dependencies:
@@ -4170,7 +4170,6 @@ __metadata:
     "@jupyterlab/coreutils": ^6.2.5
     "@jupyterlab/filebrowser": ^4.2.5
     "@jupyterlab/launcher": ^4.2.5
-    "@jupyterlab/logconsole": ^4.2.5
     "@jupyterlab/mainmenu": ^4.2.5
     "@jupyterlab/observables": ^5.2.5
     "@jupyterlab/rendermime": ^4.2.5

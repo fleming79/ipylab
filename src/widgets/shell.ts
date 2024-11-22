@@ -1,7 +1,6 @@
 // Copyright (c) ipylab contributors
 // Distributed under the terms of the Modified BSD License.
 import { MainAreaWidget } from '@jupyterlab/apputils';
-import { DocumentWidget } from '@jupyterlab/docregistry';
 import { UUID } from '@lumino/coreutils';
 import { Widget } from '@lumino/widgets';
 import { IpylabModel } from './ipylab';
@@ -115,19 +114,12 @@ export class ShellModel extends IpylabModel {
     }
     args.cid =
       args.cid || ShellModel.ConnectionModel.new_cid('ShellConnection');
-    if (args.asDocument && !(widget instanceof DocumentWidget)) {
-      widget.addClass('ipylab-Document');
-      const jfem = await ShellModel.JFEM.getModelByVpath(args.vpath);
-      const context = jfem.context as any;
-      const label = widget?.title?.label || args.vpath;
-      const w = (widget = new DocumentWidget({ context, content: widget }));
+    if (args.asMainArea && !(widget instanceof MainAreaWidget)) {
+      widget.addClass('ipylab-MainArea');
+      const w = (widget = new MainAreaWidget({ content: widget }));
       w.toolbar.dispose();
       w.contentHeader.dispose();
       w.id = args.cid;
-      // Disconnect the following callback which overwrites the `title.label`.
-      w.title.changed.disconnect((w as any)._onTitleChanged, w);
-      w.title.label = label;
-      w.title.caption = w.title.caption || `vpath=${args.vpath}`;
     }
     ShellModel.ConnectionModel.registerConnection(args.cid, widget);
 

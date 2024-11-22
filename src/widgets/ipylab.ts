@@ -1,7 +1,7 @@
 // Copyright (c) ipylab contributors
 // Distributed under the terms of the Modified BSD License.
 
-import { ICallbacks, ISerializers, WidgetModel } from '@jupyter-widgets/base';
+import { DOMWidgetModel, ICallbacks } from '@jupyter-widgets/base';
 import { KernelWidgetManager } from '@jupyter-widgets/jupyterlab-manager';
 import { JupyterFrontEnd, LabShell } from '@jupyterlab/application';
 import {
@@ -37,7 +37,7 @@ import type { ShellModel } from './shell';
  *
  * Subclass as required but can also be used directly.
  */
-export class IpylabModel extends WidgetModel {
+export class IpylabModel extends DOMWidgetModel {
   /**
    * The default attributes.
    */
@@ -225,12 +225,8 @@ export class IpylabModel extends WidgetModel {
    *
    * @param msg
    */
-  private async onCustomMessage(msg: any) {
-    if (typeof msg !== 'string') {
-      return;
-    }
-    const content = JSON.parse(msg);
-
+  protected async onCustomMessage(msg: any) {
+    const content = typeof msg === 'string' ? JSON.parse(msg) : msg;
     if (content.ipylab_FE) {
       // Result of an operation request sent to Python.
       const op = this._pendingOperations.get(content.ipylab_FE);
@@ -252,10 +248,6 @@ export class IpylabModel extends WidgetModel {
       this.doOperationForPython(content);
     } else if (content.close) {
       this.close(true);
-    } else if (content.log) {
-      const { log, toLuminoWidget, toObject } = content;
-      this.replaceParts(log, toLuminoWidget, toObject);
-      IpylabModel.JFEM.getModelByKernelId(this.kernel.id).logger.log(log);
     }
   }
 
@@ -527,9 +519,6 @@ export class IpylabModel extends WidgetModel {
     return IpylabModel.app.serviceManager.sessions;
   }
 
-  static serializers: ISerializers = {
-    ...WidgetModel.serializers
-  };
   widget_manager: KernelWidgetManager;
   private _pendingOperations = new Map<string, PromiseDelegate<any>>();
   readonly base: any;

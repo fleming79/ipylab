@@ -3,10 +3,8 @@
 
 import { KernelWidgetManager } from '@jupyter-widgets/jupyterlab-manager';
 import { SessionContext, SessionContextDialogs } from '@jupyterlab/apputils';
-import { ILogger, ILoggerRegistry, IStateChange } from '@jupyterlab/logconsole';
 import { Kernel } from '@jupyterlab/services';
 import { PromiseDelegate } from '@lumino/coreutils';
-import { Signal } from '@lumino/signaling';
 import { IpylabModel } from './ipylab';
 
 /**
@@ -23,55 +21,25 @@ export class JupyterFrontEndModel extends IpylabModel {
   initialize(attributes: any, options: any): void {
     super.initialize(attributes, options);
     this.kernelId = this.kernel.id;
-    this.logger = JFEM.loggerRegistry.getLogger(this.vpath);
-    this.logger.stateChanged.connect(this.loggerStateChanged as any, this);
     Private.jfems.set(this.kernel.id, this);
   }
 
   async ipylabInit(base: any = null) {
+    const vpath = await JFEM.getVpath(this.kernelId);
+    this.set('vpath', vpath);
     this.set('version', JFEM.app.version);
     this.set('per_kernel_widget_manager_detected', JFEM.PER_KERNEL_WM);
-    this.set('logger_level', this.logger.level);
     await super.ipylabInit(base);
-    if (!Private.vpathTojfem.has(this.vpath)) {
-      Private.vpathTojfem.set(this.vpath, new PromiseDelegate());
+    if (!Private.vpathTojfem.has(vpath)) {
+      Private.vpathTojfem.set(vpath, new PromiseDelegate());
     }
-    Private.vpathTojfem.get(this.vpath).resolve(this);
+    Private.vpathTojfem.get(vpath).resolve(this);
   }
 
   close(comm_closed?: boolean): Promise<void> {
     Private.jfems.delete(this.kernelId);
-    Private.vpathTojfem.delete(this.vpath);
-    this.logger.stateChanged.disconnect(this.loggerStateChanged as any, this);
+    Private.vpathTojfem.delete(this.get('vpath'));
     return super.close(comm_closed);
-  }
-
-  get vpath() {
-    let vpath = this.get('vpath');
-    if (!vpath) {
-      const cs = this.get('current_session');
-      if (cs?.kernel?.id === this.kernelId) {
-        vpath = cs?.path;
-      }
-      if (!vpath) {
-        for (const session of JFEM.sessionManager.running()) {
-          if (session.kernel.id === this.kernelId) {
-            vpath = session.path;
-            break;
-          }
-        }
-      }
-      this.set('vpath', vpath);
-      this.save_changes();
-    }
-    return vpath;
-  }
-
-  private loggerStateChanged(sender: ILogger, change: IStateChange): void {
-    if (this.get('logger_level') !== this.logger.level) {
-      this.set('logger_level', this.logger.level);
-      this.save_changes();
-    }
   }
 
   async operation(op: string, payload: any): Promise<any> {
@@ -96,8 +64,27 @@ export class JupyterFrontEndModel extends IpylabModel {
     }
   }
 
-  static getModelByKernelId(kernelId: string) {
-    return Private.jfems.get(kernelId);
+  /**
+   * Get the vpath for given a kernel id.
+   */
+  static async getVpath(kernelId: string): Promise<string> {
+    if (Private.kernelIdToVpath.has(kernelId)) {
+      return Private.kernelIdToVpath.get(kernelId);
+    }
+    for (const session of JFEM.sessionManager.running()) {
+      if (session.kernel.id === kernelId) {
+        Private.kernelIdToVpath.set(kernelId, session.path);
+        return session.path;
+      }
+    }
+    await JFEM.sessionManager.refreshRunning();
+    for (const session of JFEM.sessionManager.running()) {
+      if (session.kernel.id === kernelId) {
+        Private.kernelIdToVpath.set(kernelId, session.path);
+        return session.path;
+      }
+    }
+    throw new Error(`Failed to determine vpath for kernelId='${kernelId}'`);
   }
 
   /**
@@ -128,6 +115,7 @@ export class JupyterFrontEndModel extends IpylabModel {
         const sessionContext = await JFEM.newSessionContext(vpath);
         kernel = sessionContext.session.kernel;
       }
+      Private.kernelIdToVpath.set(kernel.id, vpath);
       // Relies on per-kernel widget manager.
       const getManager = (KernelWidgetManager as any).getManager;
       const widget_manager: KernelWidgetManager = await getManager(kernel);
@@ -227,65 +215,18 @@ export class JupyterFrontEndModel extends IpylabModel {
     await IpylabModel.JFEM.getModelByVpath('ipylab');
   }
 
-  /**
-   * Open a console using vpath for path.
-   *
-   * @param args not used.
-   * @returns
-   */
-  static async openConsole(args: any) {
-    const currentWidget = JFEM.tracker.currentWidget;
-    const ipylabSettings = (currentWidget as any)?.ipylabSettings;
-    const jfem = await JFEM.getModelByVpath(ipylabSettings.vpath);
-    const payload = { cid: ipylabSettings.cid };
-    return await jfem.scheduleOperation('open_console', payload, 'auto');
-  }
-
-  /**
-   * Opening/close the console using vpath.
-   *
-   * logconsole:open corresponds to a toggle command, so we the best
-   * we can do is toggle the console.
-   *
-   * @param args not used.
-   */
-  static async toggleLogConsole(args: any) {
-    const currentWidget = JFEM.tracker.currentWidget;
-    const ipylabSettings = (currentWidget as any)?.ipylabSettings;
-    const source = ipylabSettings.vpath;
-    JFEM.app.commands.execute('logconsole:open', { source });
-  }
-  context = new IpylabContext(this.vpath);
   kernelId: string;
-  logger: ILogger;
-  static loggerRegistry: ILoggerRegistry;
 }
 
 IpylabModel.JFEM = JupyterFrontEndModel;
 const JFEM = JupyterFrontEndModel;
 
 /**
- * Provide minimal context necessary to create a DocumentWidget.
- */
-class IpylabContext {
-  constructor(path: string) {
-    this.path = path;
-    // this.contentsModel.path = path;
-  }
-  readonly path: string;
-  ready = new Promise<void>(resolve => resolve(null));
-  pathChanged: Signal<IpylabContext, string> = new Signal(this);
-  model: object = { stateChanged: new Signal(this) };
-  localPath = '';
-  async rename(newName: string) {}
-}
-
-/**
  * A namespace for private data
  */
 namespace Private {
   /**
-   * Mapping of vpath to JupyterFrontEndModel
+   * A mapping of vpath to JupyterFrontEndModel.
    */
   export const vpathTojfem = new Map<
     string,
@@ -293,7 +234,12 @@ namespace Private {
   >();
 
   /**
-   * Mapping of kernelId to JupyterFrontEndModel
+   * A mapping of kernelId to vpath, possibly set before the model is created.
+   */
+  export const kernelIdToVpath = new Map<string, string>();
+
+  /**
+   * A mapping of kernelId to JupyterFrontEndModel.
    */
   export const jfems = new Map<string, JupyterFrontEndModel>();
 }

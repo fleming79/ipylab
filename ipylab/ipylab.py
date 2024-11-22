@@ -11,29 +11,17 @@ import weakref
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from ipywidgets import Widget, register
-from traitlets import Bool, Container, Dict, HasTraits, Set, TraitError, TraitType, Unicode, default, observe
+from traitlets import Bool, Container, Dict, HasTraits, Instance, Set, TraitError, TraitType, Unicode, default, observe
 
 import ipylab
 import ipylab._frontend as _fe
-from ipylab.common import (
-    IpylabKwgs,
-    Obj,
-    TaskHooks,
-    TaskHookType,
-    Transform,
-    TransformType,
-    pack,
-    trait_tuple_add,
-    truncated_repr,
-)
-from ipylab.log import LogLevel
+from ipylab.common import IpylabKwgs, Obj, TaskHooks, TaskHookType, Transform, TransformType, pack, trait_tuple_add
+from ipylab.log import IpylabLoggerAdapter
 
 if TYPE_CHECKING:
     from asyncio import Task
     from collections.abc import Awaitable, Callable, Hashable
     from typing import ClassVar, Self, Unpack
-
-    from ipylab.log import LogPayloadType
 
 
 __all__ = ["Ipylab", "WidgetBase", "Readonly"]
@@ -147,6 +135,7 @@ class Ipylab(WidgetBase):
     _tasks: Container[set[asyncio.Task]] = Set()
     _has_attrs_mappings: Container[set[tuple[HasTraits, str]]] = Set()
     close_extras: Readonly[weakref.WeakSet[Widget]] = Readonly(weakref.WeakSet)
+    log = Instance(IpylabLoggerAdapter, read_only=True)
 
     @classmethod
     def _single_key(cls, kwgs: dict) -> Hashable:  # noqa: ARG003
@@ -160,7 +149,7 @@ class Ipylab(WidgetBase):
 
     @default("log")
     def _default_log(self):
-        return ipylab.app.log
+        return IpylabLoggerAdapter("ipylab", owner=self)
 
     def __new__(cls, **kwgs) -> Self:
         model_id = kwgs.get("model_id") or cls._single_map.get(cls._single_key(kwgs)) if cls.SINGLE else None
@@ -246,15 +235,12 @@ class Ipylab(WidgetBase):
             result = await aw
             try:
                 self._task_result(result, hooks)
-            except Exception as e:
-                obj = {"result": result, "hooks": hooks, "aw": aw}
-                self.log_object(LogLevel.error, "TaskHook error", error=e, obj=obj)
-                raise e from None
-        except Exception as e:
-            try:
-                self.log_object(LogLevel.error, "Task error", error=e, obj=aw)
-            finally:
-                raise e
+            except Exception:
+                self.log.exception("TaskHook error", obj={"result": result, "hooks": hooks, "aw": aw})
+                raise
+        except Exception:
+            self.log.exception("Task error", obj=aw)
+            raise
         else:
             return result
 
@@ -323,14 +309,14 @@ class Ipylab(WidgetBase):
                 self.close()
             else:
                 raise NotImplementedError(msg)  # noqa: TRY301
-        except Exception as e:
-            self.log_object(LogLevel.error, "Message processing error {obj}", error=e, obj=msg)
+        except Exception:
+            self.log.exception("Message processing error", obj=msg)
 
     def _to_frontend_error(self, content):
         error = content["error"]
         operation = content.get("operation")
         if operation:
-            msg = f'{truncated_repr(self, 40)} operation "{operation}" failed with the message "{error}"'
+            msg = f'Operation "{operation}" failed with the message "{error}"'
             return IpylabFrontendError(msg)
         return IpylabFrontendError(error)
 
@@ -346,9 +332,8 @@ class Ipylab(WidgetBase):
             content["payload"] = result
         except asyncio.CancelledError:
             content["error"] = "Cancelled"
-        except Exception as e:
-            content["error"] = str(e)
-            self.log_object(LogLevel.error, "Operation for frontend error", error=e)
+        except Exception:
+            self.log.exception("Operation for frontend error", obj={"operation": operation, "payload": payload})
         finally:
             self.send(content, buffers)
 
@@ -378,8 +363,8 @@ class Ipylab(WidgetBase):
                     aw = aw()
             if inspect.iscoroutine(aw):
                 self.to_task(aw, f"Ensure run {aw}")
-        except Exception as e:
-            self.log_object(LogLevel.error, "Ensure run", error=e)
+        except Exception:
+            self.log.exception("Ensure run", obj=aw)
             raise
 
     async def ready(self):
@@ -393,16 +378,6 @@ class Ipylab(WidgetBase):
             self._on_ready_callbacks.discard(callback)
         else:
             self._on_ready_callbacks.add(callback)
-
-    def log_object(self, level: LogLevel, msg: str = "", *, error: BaseException | None = None, obj: Any = None):
-        "Pass a message to have it logged mapped to obj."
-        match LogLevel(level):
-            case LogLevel.error:
-                self.log.exception(msg, extra={"owner": self, "obj": obj}, exc_info=error)
-            case LogLevel.critical:
-                self.log.exception(msg, extra={"owner": self, "obj": obj}, exc_info=error)
-            case _:
-                getattr(self.log, level)(msg, extra={"owner": self, "obj": obj})
 
     def add_to_tuple(self, owner: HasTraits, name: str):
         """Add self to the tuple of obj."""
@@ -423,12 +398,9 @@ class Ipylab(WidgetBase):
     def send(self, content, buffers=None):
         try:
             super().send(json.dumps(content, default=pack), buffers)
-        except Exception as e:
-            self.log_object(LogLevel.error, "Send error", error=e)
-            raise e from None
-
-    def send_log_message(self, log: LogPayloadType):
-        self.send({"log": log})
+        except Exception:
+            self.log.exception("Send error", obj=content)
+            raise
 
     def to_task(self, aw: Awaitable[T], name: str | None = None, *, hooks: TaskHookType = None) -> Task[T]:
         """Run aw in a task.

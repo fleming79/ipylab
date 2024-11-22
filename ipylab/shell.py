@@ -25,15 +25,7 @@ __all__ = ["Shell"]
 
 
 class Shell(Ipylab):
-    """
-    Provides access to the shell.
-    The minimal interface is:
-    https://jupyterlab.readthedocs.io/en/latest/api/interfaces/application.App.IShell.html
-
-    Likely the full labShell interface.
-
-    ref: https://jupyterlab.readthedocs.io/en/latest/api/interfaces/application.App.IShell.html#add
-    """
+    """Provides access to the shell."""
 
     SINGLE = True
 
@@ -92,8 +84,8 @@ class Shell(Ipylab):
             "ref": f"{pack(ref)}.id" if isinstance(ref, ShellConnection) else None,
         } | (options or {})
         args["area"] = area
-        if "asDocument" not in args:
-            args["asDocument"] = area in [Area.left, Area.main, Area.right, Area.down]
+        if "asMainArea" not in args:
+            args["asMainArea"] = area in [Area.left, Area.main, Area.right, Area.down]
         if isinstance(obj, ShellConnection):
             if "cid" in args and args["cid"] != obj.cid:
                 msg = f"The provided {args['cid']=} does not match {obj.cid=}"

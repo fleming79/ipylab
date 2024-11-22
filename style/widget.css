@@ -22,7 +22,7 @@
   background-color: var(--jp-border-color2);
 }
 
-.ipylab-Document {
+.ipylab-MainArea {
   height: 100%;
   width: 100%;
 }

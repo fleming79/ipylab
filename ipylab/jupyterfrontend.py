@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import functools
 import inspect
-import logging
 from collections import OrderedDict
 from typing import TYPE_CHECKING, Any, Unpack
 
@@ -16,7 +15,7 @@ from traitlets import Bool, Container, Dict, Instance, Unicode, UseEnum, default
 
 import ipylab
 import ipylab.hookspecs
-from ipylab import Ipylab, ShellConnection, Transform
+from ipylab import Ipylab, ShellConnection, Transform, log
 from ipylab._compat.typing import override
 from ipylab.commands import APP_COMMANDS_NAME, CommandPalette, CommandRegistry
 from ipylab.common import InsertMode, IpylabKwgs, Obj, to_selector
@@ -28,10 +27,13 @@ from ipylab.menu import ContextMenu, MainMenu
 from ipylab.notification import NotificationManager
 from ipylab.sessions import SessionManager
 from ipylab.shell import Shell
+from ipylab.widgets import Panel
 
 if TYPE_CHECKING:
     from asyncio import Task
     from typing import ClassVar
+
+    from ipylab.log_viewer import LogViewer
 
 
 class LastUpdatedDict(OrderedDict):
@@ -53,7 +55,6 @@ class App(Ipylab):
     _model_name = Unicode("JupyterFrontEndModel").tag(sync=True)
     ipylab_base = IpylabBase(Obj.IpylabModel, "app").tag(sync=True)
     version = Unicode(read_only=True).tag(sync=True)
-    logger_level = UseEnum(LogLevel, read_only=True, default_value=LogLevel.warning).tag(sync=True)
     vpath = Unicode(read_only=True).tag(sync=True)
     per_kernel_widget_manager_detected = Bool(read_only=True).tag(sync=True)
 
@@ -69,9 +70,10 @@ class App(Ipylab):
 
     console = Instance(ShellConnection, allow_none=True, read_only=True)
     logging_handler = Instance(IpylabLogHandler, read_only=True)
+    log_viewer: Instance[LogViewer] = Instance(Panel, Readonly=True)  # type: ignore
+    log_level = UseEnum(LogLevel, LogLevel.ERROR)
 
     active_namespace = Unicode("", read_only=True, help="name of the current namespace")
-    selector = Unicode("", read_only=True, help="Selector class for context menus (css)")
 
     namespaces: Container[dict[str, LastUpdatedDict]] = Dict(read_only=True)  # type: ignore
 
@@ -86,27 +88,27 @@ class App(Ipylab):
     def close(self):
         "Cannot close"
 
-    @default("log")
-    def _default_log(self):
-        log = logging.getLogger("ipylab")
-        self.logging_handler.set_as_handler(log)
-        return log
-
     @default("logging_handler")
     def _default_logging_handler(self):
-        handler = IpylabLogHandler()
-        fmt = "{owner} {obj} {message}"
-        handler.setFormatter(IpylabLogFormatter(fmt, style="{"))
+        fmt = "{color}{asctime}.{msecs:0<3.0f} {name} {owner_rep}:{reset} {message}\n"
+        handler = IpylabLogHandler(self.log_level)
+        handler.setFormatter(IpylabLogFormatter(fmt=fmt, style="{", datefmt="%H:%M:%S", colors=log.COLORS))
         return handler
 
-    @observe("_ready")
-    def _app_observe_ready(self, _):
-        if self._ready:
-            self.set_trait("selector", to_selector(self.vpath))
+    @default("log_viewer")
+    def _default_log_viewer(self):
+        return ipylab.plugin_manager.hook.get_log_viewer(app=self, handler=self.logging_handler)
+
+    @observe("_ready", "log_level")
+    def _app_observe_ready(self, change):
+        if change["name"] == "_ready" and self._ready:
+            assert self.vpath, "Vpath should always before '_ready'."  # noqa: S101
+            self._selector = to_selector(self.vpath)
             ipylab.plugin_manager.hook.autostart._call_history.clear()  # type: ignore  # noqa: SLF001
             ipylab.plugin_manager.hook.autostart.call_historic(
                 kwargs={"app": self}, result_callback=self._autostart_callback
             )
+        self.logging_handler.setLevel(self.log_level)
 
     def _autostart_callback(self, result):
         self.ensure_run(result)
@@ -114,6 +116,16 @@ class App(Ipylab):
     @property
     def repr_info(self):
         return {"vpath": self.vpath}
+
+    @property
+    def repr_log(self):
+        "A representation to use when logging"
+        return self.__class__.__name__
+
+    @property
+    def selector(self):
+        # Calling this before `_ready` is set will raise an attribute error.
+        return self._selector
 
     @override
     async def ready(self):

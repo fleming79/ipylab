@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     import ipylab
     from ipylab import App
     from ipylab.ipylab import Ipylab
+    from ipylab.log import IpylabLogHandler
 
 
 @hookimpl
@@ -31,7 +32,8 @@ async def autostart(app: ipylab.App) -> None | Awaitable[None]:
     # Register some default context menu items for Ipylab
     cmd = await app.commands.add_command("Open console", app._context_open_console)  # noqa: SLF001
     await app.context_menu.add_item(command=cmd, rank=20)
-    await app.context_menu.add_item(command="logconsole:open", args={"source": app.vpath}, rank=21)
+    cmd = await app.commands.add_command("Show log viewer", lambda: app.log_viewer.add_to_shell())
+    await app.context_menu.add_item(command=cmd, rank=21)
 
 
 @hookimpl
@@ -47,3 +49,10 @@ def vpath_getter(app: App, kwgs: dict) -> Awaitable[str] | str:
 @hookimpl
 def ready(obj: Ipylab):
     "Pass through"
+
+
+@hookimpl
+def get_log_viewer(app: App, handler: IpylabLogHandler):  # type: ignore
+    from ipylab.log_viewer import LogViewer
+
+    return LogViewer(app, handler)

@@ -9,10 +9,12 @@ import { IconModel, IconView } from './widgets/icon';
 import { IpylabModel } from './widgets/ipylab';
 import { NotificationManagerModel } from './widgets/notification';
 import { PanelModel, PanelView } from './widgets/panel';
+import { AutoscrollModel, AutoscrollView } from './widgets/autoscroll';
+import { SessionManagerModel } from './widgets/sessions';
 import { ShellModel } from './widgets/shell';
 import { SplitPanelModel, SplitPanelView } from './widgets/split_panel';
 import { TitleModel } from './widgets/title';
-import { SessionManagerModel } from './widgets/sessions';
+import { SimpleOutputModel, SimpleOutputView } from './widgets/simple_output';
 export {
   CommandRegistryModel,
   ConnectionModel,
@@ -24,6 +26,10 @@ export {
   NotificationManagerModel,
   PanelModel,
   PanelView,
+  AutoscrollModel,
+  AutoscrollView,
+  SimpleOutputModel,
+  SimpleOutputView,
   SessionManagerModel,
   ShellConnectionModel,
   ShellModel,

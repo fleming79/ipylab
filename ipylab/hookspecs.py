@@ -14,6 +14,8 @@ if TYPE_CHECKING:
 
     import ipylab
     from ipylab.common import IpylabKwgs
+    from ipylab.log import IpylabLogHandler
+    from ipylab.log_viewer import LogViewer
 
 
 @hookspec(firstresult=True)
@@ -89,3 +91,8 @@ def vpath_getter(app: ipylab.App, kwgs: dict) -> Awaitable[str] | str:  # type: 
 
     vpath is the 'virtual path' for a session.
     """
+
+
+@hookspec(firstresult=True)
+def get_log_viewer(app: ipylab.App, handler: IpylabLogHandler) -> LogViewer:  # type: ignore
+    """Create a new instance of a logViewer."""
