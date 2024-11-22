@@ -74,7 +74,7 @@ class NotificationConnection(InfoConnection):
                 to_object.extend(f"options.actions.{i}" for i in range(len(actions_)))
                 for action in actions_:
                     self.close_extras.add(action)
-            return await ipylab.app.notification.operation("update", toObject=to_object, args=args)
+            return await ipylab.app.notification.operation("update", {"args": args}, toObject=to_object)
 
         return self.to_task(update())
 

@@ -73,8 +73,10 @@ class SimpleOutput(DOMWidget, Ipylab):
         if outputs_ := self._pack_outputs(outputs):
             self.send({"add": outputs_})
 
-    def clear(self, *, wait=True):
-        "Clear the output"
+    def clear(self, *, wait=False):
+        """Clear the output.
+        wait: bool
+            True: Will delay clearing until next output is added."""
         self.send({"clear": wait})
 
     def set(self, *outputs: dict[str, str] | Widget | str, **kwgs: Unpack[IpylabKwgs]) -> Task[int]:

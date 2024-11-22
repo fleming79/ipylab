@@ -5,10 +5,9 @@ from __future__ import annotations
 
 import logging
 import weakref
-from enum import IntEnum
+from enum import IntEnum, StrEnum
 from typing import TYPE_CHECKING, Any, ClassVar
 
-from IPython.utils.coloransi import TermColors
 from ipywidgets import CallbackDispatcher
 
 import ipylab
@@ -31,17 +30,37 @@ class LogLevel(IntEnum):
     DEBUG = 10
 
 
-grey = "\x1b[38;20m"
-yellow = "\x1b[33;20m"
-ret = "\x1b[31;20m"
-bold_red = "\x1b[31;1m"
-reset = TermColors.Normal
+class ANSIColors(StrEnum):
+    # Jupyterlab supports ANSI colours
+    # https://jakob-bagterp.github.io/colorist-for-python/ansi-escape-codes/standard-16-colors/#structure
+
+    reset = "\033[0m"
+
+    black = "\033[30m"
+    red = "\033[31m"
+    green = "\033[32m"
+    yellow = "\033[33m"
+    blue = "\033[34m"
+    magenta = "\033[35m"
+    cyan = "\033[36m"
+    white = "\033[37m"
+    default = "\033[39m"
+    bright_black = "\033[90m"
+    bright_red = "\033[91m"
+    bright_green = "\033[92m"
+    bright_yellow = "\033[93m"
+    bright_blue = "\033[94m"
+    bright_magenta = "\033[95m"
+    bright_cyan = "\033[96m"
+    bright_white = "\033[97m"
+
+
 COLORS = {
-    LogLevel.DEBUG: TermColors.LightGray,
-    LogLevel.INFO: TermColors.Cyan,
-    LogLevel.WARNING: TermColors.LightRed,
-    LogLevel.ERROR: TermColors.Red,
-    LogLevel.CRITICAL: TermColors.Purple,
+    LogLevel.DEBUG: ANSIColors.cyan,
+    LogLevel.INFO: ANSIColors.bright_blue,
+    LogLevel.WARNING: ANSIColors.bright_yellow,
+    LogLevel.ERROR: ANSIColors.red,
+    LogLevel.CRITICAL: ANSIColors.bright_red,
 }
 
 
@@ -110,7 +129,7 @@ class IpylabLogHandler(logging.Handler):
 
 
 class IpylabLogFormatter(logging.Formatter):
-    def __init__(self, *, colors: dict[LogLevel, str], reset=reset, **kwargs) -> None:
+    def __init__(self, *, colors: dict[LogLevel, str], reset=ANSIColors.reset, **kwargs) -> None:
         """Initialize the formatter with specified format strings."""
         self.colors = COLORS | colors
         self.reset = reset
