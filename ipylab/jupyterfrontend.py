@@ -70,7 +70,7 @@ class App(Ipylab):
 
     console = Instance(ShellConnection, allow_none=True, read_only=True)
     logging_handler = Instance(IpylabLogHandler, read_only=True)
-    log_viewer: Instance[LogViewer] = Instance(Panel, Readonly=True)  # type: ignore
+    log_viewer: Instance[LogViewer] = Instance(Panel, read_only=True)  # type: ignore
     log_level = UseEnum(LogLevel, LogLevel.ERROR)
 
     active_namespace = Unicode("", read_only=True, help="name of the current namespace")
@@ -90,7 +90,7 @@ class App(Ipylab):
 
     @default("logging_handler")
     def _default_logging_handler(self):
-        fmt = "{color}{asctime}.{msecs:0<3.0f} {name} {owner_rep}:{reset} {message}\n"
+        fmt = "{color}{level_symbol} {asctime}.{msecs:0<3.0f} {name} {owner_rep}:{reset} {message}\n"
         handler = IpylabLogHandler(self.log_level)
         handler.setFormatter(IpylabLogFormatter(fmt=fmt, style="{", datefmt="%H:%M:%S", colors=log.COLORS))
         return handler
@@ -303,3 +303,6 @@ class App(Ipylab):
         self.namespaces.pop(name, None)
         if activate:
             self.activate_namespace(name, objects)
+
+
+JupyterFrontEnd = App

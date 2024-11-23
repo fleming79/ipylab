@@ -54,12 +54,33 @@ class LogViewer(Panel):
         )
         self.button_show_send_dialog = Button(
             description="📪",
-            tooltip="Send the record to the console",
+            tooltip="Send the record to the console.\n"
+            "The record has the properties 'owner' and 'obj'attached "
+            "which may be of interest for debugging purposes.",
             layout={"width": "auto"},
         )
-        self.autoscroll_enabled = Checkbox(description="Automatic scroll", layout={"width": "auto"})
-        children = [self.info, self.log_level, self.autoscroll_enabled, self.buffer_size, self.button_show_send_dialog]
-        self.box_controls = HBox(children, layout={"justify_content": "space-between", "flex": "0 0 auto"})
+        self.button_clear = Button(
+            description="✗",
+            tooltip="Clear output",
+            layout={"width": "auto"},
+        )
+        self.autoscroll_enabled = Checkbox(
+            description="Scroll",
+            indent=False,
+            tooltip="Scroll to the most recent logs.",
+            layout={"width": "auto"},
+        )
+        self.box_controls = HBox(
+            children=[
+                self.info,
+                self.autoscroll_enabled,
+                self.log_level,
+                self.buffer_size,
+                self.button_clear,
+                self.button_show_send_dialog,
+            ],
+            layout={"justify_content": "space-between", "flex": "0 0 auto"},
+        )
         self.output = SimpleOutput()
         self.autoscroll_widget = AutoScroll(content=self.output)
 
@@ -78,6 +99,7 @@ class LogViewer(Panel):
             (self.output, "length"), (self.buffer_size, "tooltip"), transform=lambda size: f"Current size: {size}"
         )
         self.button_show_send_dialog.on_click(self._button_on_click)
+        self.button_clear.on_click(self._button_on_click)
 
     def close(self):
         "Cannot close"
@@ -112,12 +134,15 @@ class LogViewer(Panel):
         if change["owner"] is self.buffer_size:
             self._records = collections.deque(self._records, maxlen=self.buffer_size.value)
 
-    def _button_on_click(self, _):
-        self.button_show_send_dialog.disabled = True
-        ipylab.app.dialog.to_task(
-            self._show_send_dialog(),
-            hooks={"callbacks": [lambda _: self.button_show_send_dialog.set_trait("disabled", False)]},
-        )
+    def _button_on_click(self, b):
+        if b is self.button_show_send_dialog:
+            self.button_show_send_dialog.disabled = True
+            ipylab.app.dialog.to_task(
+                self._show_send_dialog(),
+                hooks={"callbacks": [lambda _: self.button_show_send_dialog.set_trait("disabled", False)]},
+            )
+        elif b is self.button_clear:
+            self.output.clear(wait=False)
 
     async def _show_send_dialog(self):
         # TODO: make a formatter to simplify the message with obj and owner)

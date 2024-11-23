@@ -8,7 +8,7 @@ from ipylab.common import Area, InsertMode, Obj, Transform, hookimpl, pack, to_s
 from ipylab.ipylab import Ipylab
 from ipylab.connection import Connection, ShellConnection
 from ipylab import menu
-from ipylab.jupyterfrontend import App
+from ipylab.jupyterfrontend import App, JupyterFrontEnd
 from ipylab.notification import NotificationType, NotifyAction
 from ipylab.widgets import Icon, Panel, SplitPanel
 
@@ -39,9 +39,6 @@ __all__ = [
 def _jupyter_labextension_paths():
     "Called by Jupyterlab see: jupyterlab.federated_labextensions._get_labextension_metadata."
     return [{"src": "labextension", "dest": "ipylab"}]
-
-
-JupyterFrontEnd = App
 
 
 def _get_plugin_manager():

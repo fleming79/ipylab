@@ -16,8 +16,6 @@ from ipylab._compat.typing import override
 if TYPE_CHECKING:
     from asyncio import Task
 
-    from ipylab.ipylab import Ipylab
-
 
 __all__ = ["LogLevel", "IpylabLogHandler"]
 
@@ -57,7 +55,7 @@ class ANSIColors(StrEnum):
 
 COLORS = {
     LogLevel.DEBUG: ANSIColors.cyan,
-    LogLevel.INFO: ANSIColors.bright_blue,
+    LogLevel.INFO: ANSIColors.green,
     LogLevel.WARNING: ANSIColors.bright_yellow,
     LogLevel.ERROR: ANSIColors.red,
     LogLevel.CRITICAL: ANSIColors.bright_red,
@@ -74,7 +72,7 @@ def truncated_repr(obj: Any, maxlen=120, tail="…") -> str:
 
 
 class IpylabLoggerAdapter(logging.LoggerAdapter):
-    def __init__(self, name: str, owner: Ipylab) -> None:
+    def __init__(self, name: str, owner: Any) -> None:
         logger = logging.getLogger(name)
         logger.addHandler(ipylab.app.logging_handler)
         ipylab.app.logging_handler._add_logger(logger)  # noqa: SLF001
@@ -129,14 +127,16 @@ class IpylabLogHandler(logging.Handler):
 
 
 class IpylabLogFormatter(logging.Formatter):
-    def __init__(self, *, colors: dict[LogLevel, str], reset=ANSIColors.reset, **kwargs) -> None:
+    def __init__(self, *, colors: dict[LogLevel, ANSIColors], reset=ANSIColors.reset, **kwargs) -> None:
         """Initialize the formatter with specified format strings."""
         self.colors = COLORS | colors
         self.reset = reset
         super().__init__(**kwargs)
 
     def format(self, record: logging.LogRecord) -> str:
-        record.color = self.colors[LogLevel(record.levelno)]
+        level = LogLevel(record.levelno)
+        record.level_symbol = level.name[0]
+        record.color = self.colors[level]
         record.reset = self.reset
         record.owner_rep = truncated_repr(getattr(record, "owner", ""), 120)
         record.obj_rep = truncated_repr(getattr(record, "obj", ""), 120)
