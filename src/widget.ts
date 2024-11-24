@@ -1,6 +1,8 @@
 // Copyright (c) ipylab contributors
 // Distributed under the terms of the Modified BSD License.
 
+import { AutoscrollModel, AutoscrollView } from './widgets/autoscroll';
+import { CodeEditorModel, CodeEditorView } from './widgets/code_editor';
 import { CommandRegistryModel } from './widgets/commands';
 import { ConnectionModel, ShellConnectionModel } from './widgets/connection';
 import { DialogModel } from './widgets/dialog';
@@ -9,13 +11,16 @@ import { IconModel, IconView } from './widgets/icon';
 import { IpylabModel } from './widgets/ipylab';
 import { NotificationManagerModel } from './widgets/notification';
 import { PanelModel, PanelView } from './widgets/panel';
-import { AutoscrollModel, AutoscrollView } from './widgets/autoscroll';
 import { SessionManagerModel } from './widgets/sessions';
 import { ShellModel } from './widgets/shell';
+import { SimpleOutputModel, SimpleOutputView } from './widgets/simple_output';
 import { SplitPanelModel, SplitPanelView } from './widgets/split_panel';
 import { TitleModel } from './widgets/title';
-import { SimpleOutputModel, SimpleOutputView } from './widgets/simple_output';
 export {
+  AutoscrollModel,
+  AutoscrollView,
+  CodeEditorModel,
+  CodeEditorView,
   CommandRegistryModel,
   ConnectionModel,
   DialogModel,
@@ -26,13 +31,11 @@ export {
   NotificationManagerModel,
   PanelModel,
   PanelView,
-  AutoscrollModel,
-  AutoscrollView,
-  SimpleOutputModel,
-  SimpleOutputView,
   SessionManagerModel,
   ShellConnectionModel,
   ShellModel,
+  SimpleOutputModel,
+  SimpleOutputView,
   SplitPanelModel,
   SplitPanelView,
   TitleModel

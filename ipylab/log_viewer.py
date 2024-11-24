@@ -29,15 +29,7 @@ class LogViewer(Panel):
     _updating = False
 
     def __init__(self, app: App, handler: IpylabLogHandler, buffersize=100):
-        self.info = HTML(
-            f"<b>Vpath: {app.vpath}</b>",
-            tooltip="Use this panel to access the log console from either:\n"
-            "1. The icon in the status bar, or,\n"
-            "2. The context menu (right click).\n"
-            "The controls below are provided to put an object into a console.\n"
-            "Note: Jupyterlab loads a different 'log console'  for the 'console'.",
-            layout={"flex": "1 0 auto", "margin": "0px 20px 0px 20px"},
-        )
+        self.info = HTML(f"<b>Vpath: {app.vpath}</b>", layout={"flex": "1 0 auto", "margin": "0px 20px 0px 20px"})
         options = [(v.name.capitalize(), v) for v in LogLevel]
         self.log_level = Dropdown(
             description="Level",
@@ -60,7 +52,7 @@ class LogViewer(Panel):
             layout={"width": "auto"},
         )
         self.button_clear = Button(
-            description="✗",
+            description="⌧",
             tooltip="Clear output",
             layout={"width": "auto"},
         )

@@ -31,6 +31,7 @@ import { MODULE_NAME, MODULE_VERSION } from '../version';
 import type { ConnectionModel } from './connection';
 import type { JupyterFrontEndModel } from './frontend';
 import type { ShellModel } from './shell';
+import { IEditorServices } from '@jupyterlab/codeeditor';
 
 /**
  * Base model for Ipylab.
@@ -531,6 +532,7 @@ export class IpylabModel extends DOMWidgetModel {
   translator = IpylabModel.translator.load('jupyterlab');
   static launcher: ILauncher;
   static mainMenu: IMainMenu;
+  static editorServices: IEditorServices;
   static tracker = new WidgetTracker<Widget>({ namespace: 'ipylab' });
   static JFEM: typeof JupyterFrontEndModel;
   static ConnectionModel: typeof ConnectionModel;

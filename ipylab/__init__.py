@@ -11,11 +11,15 @@ from ipylab import menu
 from ipylab.jupyterfrontend import App, JupyterFrontEnd
 from ipylab.notification import NotificationType, NotifyAction
 from ipylab.widgets import Icon, Panel, SplitPanel
+from ipylab.code_editor import CodeEditor
+from ipylab.simple_output import SimpleOutput
 
 __all__ = [
     "__version__",
+    "CodeEditor",
     "Connection",
     "ShellConnection",
+    "SimpleOutput",
     "Panel",
     "SplitPanel",
     "Icon",

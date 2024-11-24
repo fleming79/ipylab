@@ -138,14 +138,11 @@ export class SimpleOutputView extends DOMWidgetView {
       model: this.model.outputAreaModel,
       promptOverlay: false
     });
-    this.luminoWidget.addClass('jupyter-widgets');
-    this.luminoWidget.addClass('jupyter-widget-output');
     return this.luminoWidget.node;
   }
 
   _setElement(el: HTMLElement): void {
     if (this.el || el !== this.luminoWidget.node) {
-      // Boxes don't allow setting the element beyond the initial creation.
       throw new Error('Cannot reset the DOM element.');
     }
 

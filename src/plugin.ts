@@ -9,6 +9,7 @@ import {
   JupyterFrontEndPlugin
 } from '@jupyterlab/application';
 import { ICommandPalette } from '@jupyterlab/apputils';
+import { IEditorServices } from '@jupyterlab/codeeditor';
 import { IDefaultFileBrowser } from '@jupyterlab/filebrowser';
 import { ILauncher } from '@jupyterlab/launcher';
 import { IMainMenu } from '@jupyterlab/mainmenu';
@@ -33,7 +34,12 @@ namespace CommandIDs {
 const extension: JupyterFrontEndPlugin<void> = {
   id: PLUGIN_ID,
   autoStart: true,
-  requires: [IJupyterWidgetRegistry, IRenderMimeRegistry, ISettingRegistry],
+  requires: [
+    IJupyterWidgetRegistry,
+    IRenderMimeRegistry,
+    ISettingRegistry,
+    IEditorServices
+  ],
   optional: [
     ILayoutRestorer,
     ICommandPalette,
@@ -48,6 +54,7 @@ const extension: JupyterFrontEndPlugin<void> = {
     registry: IJupyterWidgetRegistry,
     rendermime: IRenderMimeRegistry,
     settings: ISettingRegistry,
+    editorServices: IEditorServices,
     restorer: ILayoutRestorer,
     palette: ICommandPalette,
     labShell: ILabShell | null,
@@ -67,6 +74,7 @@ const extension: JupyterFrontEndPlugin<void> = {
     exports.IpylabModel.translator = translator;
     exports.IpylabModel.launcher = launcher;
     exports.IpylabModel.mainMenu = mainMenu;
+    exports.IpylabModel.editorServices = editorServices;
 
     registry.registerWidget({
       name: MODULE_NAME,
