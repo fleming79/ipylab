@@ -203,8 +203,8 @@ class CommandRegistry(Ipylab):
         glbls = ipylab.app.get_namespace(conn.namespace_name)
         kwgs = {}
         for n, p in inspect.signature(cmd).parameters.items():
-            if n in ["current_widget", "ref"] and cids[n]:
-                kwgs[n] = ShellConnection(cids[n])
+            if n in ["current_widget", "ref"]:
+                kwgs[n] = ShellConnection(cids[n]) if n in cids else None
                 await kwgs[n].ready()
             elif n in args:
                 kwgs[n] = args[n]

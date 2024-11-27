@@ -96,3 +96,8 @@ def vpath_getter(app: ipylab.App, kwgs: dict) -> Awaitable[str] | str:  # type: 
 @hookspec(firstresult=True)
 def get_log_viewer(app: ipylab.App, handler: IpylabLogHandler) -> LogViewer:  # type: ignore
     """Create a new instance of a logViewer."""
+
+
+@hookspec(firstresult=True)
+def default_editor_key_bindings(app: ipylab.App, obj: ipylab.CodeEditor):
+    """Get the key bindings to use for the editor."""

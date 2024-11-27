@@ -182,9 +182,14 @@ class App(Ipylab):
             self.get_namespace(namespace_name, glbls)
         return {"payload": glbls.get("payload"), "buffers": buffers}
 
-    def _context_open_console(self, ref: ShellConnection, current_widget: ShellConnection):
+    def _context_open_console(
+        self,
+        ref: ShellConnection | None = None,
+        current_widget: ShellConnection | None = None,
+        namespace_name="",
+    ):
         "This command is provided for the 'autostart' context menu."
-        return self.open_console(objects={"ref": ref, "current_widget": current_widget})
+        return self.open_console(objects={"ref": ref, "current_widget": current_widget}, namespace_name=namespace_name)
 
     def open_console(
         self,
@@ -238,7 +243,6 @@ class App(Ipylab):
         evaluate: dict[str, str | inspect._SourceObjectType] | str,
         *,
         vpath="",
-        name="",
         namespace_name="",
         **kwargs: Unpack[IpylabKwgs],
     ):
@@ -264,14 +268,14 @@ class App(Ipylab):
 
             Once evaluation is complete, the symbols named `payload` and `buffers` will be returned.
         vpath:
-            The path used for the kernel session context.
+            The path of kernel session where to perform the evaluation.
         globals:
             The globals namespace includes the follow symbols:
             * ipylab
             * ipywidgets
             * ipw (ipywidgets)
         """
-        kwgs = {"evaluate": evaluate, "vpath": vpath, "name": name, "namespace_name": namespace_name}
+        kwgs = {"evaluate": evaluate, "vpath": vpath, "namespace_name": namespace_name}
         return self.operation("evaluate", kwgs, **kwargs)
 
     def get_namespace(self, name="", objects: dict | None = None):
@@ -290,13 +294,14 @@ class App(Ipylab):
 
     def activate_namespace(self, name="", objects: dict | None = None):
         "Sets the ipython/console namespace."
-        if not self._ipy_shell:
-            msg = "Ipython shell is not loaded!"
-            raise RuntimeError(msg)
-        ns = self.get_namespace(name, objects)
-        self._ipy_shell.reset()
-        self._ipy_shell.push(ns)
-        self.set_trait("active_namespace", name)
+        if self.active_namespace != name:
+            if not self._ipy_shell:
+                msg = "Ipython shell is not loaded!"
+                raise RuntimeError(msg)
+            ns = self.get_namespace(name, objects)
+            self._ipy_shell.reset()
+            self._ipy_shell.push(ns)
+            self.set_trait("active_namespace", name)
 
     def reset_namespace(self, name: str, *, activate=True, objects: dict | None = None):
         "Reset the namespace to default. If activate is False it won't be created."

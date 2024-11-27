@@ -31,9 +31,9 @@ def launch_jupyterlab():
 async def autostart(app: ipylab.App) -> None | Awaitable[None]:
     # Register some default context menu items for Ipylab
     cmd = await app.commands.add_command("Open console", app._context_open_console)  # noqa: SLF001
-    await app.context_menu.add_item(command=cmd, rank=20)
+    await app.context_menu.add_item(command=cmd, rank=70)
     cmd = await app.commands.add_command("Show log viewer", lambda: app.log_viewer.add_to_shell())
-    await app.context_menu.add_item(command=cmd, rank=21)
+    await app.context_menu.add_item(command=cmd, rank=71)
 
 
 @hookimpl
@@ -56,3 +56,8 @@ def get_log_viewer(app: App, handler: IpylabLogHandler):  # type: ignore
     from ipylab.log_viewer import LogViewer
 
     return LogViewer(app, handler)
+
+
+@hookimpl
+def default_editor_key_bindings(app: ipylab.App, obj: ipylab.CodeEditor):  # noqa: ARG001
+    return {"invoke_completer": ["Ctrl Space"], "evaluate": ["Shift Enter"]}

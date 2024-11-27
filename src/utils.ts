@@ -238,6 +238,16 @@ export function toJSONsubstituteCylic(value: any) {
     return JSON.stringify(value);
   } catch {
     // Assuming the error is due to circular reference
+    if (value?.payload !== undefined) {
+      const info = listProperties({
+        obj: value.payload,
+        omitHidden: true,
+        depth: 3
+      });
+      info['WARNING'] =
+        'This is a simplified representation because it contains circular references.';
+      value.payload = info;
+    }
     return JSON.stringify(value, _replacer);
   }
 }

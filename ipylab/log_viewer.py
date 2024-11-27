@@ -16,6 +16,7 @@ from ipylab.simple_output import AutoScroll, SimpleOutput
 from ipylab.widgets import Icon, Panel
 
 if TYPE_CHECKING:
+    import logging
     from asyncio import Task
 
     from ipylab.connection import ShellConnection
@@ -96,29 +97,24 @@ class LogViewer(Panel):
     def close(self):
         "Cannot close"
 
-    def _add_record(self, record):
+    def _add_record(self, record: logging.LogRecord):
         self._records.append(record)
-        self.output.push(record.output)
+        self.output.push(record.output)  # type: ignore
+        if record.levelno >= LogLevel.ERROR:
+            self._notify_exception(record)
 
-    def _notify_exception(self, msg: str):
+    def _notify_exception(self, record: logging.LogRecord):
         "Create a notification that an error occurred."
-
-        msg_short = msg.split("\n", maxsplit=1)[0]
         if self._log_notify_task:
             # Limit to one notification.
             if not self._log_notify_task.done():
                 return
             self._log_notify_task.result().close()
         self._log_notify_task = ipylab.app.notification.notify(
-            msg_short,
+            message=f"Error: {record.msg}",
             type=ipylab.NotificationType.error,
             actions=[
-                ipylab.NotifyAction(
-                    label="📄",
-                    caption="Show object log panel.",
-                    callback=self.add_to_shell,
-                    keep_open=True,
-                )
+                ipylab.NotifyAction(label="📄", caption="Show log viewer.", callback=self.add_to_shell, keep_open=True)
             ],
         )
 
