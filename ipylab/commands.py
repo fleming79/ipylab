@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import functools
 import inspect
+import uuid
 from typing import TYPE_CHECKING, Any, ClassVar, NotRequired, TypedDict, Unpack
 
 from ipywidgets import TypedTuple
@@ -46,6 +47,15 @@ class CommandOptions(TypedDict):
     usage: NotRequired[str]
 
 
+class KeybindingConnection(InfoConnection):
+    command: Instance[CommandConnection] = Instance(InfoConnection)  # type: ignore
+
+    @override
+    @classmethod
+    def to_cid(cls, command: CommandConnection):
+        return super().to_cid(str(command), str(uuid.uuid4()))
+
+
 class CommandConnection(InfoConnection):
     """An Ipylab command registered in a command registry."""
 
@@ -54,8 +64,8 @@ class CommandConnection(InfoConnection):
     namespace_name = Unicode("")
 
     _config_options: ClassVar = tuple(CommandOptions.__annotations__)
-
     commands: Instance[CommandRegistry] = Instance("ipylab.commands.CommandRegistry")
+    key_bindings: Container[tuple[KeybindingConnection, ...]] = TypedTuple(trait=Instance(KeybindingConnection))
 
     @override
     @classmethod
@@ -78,6 +88,25 @@ class CommandConnection(InfoConnection):
             return config
 
         return self.to_task(configure())
+
+    def add_key_binding(
+        self, keys: list, selector="", args: dict | None = None, *, prevent_default=True
+    ) -> Task[KeybindingConnection]:
+        "Add a key binding for this command and selector."
+        if not self.comm:
+            msg = f"Closed: {self}"
+            raise RuntimeError(msg)
+        args = args or {}
+        selector = selector or ipylab.app.selector
+        args |= {"keys": keys, "preventDefault": prevent_default, "selector": selector, "command": str(self)}
+        cid = KeybindingConnection.to_cid(self)
+        transform: TransformType = {"transform": Transform.connection, "cid": cid}
+        hooks: TaskHooks = {
+            "add_to_tuple_fwd": [(self, "key_bindings")],
+            "trait_add_fwd": [("info", args), ("command", self)],
+            "close_with_fwd": [self],
+        }
+        return self.commands.execute_method("addKeyBinding", args, transform=transform, hooks=hooks)
 
 
 class CommandPalletItemConnection(InfoConnection):
