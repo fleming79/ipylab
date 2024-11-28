@@ -6,9 +6,8 @@ from __future__ import annotations
 import functools
 import inspect
 from collections import OrderedDict
-from typing import TYPE_CHECKING, Any, Unpack
+from typing import TYPE_CHECKING, Any, Literal, Unpack
 
-import ipywidgets
 from IPython.core.getipython import get_ipython
 from ipywidgets import Widget, register
 from traitlets import Bool, Container, Dict, Instance, Unicode, UseEnum, default, observe
@@ -40,10 +39,25 @@ class LastUpdatedDict(OrderedDict):
     "Store items in the order the keys were last added"
 
     # ref: https://docs.python.org/3/library/collections.html#ordereddict-examples-and-recipes
+    _updating = False
+    _last = True
 
     def __setitem__(self, key, value):
         super().__setitem__(key, value)
-        self.move_to_end(key)
+        if not self._updating:
+            self.move_to_end(key, self._last)
+
+    @override
+    def update(self, m, **kwargs):
+        self._updating = True
+        try:
+            super().update(m, **kwargs)
+        finally:
+            self._updating = False
+
+    def set_end(self, mode: Literal["first", "last"] = "last"):
+        "The end to move the last updated key."
+        self._last = mode == "last"
 
 
 @register
@@ -78,7 +92,7 @@ class App(Ipylab):
     namespaces: Container[dict[str, LastUpdatedDict]] = Dict(read_only=True)  # type: ignore
 
     _ipy_shell = get_ipython()
-    _ipy_default_namespace: ClassVar = getattr(_ipy_shell, "user_ns", {})
+    _hidden: ClassVar = {"_ih", "_oh", "_dh", "In", "Out", "get_ipython", "exit", "quit", "open"}
 
     @classmethod
     @override
@@ -178,8 +192,6 @@ class App(Ipylab):
         buffers = glbls.pop("buffers", [])
         if namespace_name == self.active_namespace:
             self.activate_namespace(namespace_name)
-        else:
-            self.get_namespace(namespace_name, glbls)
         return {"payload": glbls.get("payload"), "buffers": buffers}
 
     def _context_open_console(
@@ -220,12 +232,12 @@ class App(Ipylab):
             )
             for result in plugin_results:
                 self.ensure_run(result)
-            self.activate_namespace(args.pop("namespace_name", ""), objects=objects)
-
+            namespace_name_ = args.pop("namespace_name", "")
             conn: ShellConnection = await self.commands.execute("console:open", args, **kwargs)
             conn.add_as_trait(self, "console")
             if objects and (ref := objects.get("ref")) and isinstance(ref.widget, ipylab.Panel):
                 conn.add_as_trait(ref.widget, "console")
+            self.activate_namespace(namespace_name_, objects=objects)
             return conn
 
         return self.to_task(_open_console(), "Open console")
@@ -280,28 +292,31 @@ class App(Ipylab):
 
     def get_namespace(self, name="", objects: dict | None = None):
         "Get the 'globals' namespace stored for name."
-        if self._ipy_shell:
-            if "" not in self.namespaces:
-                self.namespaces[""] = LastUpdatedDict(self._ipy_shell.user_ns)
-            if self.active_namespace == name:
-                self.namespaces.update(self._ipy_shell.user_ns)
+        sh = self._ipy_shell
+        if sh and "" not in self.namespaces:
+            self._init_namespace(name, sh.user_ns)
         if name not in self.namespaces:
-            self.namespaces[name] = LastUpdatedDict(self._ipy_default_namespace)
-        objects = {"ipylab": ipylab, "ipywidgets": ipywidgets, "ipw": ipywidgets, "app": self} | (objects or {})
-        ipylab.plugin_manager.hook.namespace_objects(objects=objects, namespace_name=name, app=self)
-        self.namespaces[name].update(objects)
-        return self.namespaces[name]
+            self._init_namespace(name, {})
+        ns = self.namespaces[name]
+        for objs in ipylab.plugin_manager.hook.default_namespace_objects(namespace_name=name, app=self):
+            ns.update(objs)
+        if objects:
+            ns.update(objects)
+        if sh and name == self.activate_namespace:
+            ns.update(sh.user_ns)
+        return ns
+
+    def _init_namespace(self, name: str, objs: dict):
+        self.namespaces[name] = LastUpdatedDict(objs)
 
     def activate_namespace(self, name="", objects: dict | None = None):
         "Sets the ipython/console namespace."
-        if self.active_namespace != name:
-            if not self._ipy_shell:
-                msg = "Ipython shell is not loaded!"
-                raise RuntimeError(msg)
-            ns = self.get_namespace(name, objects)
+        ns = self.get_namespace(name, objects)
+        if self._ipy_shell:
             self._ipy_shell.reset()
-            self._ipy_shell.push(ns)
-            self.set_trait("active_namespace", name)
+            self._ipy_shell.push({k: v for k, v in ns.items() if k not in self._hidden})
+        self.set_trait("active_namespace", name)
+        return ns
 
     def reset_namespace(self, name: str, *, activate=True, objects: dict | None = None):
         "Reset the namespace to default. If activate is False it won't be created."

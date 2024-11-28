@@ -41,6 +41,7 @@ class CodeEditor(DOMWidget, Ipylab):
     mime_type = Unicode("text/plain", help="syntax style").tag(sync=True)
     key_bindings = Dict().tag(sync=True)
     namespace_name = Unicode("").tag(sync=True)
+    _cr_name: str | None = None
 
     @default("key_bindings")
     def _default_key_bindings(self):
@@ -64,7 +65,9 @@ class CodeEditor(DOMWidget, Ipylab):
 
     async def _complete_request(self, code: str, cursor_pos: int):
         """Handle a completion request."""
-        ipylab.app.activate_namespace(self.namespace_name)
+        if self._cr_name != self.namespace_name:
+            ipylab.app.activate_namespace(self.namespace_name)
+            self._cr_name = self.namespace_name
         matches = self.comm.kernel.do_complete(code, cursor_pos)  # type: ignore
         if inspect.isawaitable(matches):
             matches = await matches

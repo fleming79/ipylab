@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pluggy
 
@@ -45,8 +45,8 @@ async def autostart(app: ipylab.App) -> None | Awaitable[None]:
     """
 
 
-@hookspec(firstresult=True)
-def namespace_objects(objects: dict, namespace_name: str, app: ipylab.App) -> None:
+@hookspec
+def default_namespace_objects(namespace_name: str, app: ipylab.App) -> dict[str, Any]:  # type: ignore
     """
     Called when loading a namespace.
 

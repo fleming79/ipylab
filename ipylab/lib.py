@@ -5,12 +5,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import ipywidgets
+
+import ipylab
 from ipylab.common import IpylabKwgs, hookimpl
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable
 
-    import ipylab
     from ipylab import App
     from ipylab.ipylab import Ipylab
     from ipylab.log import IpylabLogHandler
@@ -61,3 +63,8 @@ def get_log_viewer(app: App, handler: IpylabLogHandler):  # type: ignore
 @hookimpl
 def default_editor_key_bindings(app: ipylab.App, obj: ipylab.CodeEditor):  # noqa: ARG001
     return {"invoke_completer": ["Ctrl Space"], "evaluate": ["Shift Enter"]}
+
+
+@hookimpl
+def default_namespace_objects(namespace_name: str, app: ipylab.App):
+    return {"ipylab": ipylab, "ipw": ipywidgets, "app": app, "namespace_name": namespace_name}

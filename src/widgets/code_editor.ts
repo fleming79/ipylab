@@ -150,15 +150,12 @@ export class CodeEditorView extends DOMWidgetView {
   remove() {
     this.model.off('change:mimeType', this.updateCompleter, this);
     this.model.off('change:completer_invoke_keys', this.updateCompleter, this);
-    this?._disposeCompleter();
+    this.disposeCompleter();
     super.remove();
   }
   private updateCompleter() {
-    if (
-      ['text/x-python', 'text/x-ipython'].includes(
-        this.model.editorModel.mimeType
-      )
-    ) {
+    if (!this.model.editorModel.mimeType.toLowerCase().includes('python')) {
+      this.disposeCompleter();
       return;
     }
     this._updateCompleter();
@@ -211,11 +208,20 @@ export class CodeEditorView extends DOMWidgetView {
       this._disposeCompleter = () => {
         model.dispose();
         completer.dispose();
+        this.handler?.dispose();
+        delete this.handler;
         this.cmdInvoke?.dispose();
         this.kbInvoke?.dispose();
       };
     }
     this._updateCommands();
+  }
+
+  disposeCompleter() {
+    if (this._disposeCompleter) {
+      this._disposeCompleter();
+      delete this._disposeCompleter;
+    }
   }
 
   _updateCommands() {
