@@ -110,7 +110,7 @@ class BuiltinMenu(RankedMenu):
         return ipylab.app.commands.execute(f"{name}:open")
 
 
-class MenuConnection(RankedMenu, InfoConnection):
+class MenuConnection(InfoConnection, RankedMenu):
     """A connection to a custom menu"""
 
     commands = Instance(CommandRegistry)

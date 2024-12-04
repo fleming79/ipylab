@@ -65,17 +65,28 @@ class Dialog(Ipylab):
         title: str = "",
         body: str | Widget = "",
         options: dict | None = None,
+        *,
+        has_close=True,
         **kwgs: Unpack[IpylabKwgs],
     ) -> Task[dict[str, Any]]:
         """Jupyter dialog to get user response with custom buttons and checkbox.
 
-            returns {'value':any, 'isChecked':bool|None}
+        returns {'value':any, 'isChecked':bool|None}
 
-            'value' is the button 'accept' value of the selected button.
+        'value' is the button 'accept' value of the selected button.
 
-            title: 'Dialog title', // Can be text or a react element
-            body: 'Dialog body', // Can be text, a widget or a react element
-            specify kwgs passed as below.
+        title: str
+            The dialog title.  // Can be text or a react element
+
+        body: str | Widget
+            Text to show in the body or a widget. 'Dialog body', // Can be text, a widget or a react element
+
+        has_close: bool [True]
+            By default (True), clicking outside the dialog will close it.
+            When `False`, the user must specifically cancel or accept a result.
+
+        options:
+            specify options can be passed as below.
             buttons: [ // List of buttons
             buttons=[
             {
@@ -111,15 +122,14 @@ class Dialog(Ipylab):
             },
             defaultButton: 0, // Index of the default button
             focusNodeSelector: '.my-input', // Selector for focussing an input element when dialog opens
-            hasClose: false, // Whether to display a close button or not
             renderer: undefined // To define customized dialog structure
 
-            see: https://jupyterlab.readthedocs.io/en/stable/api/functions/apputils.showDialog.html
-            source: https://jupyterlab.readthedocs.io/en/stable/extension/ui_helpers.html#generic-dialog
+        see: https://jupyterlab.readthedocs.io/en/stable/api/functions/apputils.showDialog.html
+        source: https://jupyterlab.readthedocs.io/en/stable/extension/ui_helpers.html#generic-dialog
         """
         if isinstance(body, Widget) and "toLuminoWidget" not in kwgs:
             kwgs["toLuminoWidget"] = ["body"]
-        return self.operation("showDialog", _combine(options, title=title, body=body), **kwgs)
+        return self.operation("showDialog", _combine(options, title=title, body=body, hasClose=has_close), **kwgs)
 
     def show_error_message(
         self, title: str, error: str, options: dict | None = None, **kwgs: Unpack[IpylabKwgs]

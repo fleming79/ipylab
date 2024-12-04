@@ -17,14 +17,17 @@ mime_types = (
     "text/x-python",
     "text/x-ipython",
     "text/x-markdown",
-    "application/json",
     "text/html",
     "text/css",
+    "text/csv",
+    "text/yaml",
+    "text/json",
+    "application/json",
 )
 
 
 @register
-class CodeEditor(DOMWidget, Ipylab):
+class CodeEditor(Ipylab, DOMWidget):
     """A Widget for code editing.
 
     Code completion is provided for Python code for the specified namespace.

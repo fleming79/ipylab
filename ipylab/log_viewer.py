@@ -99,8 +99,9 @@ class LogViewer(Panel):
 
     def _add_record(self, record: logging.LogRecord):
         self._records.append(record)
-        self.output.push(record.output)  # type: ignore
-        if record.levelno >= LogLevel.ERROR:
+        if self.output._ready:  # noqa: SLF001
+            self.output.push(record.output)  # type: ignore
+        if record.levelno >= LogLevel.ERROR and ipylab.app._ready:  # noqa: SLF001
             self._notify_exception(record)
 
     def _notify_exception(self, record: logging.LogRecord):

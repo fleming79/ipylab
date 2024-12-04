@@ -36,11 +36,18 @@ if TYPE_CHECKING:
 
 
 class LastUpdatedDict(OrderedDict):
-    "Store items in the order the keys were last added"
+    """Store items in the order the keys were last added.
+
+    mode: Literal["first", "last"]
+        The end to shift the last added key."""
 
     # ref: https://docs.python.org/3/library/collections.html#ordereddict-examples-and-recipes
     _updating = False
     _last = True
+
+    def __init__(self, *args, mode: Literal["first", "last"] = "last", **kwargs):
+        self._last = mode == "last"
+        super().__init__(*args, **kwargs)
 
     def __setitem__(self, key, value):
         super().__setitem__(key, value)
@@ -54,10 +61,6 @@ class LastUpdatedDict(OrderedDict):
             super().update(m, **kwargs)
         finally:
             self._updating = False
-
-    def set_end(self, mode: Literal["first", "last"] = "last"):
-        "The end to move the last updated key."
-        self._last = mode == "last"
 
 
 @register

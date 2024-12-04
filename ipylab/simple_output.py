@@ -6,14 +6,15 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ipywidgets import DOMWidget, Widget, register
-from traitlets import Bool, Enum, Int, Unicode
+from traitlets import Bool, Callable, Enum, Int, Unicode, default
 
-import ipylab
 from ipylab.ipylab import Ipylab
 
 if TYPE_CHECKING:
     from asyncio import Task
     from typing import Unpack
+
+    from IPython.display import TextDisplayObject
 
     from ipylab.common import IpylabKwgs
 from typing import TYPE_CHECKING
@@ -29,7 +30,7 @@ if TYPE_CHECKING:
 
 
 @register
-class SimpleOutput(DOMWidget, Ipylab):
+class SimpleOutput(Ipylab, DOMWidget):
     """An output with no prompts designed to accept frequent additions.
 
     The interface differs from Ipywidgets.Output widget in almost every way.
@@ -42,30 +43,38 @@ class SimpleOutput(DOMWidget, Ipylab):
     max_outputs = Int(100, help="The maximum number of individual widgets.").tag(sync=True)
     max_continuous_streams = Int(100, help="Max streams to put in same output.").tag(sync=True)
     length = Int(read_only=True, help="The current length of the output area").tag(sync=True)
+    formatter = Callable(allow_none=True, default_value=None)
 
-    invalid_data_mode = Enum(["raise", "skip"], "raise", help="What to do with invalid output")
+    @default("formatter")
+    def get_display_formatter(self):
+        try:
+            return self.comm.kernel.shell.display_formatter.format  # type: ignore
+        except AttributeError:
+            return None
 
-    def _pack_outputs(self, outputs: tuple[dict[str, str] | Widget | str, ...]):
+    def _pack_outputs(self, outputs: tuple[dict[str, str] | Widget | str | TextDisplayObject, ...]):
         outputs_ = []
+        fmt = self.formatter
         for output in outputs:
             if hasattr(output, "_repr_mimebundle_"):
-                if not callable(output._repr_mimebundle_):  # type: ignore
-                    if self.invalid_data_mode == "raise":
-                        msg = f"Invalid data {output}"
-                        raise TypeError(msg)
-                    continue
-                outputs_.append(output._repr_mimebundle_())  # type: ignore
+                if callable(output._repr_mimebundle_):  # type: ignore
+                    outputs_.append(output._repr_mimebundle_())  # type: ignore
+                else:
+                    self.log.warning("Unable to pack {output}", output=output)
+                continue
             if isinstance(output, str):
                 outputs_.append({"output_type": "stream", "name": "stdout", "text": output})
             elif isinstance(output, dict):
                 outputs_.append(output)
-            else:
-                data, metadata = ipylab.app._ipy_shell.display_formatter.format(output)  # type: ignore  # noqa: SLF001
+            elif fmt:
+                data, metadata = fmt(output)
                 outputs_.append({"output_type": "display_data", "data": data, "metadata": metadata})
+            else:
+                self.log.warning("Unable to pack {output}", output=output)
 
         return outputs_
 
-    def push(self, *outputs: dict[str, str] | Widget | str):
+    def push(self, *outputs: dict[str, str] | Widget | str | TextDisplayObject):
         """Add one or more items to the output.
         Consecutive `streams` of the same type are placed in the same 'output'.
         Outputs passed as dicts are assumed to be correctly packed as `repr_mime` data.
@@ -79,13 +88,13 @@ class SimpleOutput(DOMWidget, Ipylab):
             True: Will delay clearing until next output is added."""
         self.send({"clear": wait})
 
-    def set(self, *outputs: dict[str, str] | Widget | str, **kwgs: Unpack[IpylabKwgs]) -> Task[int]:
+    def set(self, *outputs: dict[str, str] | Widget | str | TextDisplayObject, **kwgs: Unpack[IpylabKwgs]) -> Task[int]:
         """Set the output explicitly by first clearing and then adding the outputs."""
         return self.operation("setOutputs", {"outputs": self._pack_outputs(outputs)}, **kwgs)
 
 
 @register
-class AutoScroll(DOMWidget, WidgetBase):
+class AutoScroll(WidgetBase, DOMWidget):
     """An automatic scrolling container.
 
     The content can be changed and the scrolling enabled and disabled on the fly.

@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 
 @register
-class Icon(DOMWidget, WidgetBase):
+class Icon(WidgetBase, DOMWidget):
     _model_name = Unicode("IconModel").tag(sync=True)
     _view_name = Unicode("IconView").tag(sync=True)
 
