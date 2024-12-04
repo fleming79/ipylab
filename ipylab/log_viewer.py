@@ -7,7 +7,7 @@ import collections
 from typing import TYPE_CHECKING
 
 from ipywidgets import HTML, BoundedIntText, Button, Checkbox, Combobox, Dropdown, HBox, Output, Select, VBox
-from traitlets import directional_link, link
+from traitlets import directional_link, link, observe
 
 import ipylab
 from ipylab.common import SVGSTR_TEST_TUBE, Area, InsertMode
@@ -97,9 +97,17 @@ class LogViewer(Panel):
     def close(self):
         "Cannot close"
 
+    @observe("connections")
+    def _observe_connections(self, _):
+        if self.connections:
+            self.output.clear()
+            self.output.push(*(rec.output for rec in self._records))
+        else:
+            self.output.clear()
+
     def _add_record(self, record: logging.LogRecord):
         self._records.append(record)
-        if self.output._ready:  # noqa: SLF001
+        if self.connections:
             self.output.push(record.output)  # type: ignore
         if record.levelno >= LogLevel.ERROR and ipylab.app._ready:  # noqa: SLF001
             self._notify_exception(record)

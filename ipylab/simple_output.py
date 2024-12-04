@@ -40,13 +40,13 @@ class SimpleOutput(Ipylab, DOMWidget):
 
     _model_name = Unicode("SimpleOutputModel").tag(sync=True)
     _view_name = Unicode("SimpleOutputView").tag(sync=True)
-    max_outputs = Int(100, help="The maximum number of individual widgets.").tag(sync=True)
-    max_continuous_streams = Int(100, help="Max streams to put in same output.").tag(sync=True)
+    max_outputs = Int(100, help="The maximum number of individual widgets").tag(sync=True)
+    max_continuous_streams = Int(100, help="Max streams to put in same output").tag(sync=True)
     length = Int(read_only=True, help="The current length of the output area").tag(sync=True)
-    formatter = Callable(allow_none=True, default_value=None)
+    format = Callable(allow_none=True, default_value=None)
 
-    @default("formatter")
-    def get_display_formatter(self):
+    @default("format")
+    def _default_format(self):
         try:
             return self.comm.kernel.shell.display_formatter.format  # type: ignore
         except AttributeError:
@@ -54,29 +54,25 @@ class SimpleOutput(Ipylab, DOMWidget):
 
     def _pack_outputs(self, outputs: tuple[dict[str, str] | Widget | str | TextDisplayObject, ...]):
         outputs_ = []
-        fmt = self.formatter
+        fmt = self.format
         for output in outputs:
-            if hasattr(output, "_repr_mimebundle_"):
-                if callable(output._repr_mimebundle_):  # type: ignore
-                    outputs_.append(output._repr_mimebundle_())  # type: ignore
-                else:
-                    self.log.warning("Unable to pack {output}", output=output)
-                continue
-            if isinstance(output, str):
-                outputs_.append({"output_type": "stream", "name": "stdout", "text": output})
-            elif isinstance(output, dict):
-                outputs_.append(output)
+            if isinstance(output, dict):
+                output_ = output
+            elif isinstance(output, str):
+                output_ = {"output_type": "stream", "name": "stdout", "text": output}
+            elif hasattr(output, "_repr_mimebundle_") and callable(output._repr_mimebundle_):  # type: ignore
+                output_ = output._repr_mimebundle_()  # type: ignore
             elif fmt:
                 data, metadata = fmt(output)
-                outputs_.append({"output_type": "display_data", "data": data, "metadata": metadata})
+                output_ = {"output_type": "display_data", "data": data, "metadata": metadata}
             else:
-                self.log.warning("Unable to pack {output}", output=output)
-
+                output_ = {"output_type": "display_data", "data": repr(output)}
+            outputs_.append(output_)
         return outputs_
 
     def push(self, *outputs: dict[str, str] | Widget | str | TextDisplayObject):
         """Add one or more items to the output.
-        Consecutive `streams` of the same type are placed in the same 'output'.
+        Consecutive `streams` of the same type are placed in the same 'output' up to `max_outputs`.
         Outputs passed as dicts are assumed to be correctly packed as `repr_mime` data.
         """
         if outputs_ := self._pack_outputs(outputs):
