@@ -134,7 +134,9 @@ export class CodeEditorView extends DOMWidgetView {
     this.luminoWidget.id = this.luminoWidget.id || UUID.uuid4();
     this.model.on('change:mimeType', this.updateCompleter, this);
     this.model.on('change:completer_invoke_keys', this.updateCompleter, this);
+    this.model.on('change:editor_options', this.updateEditorOptions, this);
     this.updateCompleter();
+    this.updateEditorOptions();
     return this.luminoWidget.node;
   }
 
@@ -150,6 +152,7 @@ export class CodeEditorView extends DOMWidgetView {
   remove() {
     this.model.off('change:mimeType', this.updateCompleter, this);
     this.model.off('change:completer_invoke_keys', this.updateCompleter, this);
+    this.model.off('change:editor_options', this.updateEditorOptions, this);
     this.disposeCompleter();
     super.remove();
   }
@@ -270,6 +273,11 @@ export class CodeEditorView extends DOMWidgetView {
       keys: keyBindings['evaluate'],
       command: cmdEvaluate
     });
+  }
+
+  updateEditorOptions() {
+    const options = this.model.get('editor_options');
+    this.luminoWidget.editor.setOptions(options);
   }
 
   model: CodeEditorModel;

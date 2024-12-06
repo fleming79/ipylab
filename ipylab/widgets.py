@@ -12,13 +12,12 @@ from traitlets import Container, Dict, Instance, Unicode, observe
 
 import ipylab
 import ipylab._frontend as _fe
-from ipylab.common import Area, InsertMode, IpylabKwgs
+from ipylab.common import Area, InsertMode
 from ipylab.connection import ShellConnection
 from ipylab.ipylab import WidgetBase
 
 if TYPE_CHECKING:
     from asyncio import Task
-    from typing import Unpack
 
 
 @register
@@ -55,7 +54,6 @@ class Panel(Box):
     title: Instance[Title] = InstanceDict(Title, ()).tag(sync=True, **widget_serialization)
 
     connections: Container[tuple[ShellConnection, ...]] = TypedTuple(trait=Instance(ShellConnection))
-    console = Instance(ShellConnection, allow_none=True, read_only=True)
 
     def add_to_shell(
         self,
@@ -78,28 +76,6 @@ class Panel(Box):
             ref=ref,
             options=options,
             **kwgs,
-        )
-
-    def open_console(
-        self,
-        *,
-        insertMode=InsertMode.split_bottom,
-        namespace_name="",
-        activate=True,
-        **kwargs: Unpack[IpylabKwgs],
-    ) -> Task[ShellConnection]:
-        """Open a console and activate the namespace.
-        namespace_name: str
-            An alternate namespace to activate.
-        """
-        hooks = kwargs.pop("hooks", None) or {}
-        hooks["trait_add_rev"] = [*hooks.pop("trait_add_rev", ()), (self, "console")]
-        kwargs["hooks"] = hooks
-        return ipylab.app.open_console(
-            activate=activate,
-            namespace_name=namespace_name,
-            insertMode=InsertMode(insertMode),
-            **kwargs,
         )
 
 

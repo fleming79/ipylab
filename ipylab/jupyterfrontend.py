@@ -8,16 +8,16 @@ import inspect
 from collections import OrderedDict
 from typing import TYPE_CHECKING, Any, Literal, Unpack
 
-from IPython.core.getipython import get_ipython
+from IPython.core import completer as IPC  # noqa: N812
 from ipywidgets import Widget, register
 from traitlets import Bool, Container, Dict, Instance, Unicode, UseEnum, default, observe
 
 import ipylab
 import ipylab.hookspecs
-from ipylab import Ipylab, ShellConnection, Transform, log
+from ipylab import Ipylab, log
 from ipylab._compat.typing import override
 from ipylab.commands import APP_COMMANDS_NAME, CommandPalette, CommandRegistry
-from ipylab.common import InsertMode, IpylabKwgs, Obj, to_selector
+from ipylab.common import IpylabKwgs, Obj, to_selector
 from ipylab.dialog import Dialog
 from ipylab.ipylab import IpylabBase, Readonly
 from ipylab.launcher import Launcher
@@ -29,7 +29,6 @@ from ipylab.shell import Shell
 from ipylab.widgets import Panel
 
 if TYPE_CHECKING:
-    from asyncio import Task
     from typing import ClassVar
 
     from ipylab.log_viewer import LogViewer
@@ -68,6 +67,17 @@ class App(Ipylab):
     "A connection to the 'app' in the frontend. A singleton (per kernel) not to be subclassed."
 
     SINGLE = True
+    DISABLE_MATCHERS = (
+        "IPCompleter.latex_name_matcher",
+        "IPCompleter.unicode_name_matcher",
+        "back_latex_name_matcher",
+        "back_unicode_name_matcher",
+        "IPCompleter.fwd_unicode_matcher",
+        "IPCompleter.magic_config_matcher",
+        "IPCompleter.magic_color_matcher",
+        "IPCompleter.magic_matcher",
+        "IPCompleter.file_matcher",
+    )
 
     _model_name = Unicode("JupyterFrontEndModel").tag(sync=True)
     ipylab_base = IpylabBase(Obj.IpylabModel, "app").tag(sync=True)
@@ -85,16 +95,13 @@ class App(Ipylab):
     context_menu = Readonly(ContextMenu, sub_attrs=["commands"], commands=lambda app: app.commands)
     sessions = Readonly(SessionManager)
 
-    console = Instance(ShellConnection, allow_none=True, read_only=True)
     logging_handler = Instance(IpylabLogHandler, read_only=True)
     log_viewer: Instance[LogViewer] = Instance(Panel, read_only=True)  # type: ignore
     log_level = UseEnum(LogLevel, LogLevel.ERROR)
 
-    active_namespace = Unicode("", read_only=True, help="name of the current namespace")
-
     namespaces: Container[dict[str, LastUpdatedDict]] = Dict(read_only=True)  # type: ignore
+    _completers: Container[dict[str, IPC.IPCompleter]] = Dict(read_only=True)  # type: ignore
 
-    _ipy_shell = get_ipython()
     _hidden: ClassVar = {"_ih", "_oh", "_dh", "In", "Out", "get_ipython", "exit", "quit", "open"}
 
     @classmethod
@@ -193,57 +200,65 @@ class App(Ipylab):
                     result = await result
             glbls[name] = result
         buffers = glbls.pop("buffers", [])
-        if namespace_name == self.active_namespace:
-            self.activate_namespace(namespace_name)
         return {"payload": glbls.get("payload"), "buffers": buffers}
 
-    def _context_open_console(
-        self,
-        ref: ShellConnection | None = None,
-        current_widget: ShellConnection | None = None,
-        namespace_name="",
-    ):
-        "This command is provided for the 'autostart' context menu."
-        return self.open_console(objects={"ref": ref, "current_widget": current_widget}, namespace_name=namespace_name)
+    def _get_completer(self, namespace_name: str):
+        completer = self._completers.get(namespace_name)
+        if not completer:
+            # self._completers[namespace_name] = completer = IPC.IPCompleter(shell=self.comm.kernel.shell, namespace={})
+            self._completers[namespace_name] = completer = IPC.IPCompleter(namespace={})
+            completer.set_trait("disable_matchers", self.DISABLE_MATCHERS)
+        completer.namespace = self.get_namespace(namespace_name)
+        return completer
 
-    def open_console(
-        self,
-        *,
-        insertMode=InsertMode.split_bottom,
-        namespace_name="",
-        activate=True,
-        objects: dict | None = None,
-        **kwargs: Unpack[IpylabKwgs],
-    ) -> Task[ShellConnection]:
-        """Open a console and activate the namespace.
-        namespace_name: str
-            An alternate namespace to load into the console.
-        """
+    def _get_completions(self, namespace_name: str, code: str, cursor_pos: int):
+        # Borrowed from `IPC._rectify_completions`
+        completer = self._get_completer(namespace_name)
+        with IPC.provisionalcompleter():
+            completions = list(completer.completions(code, cursor_pos))
+            if not completions:
+                return
+            new_start = min(c.start for c in completions)
+            new_end = max(c.end for c in completions)
+            for c in completions:
+                yield IPC.Completion(
+                    new_start,
+                    new_end,
+                    code[new_start : c.start] + c.text + code[c.end : new_end],
+                    type=c.type,
+                    _origin=c._origin,  # noqa: SLF001
+                    signature=c.signature,
+                )
 
-        async def _open_console():
-            args = {
-                "path": self.vpath,
-                "insertMode": insertMode,
-                "activate": activate,
-                "namespace_name": namespace_name,
+    def _do_complete(self, namespace_name: str, code: str, cursor_pos: int | None):
+        """Completions provided by IPython completer, using Jedi."""
+        # Borrowed from Shell._get_completions_experimental
+        completions = list(self._get_completions(namespace_name, code, len(code) if cursor_pos is None else cursor_pos))
+        comps = [
+            {
+                "start": comp.start,
+                "end": comp.end,
+                "text": comp.text,
+                "type": comp.type,
+                "signature": comp.signature,
             }
-            kwargs["transform"] = {"transform": Transform.connection}
-
-            # plugins
-            plugin_results = ipylab.plugin_manager.hook.opening_console(
-                app=self, args=args, objects=objects, kwgs=kwargs
-            )
-            for result in plugin_results:
-                self.ensure_run(result)
-            namespace_name_ = args.pop("namespace_name", "")
-            conn: ShellConnection = await self.commands.execute("console:open", args, **kwargs)
-            conn.add_as_trait(self, "console")
-            if objects and (ref := objects.get("ref")) and isinstance(ref.widget, ipylab.Panel):
-                conn.add_as_trait(ref.widget, "console")
-            self.activate_namespace(namespace_name_, objects=objects)
-            return conn
-
-        return self.to_task(_open_console(), "Open console")
+            for comp in completions
+        ]
+        if completions:
+            s = completions[0].start
+            e = completions[0].end
+            matches = [c.text for c in completions]
+        else:
+            s = cursor_pos
+            e = cursor_pos
+            matches = []
+        return {
+            "matches": matches,
+            "cursor_end": e,
+            "cursor_start": s,
+            "metadata": {"_jupyter_types_experimental": comps},
+            "status": "ok",
+        }
 
     def shutdown_kernel(self, vpath: str | None = None):
         "Shutdown the kernel"
@@ -252,6 +267,17 @@ class App(Ipylab):
     def start_iyplab_python_kernel(self, *, restart=False):
         "Start the 'ipylab' Python kernel."
         return self.operation("startIyplabKernel", {"restart": restart})
+
+    def get_namespace(self, name="", objects: dict | None = None):
+        "Get the 'globals' namespace stored for name."
+        if name not in self.namespaces:
+            self.namespaces[name] = LastUpdatedDict()
+        ns = self.namespaces[name]
+        for objs in ipylab.plugin_manager.hook.default_namespace_objects(namespace_name=name, app=self):
+            ns.update(objs)
+        if objects:
+            ns.update(objects)
+        return ns
 
     def evaluate(
         self,
@@ -293,39 +319,11 @@ class App(Ipylab):
         kwgs = {"evaluate": evaluate, "vpath": vpath, "namespace_name": namespace_name}
         return self.operation("evaluate", kwgs, **kwargs)
 
-    def get_namespace(self, name="", objects: dict | None = None):
-        "Get the 'globals' namespace stored for name."
-        sh = self._ipy_shell
-        if sh and "" not in self.namespaces:
-            self._init_namespace(name, sh.user_ns)
-        if name not in self.namespaces:
-            self._init_namespace(name, {})
-        ns = self.namespaces[name]
-        for objs in ipylab.plugin_manager.hook.default_namespace_objects(namespace_name=name, app=self):
-            ns.update(objs)
-        if objects:
-            ns.update(objects)
-        if sh and name == self.activate_namespace:
-            ns.update(sh.user_ns)
-        return ns
-
-    def _init_namespace(self, name: str, objs: dict):
-        self.namespaces[name] = LastUpdatedDict(objs)
-
-    def activate_namespace(self, name="", objects: dict | None = None):
-        "Sets the ipython/console namespace."
-        ns = self.get_namespace(name, objects)
-        if self._ipy_shell:
-            self._ipy_shell.reset()
-            self._ipy_shell.push({k: v for k, v in ns.items() if k not in self._hidden})
-        self.set_trait("active_namespace", name)
-        return ns
-
-    def reset_namespace(self, name: str, *, activate=True, objects: dict | None = None):
-        "Reset the namespace to default. If activate is False it won't be created."
-        self.namespaces.pop(name, None)
-        if activate:
-            self.activate_namespace(name, objects)
+    def push_namespace_to_shell(self, ns: dict, *, reset=False):
+        "Load objects into the IPython/console namespace."
+        if reset:
+            self.comm.kernel.shell.ipy_shell.reset()
+        self.comm.kernel.shell.push(ns)
 
 
 JupyterFrontEnd = App

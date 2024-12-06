@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import ipywidgets
 
 import ipylab
-from ipylab.common import IpylabKwgs, hookimpl
+from ipylab.common import InsertMode, hookimpl
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable
@@ -32,15 +32,32 @@ def launch_jupyterlab():
 @hookimpl
 async def autostart(app: ipylab.App) -> None | Awaitable[None]:
     # Register some default context menu items for Ipylab
-    cmd = await app.commands.add_command("Open console", app._context_open_console)  # noqa: SLF001
+
+    def open_console(ref: ipylab.ShellConnection | None, current_widget: ipylab.ShellConnection | None, args: dict):
+        app.ensure_run(
+            ipylab.plugin_manager.hook.open_console(app=app, ref=ref, current_widget=current_widget, args=args)
+        )
+
+    cmd = await app.commands.add_command("Open console", open_console)
     await app.context_menu.add_item(command=cmd, rank=70)
     cmd = await app.commands.add_command("Show log viewer", lambda: app.log_viewer.add_to_shell())
     await app.context_menu.add_item(command=cmd, rank=71)
 
 
 @hookimpl
-def opening_console(app: App, args: dict, objects: dict, kwgs: IpylabKwgs):
-    "no-op"
+def open_console(
+    app: ipylab.App, ref: ipylab.ShellConnection | None, current_widget: ipylab.ShellConnection | None, args: dict
+):
+    args = {"path": app.vpath, "insertMode": InsertMode.split_bottom, "activate": True} | (args or {})
+
+    async def _open_console():
+        conn: ipylab.ShellConnection = await app.commands.execute("console:open", args)
+        conn.add_to_tuple(app.shell, "connections")
+        if ref:
+            app.push_namespace_to_shell({"ref": ref, "current_widget": current_widget})
+        return conn
+
+    return _open_console()
 
 
 @hookimpl
@@ -62,7 +79,7 @@ def get_log_viewer(app: App, handler: IpylabLogHandler):  # type: ignore
 
 @hookimpl
 def default_editor_key_bindings(app: ipylab.App, obj: ipylab.CodeEditor):  # noqa: ARG001
-    return {"invoke_completer": ["Ctrl Space"], "evaluate": ["Shift Enter"]}
+    return {"invoke_completer": ["Tab"], "evaluate": ["Shift Enter"]}
 
 
 @hookimpl

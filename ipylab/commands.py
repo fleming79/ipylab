@@ -224,7 +224,7 @@ class CommandRegistry(Ipylab):
             msg = f'Invalid command "{payload["id"]} {conn=}"'
             raise TypeError(msg)
         cmd = conn.python_command
-        args = conn.args | (payload.get("args") or {}) | {"buffers": buffers}
+        args = conn.args | (payload.get("args") or {})
 
         # Shell connections
         cids = {"current_widget": payload["cid1"], "ref": payload["cid2"]}
@@ -245,6 +245,10 @@ class CommandRegistry(Ipylab):
             elif p.kind is p.VAR_KEYWORD:
                 kwgs = args
                 break
+            elif n == "args":
+                kwgs[n] = args
+            elif n == "buffers":
+                kwgs[n] = buffers
             elif p.default is p.empty:
                 msg = f"Required parameter '{n}' missing for {cmd} of {conn}"
                 raise NameError(msg)

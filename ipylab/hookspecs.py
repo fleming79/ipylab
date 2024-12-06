@@ -13,7 +13,6 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable
 
     import ipylab
-    from ipylab.common import IpylabKwgs
     from ipylab.log import IpylabLogHandler
     from ipylab.log_viewer import LogViewer
 
@@ -53,32 +52,16 @@ def default_namespace_objects(namespace_name: str, app: ipylab.App) -> dict[str,
     You can use this to customise the objects available in the namespace."""
 
 
-@hookspec
-def opening_console(app: ipylab.App, args: dict, objects: dict, kwgs: IpylabKwgs) -> None | Awaitable[None]:
-    """
-    Called when the console is opening.
-
-    Alter the contents of the dicts as required to adjust the namespace of the console.
-
-    Returned awaitables will be awaited prior to proceeding.
-
-    Args
-    ----
-
-    app: ipylab.App
-
-    The Ipylab widget that owns the shell connection if there is one.
-
+@hookspec(firstresult=True)
+def open_console(
+    app: ipylab.App, ref: ipylab.ShellConnection | None, current_widget: ipylab.ShellConnection | None, args: dict
+):
+    """Called to open a console.
+    ref: ShellConnection
+        The widget in the shell.
     args: dict
         options used with `open_console`.
         keys: [activate, ref (as id), insertMode, type]
-
-    objects: dict
-        objects for loading into the namespace.
-        'ref:(as ShellConnection) is used as the ref for options. This must be a ShellConnection or None.
-
-    kwgs:IpylabKwgs
-        Added keys 'namesapace_name' the name of the name space to load.
     """
 
 

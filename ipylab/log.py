@@ -8,6 +8,7 @@ import weakref
 from enum import IntEnum, StrEnum
 from typing import TYPE_CHECKING, Any, ClassVar
 
+from IPython.core.ultratb import FormattedTB
 from ipywidgets import CallbackDispatcher
 
 import ipylab
@@ -15,7 +16,6 @@ from ipylab._compat.typing import override
 
 if TYPE_CHECKING:
     from asyncio import Task
-
 
 __all__ = ["LogLevel", "IpylabLogHandler"]
 
@@ -127,11 +127,14 @@ class IpylabLogHandler(logging.Handler):
 
 
 class IpylabLogFormatter(logging.Formatter):
+    itb = None
+
     def __init__(self, *, colors: dict[LogLevel, ANSIColors], reset=ANSIColors.reset, **kwargs) -> None:
         """Initialize the formatter with specified format strings."""
         self.colors = COLORS | colors
         self.reset = reset
         super().__init__(**kwargs)
+        self.tb_formatter = FormattedTB()
 
     def format(self, record: logging.LogRecord) -> str:
         level = LogLevel(record.levelno)
@@ -143,11 +146,7 @@ class IpylabLogFormatter(logging.Formatter):
         return super().format(record)
 
     def formatException(self, ei) -> str:  # noqa: N802
-        (etype, value, tb) = ei
-        sh = ipylab.app._ipy_shell  # noqa: SLF001
-        if not sh:
-            return super().formatException(ei)
-        itb = sh.InteractiveTB
-        itb.verbose if ipylab.app.logging_handler.level == LogLevel.DEBUG else itb.minimal  # noqa: B018
-        stb = itb.structured_traceback(etype, value, tb)  # type: ignore
-        return itb.stb2text(stb)
+        tbf = self.tb_formatter
+        tbf.verbose if ipylab.app.logging_handler.level == LogLevel.DEBUG else tbf.minimal  # noqa: B018
+        stb = tbf.structured_traceback(*ei)  # type: ignore
+        return tbf.stb2text(stb)
