@@ -129,7 +129,7 @@ class IpylabLogHandler(logging.Handler):
 class IpylabLogFormatter(logging.Formatter):
     itb = None
 
-    def __init__(self, *, colors: dict[LogLevel, ANSIColors], reset=ANSIColors.reset, **kwargs) -> None:
+    def __init__(self, *, colors: dict[LogLevel, ANSIColors] = COLORS, reset=ANSIColors.reset, **kwargs) -> None:
         """Initialize the formatter with specified format strings."""
         self.colors = COLORS | colors
         self.reset = reset
@@ -146,7 +146,8 @@ class IpylabLogFormatter(logging.Formatter):
         return super().format(record)
 
     def formatException(self, ei) -> str:  # noqa: N802
+        if not ei[0]:
+            return ""
         tbf = self.tb_formatter
         tbf.verbose if ipylab.app.logging_handler.level == LogLevel.DEBUG else tbf.minimal  # noqa: B018
-        stb = tbf.structured_traceback(*ei)  # type: ignore
-        return tbf.stb2text(stb)
+        return tbf.stb2text(tbf.structured_traceback(*ei))

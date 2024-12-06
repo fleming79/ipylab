@@ -11,6 +11,7 @@ from traitlets import directional_link, link, observe
 
 import ipylab
 from ipylab.common import SVGSTR_TEST_TUBE, Area, InsertMode
+from ipylab.ipylab import Readonly
 from ipylab.log import IpylabLogHandler, LogLevel
 from ipylab.simple_output import AutoScroll, SimpleOutput
 from ipylab.widgets import Icon, Panel
@@ -28,59 +29,57 @@ class LogViewer(Panel):
 
     _log_notify_task: None | Task = None
     _updating = False
+    info = Readonly(HTML, layout={"flex": "1 0 auto", "margin": "0px 20px 0px 20px"})
+    log_level = Readonly(
+        Dropdown,
+        description="Level",
+        options=[(v.name.capitalize(), v) for v in LogLevel],
+        layout={"width": "max-content"},
+    )
+    buffer_size = Readonly(BoundedIntText, description="Buffer size", min=1, max=1e6, layout={"width": "max-content"})
+    button_show_send_dialog = Readonly(
+        Button,
+        description="📪",
+        tooltip="Send the record to the console.\n"
+        "The record has the properties 'owner' and 'obj'attached "
+        "which may be of interest for debugging purposes.",
+        layout={"width": "auto"},
+    )
+    button_clear = Readonly(
+        Button,
+        description="⌧",
+        tooltip="Clear output",
+        layout={"width": "auto"},
+    )
+    autoscroll_enabled = Readonly(
+        Checkbox,
+        description="Scroll",
+        indent=False,
+        tooltip="Scroll to the most recent logs.",
+        layout={"width": "auto"},
+    )
+    box_controls = Readonly(
+        HBox,
+        layout={"justify_content": "space-between", "flex": "0 0 auto"},
+    )
+    output = Readonly(SimpleOutput)
+    autoscroll_widget = Readonly(AutoScroll)
 
     def __init__(self, app: App, handler: IpylabLogHandler, buffersize=100):
-        self.info = HTML(f"<b>Vpath: {app.vpath}</b>", layout={"flex": "1 0 auto", "margin": "0px 20px 0px 20px"})
-        options = [(v.name.capitalize(), v) for v in LogLevel]
-        self.log_level = Dropdown(
-            description="Level",
-            value=app.log_level,
-            options=options,
-            layout={"width": "max-content"},
-        )
-        self.buffer_size = BoundedIntText(
-            description="Buffer size",
-            value=buffersize,
-            min=1,
-            max=1e6,
-            layout={"width": "max-content"},
-        )
-        self.button_show_send_dialog = Button(
-            description="📪",
-            tooltip="Send the record to the console.\n"
-            "The record has the properties 'owner' and 'obj'attached "
-            "which may be of interest for debugging purposes.",
-            layout={"width": "auto"},
-        )
-        self.button_clear = Button(
-            description="⌧",
-            tooltip="Clear output",
-            layout={"width": "auto"},
-        )
-        self.autoscroll_enabled = Checkbox(
-            description="Scroll",
-            indent=False,
-            tooltip="Scroll to the most recent logs.",
-            layout={"width": "auto"},
-        )
-        self.box_controls = HBox(
-            children=[
-                self.info,
-                self.autoscroll_enabled,
-                self.log_level,
-                self.buffer_size,
-                self.button_clear,
-                self.button_show_send_dialog,
-            ],
-            layout={"justify_content": "space-between", "flex": "0 0 auto"},
-        )
-        self.output = SimpleOutput()
-        self.autoscroll_widget = AutoScroll(content=self.output)
-
+        self._records = collections.deque(maxlen=buffersize)
+        self.info.value = f"<b>Vpath: {app.vpath}</b>"
         self.title.label = f"Log: {app.vpath}"
         self.title.icon = Icon(name="ipylab-test_tube", svgstr=SVGSTR_TEST_TUBE)
-        self._records = collections.deque(maxlen=buffersize)
-
+        self.buffer_size.value = buffersize
+        self.box_controls.children = [
+            self.info,
+            self.autoscroll_enabled,
+            self.log_level,
+            self.buffer_size,
+            self.button_clear,
+            self.button_show_send_dialog,
+        ]
+        self.autoscroll_widget.content = self.output
         super().__init__(children=[self.box_controls, self.autoscroll_widget])
 
         self.buffer_size.observe(self._observe_buffer_size, "value")
@@ -170,9 +169,9 @@ class LogViewer(Panel):
         try:
             await ipylab.app.dialog.show_dialog("Send record to console", body=body)
             if select.value:
-                await ipylab.app.open_console(
-                    objects={"record": select.value}, namespace_name=ipylab.app.active_namespace
-                )
+                ipylab.app.commands.execute("Open console")
+                ipylab.app.add_objects_to_shell_namespace({"record": select.value})
+                await ipylab.plugin_manager.hook.open_console(objects={"record": select.value})
         except Exception:
             return
         finally:

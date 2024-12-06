@@ -54,7 +54,7 @@ def open_console(
         conn: ipylab.ShellConnection = await app.commands.execute("console:open", args)
         conn.add_to_tuple(app.shell, "connections")
         if ref:
-            app.push_namespace_to_shell({"ref": ref, "current_widget": current_widget})
+            app.add_objects_to_shell_namespace({"ref": ref, "current_widget": current_widget})
         return conn
 
     return _open_console()
@@ -83,5 +83,5 @@ def default_editor_key_bindings(app: ipylab.App, obj: ipylab.CodeEditor):  # noq
 
 
 @hookimpl
-def default_namespace_objects(namespace_name: str, app: ipylab.App):
-    return {"ipylab": ipylab, "ipw": ipywidgets, "app": app, "namespace_name": namespace_name}
+def default_namespace_objects(namespace_id: str, app: ipylab.App):
+    return {"ipylab": ipylab, "ipw": ipywidgets, "app": app, "namespace_id": namespace_id}

@@ -14,7 +14,7 @@ from traitlets import Bool, Container, Dict, Instance, Unicode, UseEnum, default
 
 import ipylab
 import ipylab.hookspecs
-from ipylab import Ipylab, log
+from ipylab import Ipylab
 from ipylab._compat.typing import override
 from ipylab.commands import APP_COMMANDS_NAME, CommandPalette, CommandRegistry
 from ipylab.common import IpylabKwgs, Obj, to_selector
@@ -116,7 +116,7 @@ class App(Ipylab):
     def _default_logging_handler(self):
         fmt = "{color}{level_symbol} {asctime}.{msecs:0<3.0f} {name} {owner_rep}:{reset} {message}\n"
         handler = IpylabLogHandler(self.log_level)
-        handler.setFormatter(IpylabLogFormatter(fmt=fmt, style="{", datefmt="%H:%M:%S", colors=log.COLORS))
+        handler.setFormatter(IpylabLogFormatter(fmt=fmt, style="{", datefmt="%H:%M:%S"))
         return handler
 
     @default("log_viewer")
@@ -179,8 +179,8 @@ class App(Ipylab):
          2. A direct call in the frontend at jfem.evaluate.
 
         """
-        namespace_name = options.get("namespace_name", "")
-        glbls = self.get_namespace(namespace_name, options | {"buffers": buffers})
+        namespace_id = options.get("namespace_id", "")
+        glbls = self.get_namespace(namespace_id, options | {"buffers": buffers})
         evaluate = options.get("evaluate", {})
         if isinstance(evaluate, str):
             evaluate = {"payload": evaluate}
@@ -202,18 +202,17 @@ class App(Ipylab):
         buffers = glbls.pop("buffers", [])
         return {"payload": glbls.get("payload"), "buffers": buffers}
 
-    def _get_completer(self, namespace_name: str):
-        completer = self._completers.get(namespace_name)
+    def _get_completer(self, namespace_id: str):
+        completer = self._completers.get(namespace_id)
         if not completer:
-            # self._completers[namespace_name] = completer = IPC.IPCompleter(shell=self.comm.kernel.shell, namespace={})
-            self._completers[namespace_name] = completer = IPC.IPCompleter(namespace={})
+            self._completers[namespace_id] = completer = IPC.IPCompleter(namespace={})
             completer.set_trait("disable_matchers", self.DISABLE_MATCHERS)
-        completer.namespace = self.get_namespace(namespace_name)
+        completer.namespace = self.get_namespace(namespace_id)
         return completer
 
-    def _get_completions(self, namespace_name: str, code: str, cursor_pos: int):
+    def _get_completions(self, namespace_id: str, code: str, cursor_pos: int):
         # Borrowed from `IPC._rectify_completions`
-        completer = self._get_completer(namespace_name)
+        completer = self._get_completer(namespace_id)
         with IPC.provisionalcompleter():
             completions = list(completer.completions(code, cursor_pos))
             if not completions:
@@ -230,10 +229,10 @@ class App(Ipylab):
                     signature=c.signature,
                 )
 
-    def _do_complete(self, namespace_name: str, code: str, cursor_pos: int | None):
+    def _do_complete(self, namespace_id: str, code: str, cursor_pos: int | None):
         """Completions provided by IPython completer, using Jedi."""
         # Borrowed from Shell._get_completions_experimental
-        completions = list(self._get_completions(namespace_name, code, len(code) if cursor_pos is None else cursor_pos))
+        completions = list(self._get_completions(namespace_id, code, len(code) if cursor_pos is None else cursor_pos))
         comps = [
             {
                 "start": comp.start,
@@ -273,7 +272,7 @@ class App(Ipylab):
         if name not in self.namespaces:
             self.namespaces[name] = LastUpdatedDict()
         ns = self.namespaces[name]
-        for objs in ipylab.plugin_manager.hook.default_namespace_objects(namespace_name=name, app=self):
+        for objs in ipylab.plugin_manager.hook.default_namespace_objects(namespace_id=name, app=self):
             ns.update(objs)
         if objects:
             ns.update(objects)
@@ -284,7 +283,7 @@ class App(Ipylab):
         evaluate: dict[str, str | inspect._SourceObjectType] | str,
         *,
         vpath="",
-        namespace_name="",
+        namespace_id="",
         **kwargs: Unpack[IpylabKwgs],
     ):
         """Evaluate code in a Python kernel.
@@ -316,14 +315,14 @@ class App(Ipylab):
             * ipywidgets
             * ipw (ipywidgets)
         """
-        kwgs = {"evaluate": evaluate, "vpath": vpath, "namespace_name": namespace_name}
+        kwgs = {"evaluate": evaluate, "vpath": vpath, "namespace_id": namespace_id}
         return self.operation("evaluate", kwgs, **kwargs)
 
-    def push_namespace_to_shell(self, ns: dict, *, reset=False):
+    def add_objects_to_shell_namespace(self, objects: dict, *, reset=False):
         "Load objects into the IPython/console namespace."
         if reset:
             self.comm.kernel.shell.ipy_shell.reset()
-        self.comm.kernel.shell.push(ns)
+        self.comm.kernel.shell.push(objects)
 
 
 JupyterFrontEnd = App

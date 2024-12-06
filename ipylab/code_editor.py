@@ -3,10 +3,11 @@
 
 from __future__ import annotations
 
+import inspect
 from typing import NotRequired, TypedDict
 
 from ipywidgets import DOMWidget, register
-from traitlets import Dict, Instance, Unicode, default
+from traitlets import Callable, Dict, Instance, Unicode, default
 
 import ipylab
 from ipylab._compat.typing import override
@@ -52,6 +53,8 @@ class CodeEditor(Ipylab, DOMWidget):
     The default namespace '' corresponds to the shell namespace.
 
     The completer is invoked with `Tab` by default. Use completer_invoke_keys to change.
+
+    `evaluate` and `do_complete` can be overloaded as required.
     """
 
     # TODO: connect code completion
@@ -63,32 +66,47 @@ class CodeEditor(Ipylab, DOMWidget):
     key_bindings = Dict().tag(sync=True)
     editor_options: Instance[CodeEditorOptions] = Dict().tag(sync=True)  # type: ignore
 
-    namespace_name = Unicode("")
-    _cr_name: str | None = None
+    namespace_id = Unicode("")
+    evaluate = Callable()
+    do_complete = Callable()
 
     @default("key_bindings")
     def _default_key_bindings(self):
         # default is {"invoke_completer": ["Tab"], "evaluate": ["Shift Enter"]}
         return ipylab.plugin_manager.hook.default_editor_key_bindings(app=ipylab.app, obj=self)
 
+    @default("evaluate")
+    def _default_evaluate(self):
+        return self.evaluate_code
+
+    @default("do_complete")
+    def _default_complete_request(self):
+        return self._do_complete
+
     @override
     async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list):
         match operation:
             case "requestComplete":
-                return await self._complete_request(**payload)
+                return await self.do_complete(payload["code"], payload["cursor_pos"])  # type: ignore
             case "evaluateCode":
-                payload["namespace_name"] = self.namespace_name
-                if not payload.get("evaluate"):
-                    # If there was no selection, we will evaluate all of the code
-                    payload["evaluate"] = self.value
-                await self.evaluate(payload)
+                await self.evaluate(payload["code"] or self.value, self.namespace_id)
                 return True
 
         return await super()._do_operation_for_frontend(operation, payload, buffers)
 
-    async def evaluate(self, payload: dict, buffers: list | None = None):
-        return await ipylab.app._evaluate(payload, buffers or [])  # noqa: SLF001
+    async def evaluate_code(self, code: str, namespace_id: str):
+        ns = ipylab.app.get_namespace(namespace_id)
+        wait = code.startswith("await")
+        try:
+            result = eval(code.removeprefix("await").strip(), ns)  # noqa: S307
+            if wait or inspect.iscoroutine(result):
+                result = await result
+        except SyntaxError:
+            exec(code, ns, ns)  # noqa: S102
+            return next(reversed(ns.values()))
+        else:
+            return result
 
-    async def _complete_request(self, code: str, cursor_pos: int):
+    async def _do_complete(self, code: str, cursor_pos: int):
         """Handle a completion request."""
-        return ipylab.app._do_complete(self.namespace_name, code, cursor_pos)  # noqa: SLF001
+        return ipylab.app._do_complete(self.namespace_id, code, cursor_pos)  # noqa: SLF001

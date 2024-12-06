@@ -61,7 +61,7 @@ class CommandConnection(InfoConnection):
 
     args = Dict()
     python_command = CallableTrait(allow_none=False)
-    namespace_name = Unicode("")
+    namespace_id = Unicode("")
 
     _config_options: ClassVar = tuple(CommandOptions.__annotations__)
     commands: Instance[CommandRegistry] = Instance("ipylab.commands.CommandRegistry")
@@ -229,7 +229,7 @@ class CommandRegistry(Ipylab):
         # Shell connections
         cids = {"current_widget": payload["cid1"], "ref": payload["cid2"]}
 
-        glbls = ipylab.app.get_namespace(conn.namespace_name)
+        glbls = ipylab.app.get_namespace(conn.namespace_id)
         kwgs = {}
         for n, p in inspect.signature(cmd).parameters.items():
             if n in ["current_widget", "ref"]:
@@ -268,7 +268,7 @@ class CommandRegistry(Ipylab):
         icon_class: str | None = None,
         icon: Icon | None = None,
         args: dict | None = None,
-        namespace_name="",
+        namespace_id="",
         hooks: TaskHookType = None,
         **kwgs,
     ) -> Task[CommandConnection]:
@@ -313,7 +313,7 @@ class CommandRegistry(Ipylab):
                 "add_to_tuple_fwd": [(self, "connections")],
                 "trait_add_fwd": [
                     ("commands", self),
-                    ("namespace_name", namespace_name),
+                    ("namespace_id", namespace_id),
                     ("python_command", execute),
                     ("args", args or {}),
                     ("info", kwgs_),

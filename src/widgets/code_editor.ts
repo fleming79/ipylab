@@ -261,11 +261,7 @@ export class CodeEditorView extends DOMWidgetView {
         const start = editor.getOffsetAt(selection.start);
         const end = editor.getOffsetAt(selection.end);
         const code = editor.model.sharedModel.getSource().substring(start, end);
-        await this.model.scheduleOperation(
-          'evaluateCode',
-          { evaluate: code },
-          'auto'
-        );
+        await this.model.scheduleOperation('evaluateCode', { code }, 'auto');
       }
     });
     this.kbEvaluate = Private.commands.addKeyBinding({

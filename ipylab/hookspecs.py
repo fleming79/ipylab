@@ -45,7 +45,7 @@ async def autostart(app: ipylab.App) -> None | Awaitable[None]:
 
 
 @hookspec
-def default_namespace_objects(namespace_name: str, app: ipylab.App) -> dict[str, Any]:  # type: ignore
+def default_namespace_objects(namespace_id: str, app: ipylab.App) -> dict[str, Any]:  # type: ignore
     """
     Called when loading a namespace.
 
