@@ -144,27 +144,25 @@ class CommandPalette(Ipylab):
 
         Special args
         ------------
+        * ref: ShellConnection | None
 
-        * current_widget: ShellConnection
-        * ref: ShellConnection
+        Include `ref` as an argument for function to have the argument provided
+        when the command is called via the command registry.
 
-        Include in the argument list of the function to have the value provided when the command
-        is called.
+        ref:
+            This is a ShellConnection to the current widget in the shell.
 
-        current_widget:
-            This is a ShellConnection to the Jupyterlab defined current widget.
-            For the command to appear in the context menu non-ipylab widgets, the appropriate selector
-            should be used. see: https://jupyterlab.readthedocs.io/en/stable/developer/css.html#commonly-used-css-selectors
+            For the command to appear in the context menu non-ipylab widgets,
+            the appropriate selector should be used.
+
+            see: https://jupyterlab.readthedocs.io/en/stable/developer/css.html#commonly-used-css-selectors
+
             Selectors:
                 * Notebook: '.jp-Notebook'
                 * Main area: '.jp-Activity'
 
-        ref:
-            This is a ShellConnection to the Ipylab current widget.
-            The associated widget/panel is then accessible by `ref.widget`.
-
-        Tip: This is can be used in context menus to perform actions specific to the current widget
-        in the shell.
+            If the ShellConnection relates to an Ipylab widget. The associated
+            widget/panel is accessible as `ref.widget`.
         """
         cid = CommandPalletItemConnection.to_cid(command, category)
         CommandRegistry._check_belongs_to_application_registry(cid)  # noqa: SLF001
@@ -226,22 +224,16 @@ class CommandRegistry(Ipylab):
         cmd = conn.python_command
         args = conn.args | (payload.get("args") or {})
 
-        # Shell connections
-        cids = {"current_widget": payload["cid1"], "ref": payload["cid2"]}
-
-        glbls = ipylab.app.get_namespace(conn.namespace_id)
+        ns = ipylab.app.get_namespace(conn.namespace_id)
         kwgs = {}
         for n, p in inspect.signature(cmd).parameters.items():
-            if n in ["current_widget", "ref"]:
-                if cid := cids.get(n, ""):
-                    kwgs[n] = ShellConnection(cid)
-                    await kwgs[n].ready()
-                else:
-                    kwgs[n] = None
+            if n == "ref":
+                cid = payload.get("cid")
+                kwgs[n] = ShellConnection(cid) if cid else None
             elif n in args:
                 kwgs[n] = args[n]
-            elif n in glbls:
-                kwgs[n] = glbls[n]
+            elif n in ns:
+                kwgs[n] = ns[n]
             elif p.kind is p.VAR_KEYWORD:
                 kwgs = args
                 break
@@ -252,9 +244,9 @@ class CommandRegistry(Ipylab):
             elif p.default is p.empty:
                 msg = f"Required parameter '{n}' missing for {cmd} of {conn}"
                 raise NameError(msg)
-        glbls["_to_eval"] = functools.partial(cmd, **kwgs)
-        result = eval("_to_eval()", glbls)  # noqa: S307
-        if inspect.isawaitable(result):
+        ns["_to_eval"] = functools.partial(cmd, **kwgs)
+        result = eval("_to_eval()", ns)  # noqa: S307
+        while inspect.isawaitable(result):
             result = await result
         return result
 
@@ -275,7 +267,9 @@ class CommandRegistry(Ipylab):
         """Add a python command that can be executed by Jupyterlab.
 
         The `id` in the command registry is the `cid` of the CommnadConnection.
+
         The `cid` is constructed from:
+
         1. registry name: The name of this command registry [Jupyterlab]
         2. vpath: The virtual 'path' of the app.
         3. name:

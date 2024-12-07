@@ -188,37 +188,36 @@ class App(Ipylab):
             `jfem.evaluate` in the frontend.
          2. A call in the frontend to `jfem.evaluate`.
         """
-        namespace_id = options.get("namespace_id", "")
-        evaluate = options.pop("evaluate")
+        evaluate = options["evaluate"]
         if isinstance(evaluate, str):
             evaluate = {"payload": evaluate}
-        glbls = self.get_namespace(namespace_id, buffers=buffers)
+        ns = self.get_namespace(options.get("namespace_id", ""), buffers=buffers)
         for name, expression in evaluate.items():
             try:
-                result = eval(expression, glbls)  # noqa: S307
+                result = eval(expression, ns)  # noqa: S307
             except SyntaxError:
-                exec(expression, glbls)  # noqa: S102
-                result = next(reversed(glbls.values()))  # Requires: LastUpdatedDict
+                exec(expression, ns)  # noqa: S102
+                result = next(reversed(ns.values()))  # Requires: LastUpdatedDict
             while callable(result) or inspect.isawaitable(result):
                 if callable(result):
                     kwgs = {}
                     for p in inspect.signature(result).parameters:
                         if p in options:
                             kwgs[p] = options[p]
-                        if p in glbls:
-                            kwgs[p] = glbls[p]
+                        if p in ns:
+                            kwgs[p] = ns[p]
                     # We use a partial so that we can evaluate with the same namespace.
-                    glbls["_partial_call"] = functools.partial(result, **kwgs)
-                    result = eval("_partial_call()", glbls)  # type: ignore # noqa: S307
-                    glbls.pop("_partial_call")
+                    ns["_partial_call"] = functools.partial(result, **kwgs)
+                    result = eval("_partial_call()", ns)  # type: ignore # noqa: S307
+                    ns.pop("_partial_call")
                 while inspect.isawaitable(result):
                     result = await result
-            glbls[name] = result
-        buffers = glbls.pop("buffers", [])
-        payload = glbls.pop("payload", None)
+            ns[name] = result
+        buffers = ns.pop("buffers", [])
+        payload = ns.pop("payload", None)
         if payload is not None:
-            glbls["_call_count"] = n = glbls.get("_call_count", 0) + 1
-            glbls[f"payload_{n}"] = payload
+            ns["_call_count"] = n = ns.get("_call_count", 0) + 1
+            ns[f"payload_{n}"] = payload
         return {"payload": payload, "buffers": buffers}
 
     def _get_completer(self, namespace_id: str):

@@ -35,9 +35,9 @@ async def autostart(app: ipylab.App) -> None | Awaitable[None]:
     # To prevent registering the command use app.DEFAULT_COMMANDS.discard(<name>) in another autostart hookimpl.
     if "Open console" in app.DEFAULT_COMMANDS:
 
-        async def open_console(ref: ShellConnection | None, current_widget: ShellConnection | None, args):
+        async def open_console(ref: ShellConnection | None, args):
             await app.open_console(**args)
-            app.add_objects_to_ipython_namespace({"ref": ref, "current_widget": current_widget})
+            app.add_objects_to_ipython_namespace({"ref": ref})
 
         cmd = await app.commands.add_command("Open console", open_console)
         await app.context_menu.add_item(command=cmd, rank=70)
