@@ -167,11 +167,11 @@ class LogViewer(Panel):
         select.observe(observe, "value")
         search.observe(observe, "value")
         try:
-            await ipylab.app.dialog.show_dialog("Send record to console", body=body)
-            if select.value:
-                ipylab.app.commands.execute("Open console")
-                await ipylab.app.open_console()
-                ipylab.app.add_objects_to_ipython_namespace({"record": select.value})
+            result = await ipylab.app.dialog.show_dialog("Send record to console", body=body)
+            if result["value"] and select.value:
+                console = await ipylab.app.shell.open_console(objects={"record": select.value})
+                await console.set_property("console.promptCell.model.sharedModel.source", "record")
+                await console.execute_method("console.execute")
         except Exception:
             return
         finally:

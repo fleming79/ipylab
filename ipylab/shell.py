@@ -34,6 +34,7 @@ class Shell(Ipylab):
     current_widget_id = Unicode(read_only=True).tag(sync=True)
 
     connections: Container[tuple[ShellConnection, ...]] = TypedTuple(trait=Instance(ShellConnection))
+    console = Instance(ShellConnection, default_value=None, allow_none=True)
 
     def add(
         self,
@@ -126,6 +127,56 @@ class Shell(Ipylab):
             return await self.operation("addToShell", {"args": args}, transform=Transform.connection, hooks=hooks_)
 
         return self.to_task(add_to_shell(), "Add to shell", hooks=hooks)
+
+    def add_objects_to_ipython_namespace(self, objects: dict, *, reset=False):
+        "Load objects into the IPython/console namespace."
+        if reset:
+            self.comm.kernel.shell.reset()  # type: ignore
+        self.comm.kernel.shell.push(objects)  # type: ignore
+
+    def open_console(
+        self,
+        *,
+        insertMode=InsertMode.split_bottom,
+        activate=True,
+        ref: ShellConnection | str = "",
+        objects: dict | None = None,
+        reset_shell=False,
+        hooks: TaskHookType = None,
+    ) -> Task[ShellConnection]:
+        """Open/activate a Jupyterlab console for this python kernel shell
+        (path=app.vpath).
+
+        Parameters
+        ----------
+
+        ref: ShellConnection | str
+            The ShellConnection or `id` of the widget in the shell.
+        objects: dict
+            Objects to load into the user namespace (shell.user_ns).
+            By default `ref` as a ShellConnection is loaded.
+        reset_shell:
+            Set true to reset the shell (clear the namespace).
+        """
+
+        async def open_console():
+            ref_ = ref or self.current_widget_id
+            if not isinstance(ref_, ShellConnection):
+                ref_ = await self.connect_to_widget(ref_)
+            objects_ = {"ref": ref_} | (objects or {})
+            args = {"path": ipylab.app.vpath, "insertMode": insertMode, "activate": activate, "ref": f"{pack(ref_)}.id"}
+            kwgs = IpylabKwgs(
+                transform=Transform.connection,
+                toObject=["args[ref]"],
+                hooks={
+                    "trait_add_rev": [(self, "console")],
+                    "add_to_tuple_fwd": [(self, "connections")],
+                    "callbacks": [lambda _: self.add_objects_to_ipython_namespace(objects_, reset=reset_shell)],
+                },
+            )
+            return await ipylab.app.commands.execute("console:open", args, **kwgs)
+
+        return self.to_task(open_console(), "Open console", hooks=hooks)
 
     def expand_left(self):
         return self.execute_method("expandLeft")

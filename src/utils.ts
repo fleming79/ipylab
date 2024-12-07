@@ -50,8 +50,8 @@ export function getNestedProperty({
           `Array (${obj.length}) {${toJSONsubstituteCylic(obj)}}`
       );
     }
-    basename = basename ? basename + '.' : basename;
-    throw new Error(`Property "${basename}${pname}" not found!`);
+    basename = basename ? '<' + basename + '>.' : basename;
+    throw new Error(`"${basename}${subpath}" not found!`);
   }
   return obj;
 }

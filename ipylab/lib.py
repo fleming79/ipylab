@@ -33,11 +33,11 @@ async def autostart(app: ipylab.App) -> None | Awaitable[None]:
     # Register some default context menu items for Ipylab
     # To prevent registering the command use app.DEFAULT_COMMANDS.discard(<name>) in another autostart hookimpl.
     if "Open console" in app.DEFAULT_COMMANDS:
-        cmd = await app.commands.add_command("Open console", app.open_console)
+        cmd = await app.commands.add_command("Open console", app.shell.open_console)
         await app.context_menu.add_item(command=cmd, rank=70)
     if "Show log viewer" in app.DEFAULT_COMMANDS:
         if app.log_viewer:
-            cmd = await app.commands.add_command("Show log viewer", lambda: app.log_viewer.add_to_shell())
+            cmd = await app.commands.add_command("Show log viewer", app.log_viewer.add_to_shell)
         await app.context_menu.add_item(command=cmd, rank=71)
 
 
