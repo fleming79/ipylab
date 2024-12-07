@@ -17,7 +17,7 @@ import ipylab.hookspecs
 from ipylab import Ipylab
 from ipylab._compat.typing import override
 from ipylab.commands import APP_COMMANDS_NAME, CommandPalette, CommandRegistry
-from ipylab.common import InsertMode, IpylabKwgs, Obj, Transform, to_selector
+from ipylab.common import InsertMode, IpylabKwgs, Obj, TaskHookType, Transform, pack, to_selector
 from ipylab.connection import ShellConnection
 from ipylab.dialog import Dialog
 from ipylab.ipylab import IpylabBase, Readonly
@@ -278,13 +278,39 @@ class App(Ipylab):
         }
 
     def open_console(
-        self, *, insertMode=InsertMode.split_bottom, activate=True, **kwargs: Unpack[IpylabKwgs]
+        self,
+        *,
+        insertMode=InsertMode.split_bottom,
+        activate=True,
+        ref: ShellConnection | str = "",
+        hooks: TaskHookType = None,
     ) -> Task[ShellConnection]:
-        """Open a Jupyterlab console for this kernel."""
-        args = {"path": self.vpath, "insertMode": insertMode, "activate": activate}
-        kwargs["transform"] = {"transform": Transform.connection}
-        kwargs["hooks"] = {"add_to_tuple_fwd": [(self, "connections")]}
-        return self.commands.execute("console:open", args, **kwargs)
+        """Open a Jupyterlab console for this kernel.
+
+        Parameters
+        ----------
+
+        ref: ShellConnection | str
+            The ShellConnection or `id` of the widget in the shell.
+        """
+
+        async def open_console():
+            args = {"path": self.vpath, "insertMode": insertMode, "activate": activate}
+            ref_ = ref
+            kwgs: IpylabKwgs = {}
+            if isinstance(ref_, str):
+                ref_ = await self.shell.connect_to_widget(ref_)
+            if isinstance(ref_, ShellConnection):
+                args["ref"] = f"{pack(ref_)}.id"
+                kwgs["toObject"] = [*(kwgs.get("toObject") or ()), "args.ref"]
+                kwgs["hooks"] = {
+                    "add_to_tuple_fwd": [(self, "connections")],
+                    "callbacks": [lambda _: self.add_objects_to_ipython_namespace({"ref": ref_})],
+                }
+            kwgs["transform"] = {"transform": Transform.connection}
+            return await self.commands.execute("console:open", args, **kwgs)
+
+        return self.to_task(open_console(), "Open console", hooks=hooks)
 
     def shutdown_kernel(self, vpath: str | None = None):
         "Shutdown the kernel"
@@ -360,7 +386,7 @@ class App(Ipylab):
     def add_objects_to_ipython_namespace(self, objects: dict, *, reset=False):
         "Load objects into the IPython/console namespace."
         if reset:
-            self.comm.kernel.shell.ipy_shell.reset()  # type: ignore
+            self.comm.kernel.shell.reset()  # type: ignore
         self.comm.kernel.shell.push(objects)  # type: ignore
 
 

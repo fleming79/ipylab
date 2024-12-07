@@ -14,7 +14,6 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable
 
     from ipylab import App
-    from ipylab.connection import ShellConnection
     from ipylab.ipylab import Ipylab
 
 
@@ -34,12 +33,7 @@ async def autostart(app: ipylab.App) -> None | Awaitable[None]:
     # Register some default context menu items for Ipylab
     # To prevent registering the command use app.DEFAULT_COMMANDS.discard(<name>) in another autostart hookimpl.
     if "Open console" in app.DEFAULT_COMMANDS:
-
-        async def open_console(ref: ShellConnection | None, args):
-            await app.open_console(**args)
-            app.add_objects_to_ipython_namespace({"ref": ref})
-
-        cmd = await app.commands.add_command("Open console", open_console)
+        cmd = await app.commands.add_command("Open console", app.open_console)
         await app.context_menu.add_item(command=cmd, rank=70)
     if "Show log viewer" in app.DEFAULT_COMMANDS:
         if app.log_viewer:
