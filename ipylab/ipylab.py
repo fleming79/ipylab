@@ -1,5 +1,6 @@
 # Copyright (c) ipylab contributors.
 # Distributed under the terms of the Modified BSD License.
+
 from __future__ import annotations
 
 import asyncio
@@ -358,7 +359,7 @@ class Ipylab(WidgetBase):
         try:
             if callable(aw):
                 try:
-                    aw = aw(obj=self)
+                    aw = aw(self)
                 except TypeError:
                     aw = aw()
             if inspect.iscoroutine(aw):

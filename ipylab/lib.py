@@ -8,14 +8,14 @@ from typing import TYPE_CHECKING
 import ipywidgets
 
 import ipylab
-from ipylab.common import InsertMode, hookimpl
+from ipylab.common import hookimpl
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable
 
     from ipylab import App
+    from ipylab.connection import ShellConnection
     from ipylab.ipylab import Ipylab
-    from ipylab.log import IpylabLogHandler
 
 
 @hookimpl
@@ -32,32 +32,19 @@ def launch_jupyterlab():
 @hookimpl
 async def autostart(app: ipylab.App) -> None | Awaitable[None]:
     # Register some default context menu items for Ipylab
+    # To prevent registering the command use app.DEFAULT_COMMANDS.discard(<name>) in another autostart hookimpl.
+    if "Open console" in app.DEFAULT_COMMANDS:
 
-    def open_console(ref: ipylab.ShellConnection | None, current_widget: ipylab.ShellConnection | None, args: dict):
-        app.ensure_run(
-            ipylab.plugin_manager.hook.open_console(app=app, ref=ref, current_widget=current_widget, args=args)
-        )
+        async def open_console(ref: ShellConnection | None, current_widget: ShellConnection | None, args):
+            await app.open_console(**args)
+            app.add_objects_to_ipython_namespace({"ref": ref, "current_widget": current_widget})
 
-    cmd = await app.commands.add_command("Open console", open_console)
-    await app.context_menu.add_item(command=cmd, rank=70)
-    cmd = await app.commands.add_command("Show log viewer", lambda: app.log_viewer.add_to_shell())
-    await app.context_menu.add_item(command=cmd, rank=71)
-
-
-@hookimpl
-def open_console(
-    app: ipylab.App, ref: ipylab.ShellConnection | None, current_widget: ipylab.ShellConnection | None, args: dict
-):
-    args = {"path": app.vpath, "insertMode": InsertMode.split_bottom, "activate": True} | (args or {})
-
-    async def _open_console():
-        conn: ipylab.ShellConnection = await app.commands.execute("console:open", args)
-        conn.add_to_tuple(app.shell, "connections")
-        if ref:
-            app.add_objects_to_shell_namespace({"ref": ref, "current_widget": current_widget})
-        return conn
-
-    return _open_console()
+        cmd = await app.commands.add_command("Open console", open_console)
+        await app.context_menu.add_item(command=cmd, rank=70)
+    if "Show log viewer" in app.DEFAULT_COMMANDS:
+        if app.log_viewer:
+            cmd = await app.commands.add_command("Show log viewer", lambda: app.log_viewer.add_to_shell())
+        await app.context_menu.add_item(command=cmd, rank=71)
 
 
 @hookimpl
@@ -68,13 +55,6 @@ def vpath_getter(app: App, kwgs: dict) -> Awaitable[str] | str:
 @hookimpl
 def ready(obj: Ipylab):
     "Pass through"
-
-
-@hookimpl
-def get_log_viewer(app: App, handler: IpylabLogHandler):  # type: ignore
-    from ipylab.log_viewer import LogViewer
-
-    return LogViewer(app, handler)
 
 
 @hookimpl

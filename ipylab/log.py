@@ -74,8 +74,8 @@ def truncated_repr(obj: Any, maxlen=120, tail="…") -> str:
 class IpylabLoggerAdapter(logging.LoggerAdapter):
     def __init__(self, name: str, owner: Any) -> None:
         logger = logging.getLogger(name)
-        logger.addHandler(ipylab.app.logging_handler)
-        ipylab.app.logging_handler._add_logger(logger)  # noqa: SLF001
+        if handler := ipylab.app.logging_handler:
+            handler._add_logger(logger)  # noqa: SLF001
         super().__init__(logger)
         self.owner_ref = weakref.ref(owner)
 
@@ -149,5 +149,7 @@ class IpylabLogFormatter(logging.Formatter):
         if not ei[0]:
             return ""
         tbf = self.tb_formatter
-        tbf.verbose if ipylab.app.logging_handler.level == LogLevel.DEBUG else tbf.minimal  # noqa: B018
-        return tbf.stb2text(tbf.structured_traceback(*ei))
+        if ipylab.app.logging_handler:
+            tbf.verbose if ipylab.app.logging_handler.level == LogLevel.DEBUG else tbf.minimal  # noqa: B018
+            return tbf.stb2text(tbf.structured_traceback(*ei))
+        return super().formatException(ei)

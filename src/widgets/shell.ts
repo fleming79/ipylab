@@ -1,5 +1,6 @@
 // Copyright (c) ipylab contributors
 // Distributed under the terms of the Modified BSD License.
+
 import { MainAreaWidget } from '@jupyterlab/apputils';
 import { UUID } from '@lumino/coreutils';
 import { Widget } from '@lumino/widgets';

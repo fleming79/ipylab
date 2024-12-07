@@ -170,8 +170,8 @@ class LogViewer(Panel):
             await ipylab.app.dialog.show_dialog("Send record to console", body=body)
             if select.value:
                 ipylab.app.commands.execute("Open console")
-                ipylab.app.add_objects_to_shell_namespace({"record": select.value})
-                await ipylab.plugin_manager.hook.open_console(objects={"record": select.value})
+                await ipylab.app.open_console()
+                ipylab.app.add_objects_to_ipython_namespace({"record": select.value})
         except Exception:
             return
         finally:

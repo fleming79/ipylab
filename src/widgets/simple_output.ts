@@ -1,5 +1,6 @@
 // Copyright (c) ipylab contributors
 // Distributed under the terms of the Modified BSD License.
+
 import { DOMWidgetView } from '@jupyter-widgets/base';
 import * as nbformat from '@jupyterlab/nbformat';
 import { IOutput } from '@jupyterlab/nbformat';

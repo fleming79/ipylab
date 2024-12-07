@@ -9,7 +9,7 @@ from collections import OrderedDict
 from typing import TYPE_CHECKING, Any, Literal, Unpack
 
 from IPython.core import completer as IPC  # noqa: N812
-from ipywidgets import Widget, register
+from ipywidgets import TypedTuple, Widget, register
 from traitlets import Bool, Container, Dict, Instance, Unicode, UseEnum, default, observe
 
 import ipylab
@@ -17,11 +17,13 @@ import ipylab.hookspecs
 from ipylab import Ipylab
 from ipylab._compat.typing import override
 from ipylab.commands import APP_COMMANDS_NAME, CommandPalette, CommandRegistry
-from ipylab.common import IpylabKwgs, Obj, to_selector
+from ipylab.common import InsertMode, IpylabKwgs, Obj, Transform, to_selector
+from ipylab.connection import ShellConnection
 from ipylab.dialog import Dialog
 from ipylab.ipylab import IpylabBase, Readonly
 from ipylab.launcher import Launcher
 from ipylab.log import IpylabLogFormatter, IpylabLogHandler, LogLevel
+from ipylab.log_viewer import LogViewer
 from ipylab.menu import ContextMenu, MainMenu
 from ipylab.notification import NotificationManager
 from ipylab.sessions import SessionManager
@@ -29,9 +31,8 @@ from ipylab.shell import Shell
 from ipylab.widgets import Panel
 
 if TYPE_CHECKING:
+    from asyncio import Task
     from typing import ClassVar
-
-    from ipylab.log_viewer import LogViewer
 
 
 class LastUpdatedDict(OrderedDict):
@@ -78,7 +79,7 @@ class App(Ipylab):
         "IPCompleter.magic_matcher",
         "IPCompleter.file_matcher",
     )
-
+    DEFAULT_COMMANDS: ClassVar = {"Open console", "Show log viewer"}
     _model_name = Unicode("JupyterFrontEndModel").tag(sync=True)
     ipylab_base = IpylabBase(Obj.IpylabModel, "app").tag(sync=True)
     version = Unicode(read_only=True).tag(sync=True)
@@ -95,8 +96,10 @@ class App(Ipylab):
     context_menu = Readonly(ContextMenu, sub_attrs=["commands"], commands=lambda app: app.commands)
     sessions = Readonly(SessionManager)
 
-    logging_handler = Instance(IpylabLogHandler, read_only=True)
-    log_viewer: Instance[LogViewer] = Instance(Panel, read_only=True)  # type: ignore
+    connections: Container[tuple[ShellConnection, ...]] = TypedTuple(trait=Instance(ShellConnection))
+
+    logging_handler: Instance[IpylabLogHandler | None] = Instance(IpylabLogHandler, allow_none=True)  # type: ignore
+    log_viewer: Instance[LogViewer] = Instance(Panel, allow_none=True)  # type: ignore
     log_level = UseEnum(LogLevel, LogLevel.ERROR)
 
     namespaces: Container[dict[str, LastUpdatedDict]] = Dict(read_only=True)  # type: ignore
@@ -121,7 +124,9 @@ class App(Ipylab):
 
     @default("log_viewer")
     def _default_log_viewer(self):
-        return ipylab.plugin_manager.hook.get_log_viewer(app=self, handler=self.logging_handler)
+        if self.logging_handler:
+            return LogViewer(self, self.logging_handler)
+        return None
 
     @observe("_ready", "log_level")
     def _app_observe_ready(self, change):
@@ -129,10 +134,14 @@ class App(Ipylab):
             assert self.vpath, "Vpath should always before '_ready'."  # noqa: S101
             self._selector = to_selector(self.vpath)
             ipylab.plugin_manager.hook.autostart._call_history.clear()  # type: ignore  # noqa: SLF001
-            ipylab.plugin_manager.hook.autostart.call_historic(
-                kwargs={"app": self}, result_callback=self._autostart_callback
-            )
-        self.logging_handler.setLevel(self.log_level)
+            try:
+                ipylab.plugin_manager.hook.autostart.call_historic(
+                    kwargs={"app": self}, result_callback=self._autostart_callback
+                )
+            except Exception:
+                self.log.exception("Error with autostart")
+        if self.logging_handler:
+            self.logging_handler.setLevel(self.log_level)
 
     def _autostart_callback(self, result):
         self.ensure_run(result)
@@ -259,6 +268,15 @@ class App(Ipylab):
             "status": "ok",
         }
 
+    def open_console(
+        self, *, insertMode=InsertMode.split_bottom, activate=True, **kwargs: Unpack[IpylabKwgs]
+    ) -> Task[ShellConnection]:
+        """Open a Jupyterlab console for this kernel."""
+        args = {"path": self.vpath, "insertMode": insertMode, "activate": activate}
+        kwargs["transform"] = {"transform": Transform.connection}
+        kwargs["hooks"] = {"add_to_tuple_fwd": [(self, "connections")]}
+        return self.commands.execute("console:open", args, **kwargs)
+
     def shutdown_kernel(self, vpath: str | None = None):
         "Shutdown the kernel"
         return self.operation("shutdownKernel", {"vpath": vpath})
@@ -318,11 +336,11 @@ class App(Ipylab):
         kwgs = {"evaluate": evaluate, "vpath": vpath, "namespace_id": namespace_id}
         return self.operation("evaluate", kwgs, **kwargs)
 
-    def add_objects_to_shell_namespace(self, objects: dict, *, reset=False):
+    def add_objects_to_ipython_namespace(self, objects: dict, *, reset=False):
         "Load objects into the IPython/console namespace."
         if reset:
-            self.comm.kernel.shell.ipy_shell.reset()
-        self.comm.kernel.shell.push(objects)
+            self.comm.kernel.shell.ipy_shell.reset()  # type: ignore
+        self.comm.kernel.shell.push(objects)  # type: ignore
 
 
 JupyterFrontEnd = App

@@ -13,8 +13,6 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable
 
     import ipylab
-    from ipylab.log import IpylabLogHandler
-    from ipylab.log_viewer import LogViewer
 
 
 @hookspec(firstresult=True)
@@ -53,19 +51,6 @@ def default_namespace_objects(namespace_id: str, app: ipylab.App) -> dict[str, A
 
 
 @hookspec(firstresult=True)
-def open_console(
-    app: ipylab.App, ref: ipylab.ShellConnection | None, current_widget: ipylab.ShellConnection | None, args: dict
-):
-    """Called to open a console.
-    ref: ShellConnection
-        The widget in the shell.
-    args: dict
-        options used with `open_console`.
-        keys: [activate, ref (as id), insertMode, type]
-    """
-
-
-@hookspec(firstresult=True)
 def vpath_getter(app: ipylab.App, kwgs: dict) -> Awaitable[str] | str:  # type: ignore
     """
     Resolve with a request for a vpath.
@@ -74,11 +59,6 @@ def vpath_getter(app: ipylab.App, kwgs: dict) -> Awaitable[str] | str:  # type: 
 
     vpath is the 'virtual path' for a session.
     """
-
-
-@hookspec(firstresult=True)
-def get_log_viewer(app: ipylab.App, handler: IpylabLogHandler) -> LogViewer:  # type: ignore
-    """Create a new instance of a logViewer."""
 
 
 @hookspec(firstresult=True)

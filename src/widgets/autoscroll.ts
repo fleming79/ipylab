@@ -1,5 +1,6 @@
 // Copyright (c) ipylab contributors
 // Distributed under the terms of the Modified BSD License.
+
 import { DOMWidgetModel, DOMWidgetView } from '@jupyter-widgets/base';
 import { Message } from '@lumino/messaging';
 import { PanelLayout, Widget } from '@lumino/widgets';
