@@ -184,32 +184,42 @@ class App(Ipylab):
         """Evaluate code corresponding to a call from 'evaluate'.
 
         A call to this method should originate from either:
-         1. An `evaluate` method call from a subclass of `Ipylab`.
-         2. A direct call in the frontend at jfem.evaluate.
-
+         1. An `evaluate` method call from a subclass of `Ipylab` from kernel via
+            `jfem.evaluate` in the frontend.
+         2. A call in the frontend to `jfem.evaluate`.
         """
         namespace_id = options.get("namespace_id", "")
-        glbls = self.get_namespace(namespace_id, options | {"buffers": buffers})
-        evaluate = options.get("evaluate", {})
+        evaluate = options.pop("evaluate")
         if isinstance(evaluate, str):
             evaluate = {"payload": evaluate}
+        glbls = self.get_namespace(namespace_id, buffers=buffers)
         for name, expression in evaluate.items():
             try:
-                result = eval(expression, glbls, glbls)  # noqa: S307
+                result = eval(expression, glbls)  # noqa: S307
             except SyntaxError:
-                exec(expression, glbls, glbls)  # noqa: S102
-                result = next(reversed(glbls.values()))
+                exec(expression, glbls)  # noqa: S102
+                result = next(reversed(glbls.values()))  # Requires: LastUpdatedDict
             while callable(result) or inspect.isawaitable(result):
                 if callable(result):
-                    pnames = set(glbls).intersection(inspect.signature(result).parameters)
-                    kwgs = {name: glbls[name] for name in pnames}
-                    glbls[name] = functools.partial(result, **kwgs)
-                    result = eval(f"{name}()", glbls)  # type: ignore # noqa: S307
-                if inspect.isawaitable(result):
+                    kwgs = {}
+                    for p in inspect.signature(result).parameters:
+                        if p in options:
+                            kwgs[p] = options[p]
+                        if p in glbls:
+                            kwgs[p] = glbls[p]
+                    # We use a partial so that we can evaluate with the same namespace.
+                    glbls["_partial_call"] = functools.partial(result, **kwgs)
+                    result = eval("_partial_call()", glbls)  # type: ignore # noqa: S307
+                    glbls.pop("_partial_call")
+                while inspect.isawaitable(result):
                     result = await result
             glbls[name] = result
         buffers = glbls.pop("buffers", [])
-        return {"payload": glbls.get("payload"), "buffers": buffers}
+        payload = glbls.pop("payload", None)
+        if payload is not None:
+            glbls["_call_count"] = n = glbls.get("_call_count", 0) + 1
+            glbls[f"payload_{n}"] = payload
+        return {"payload": payload, "buffers": buffers}
 
     def _get_completer(self, namespace_id: str):
         completer = self._completers.get(namespace_id)
@@ -239,7 +249,7 @@ class App(Ipylab):
                 )
 
     def _do_complete(self, namespace_id: str, code: str, cursor_pos: int | None):
-        """Completions provided by IPython completer, using Jedi."""
+        """Completions provided by IPython completer, using Jedi for different namespaces."""
         # Borrowed from Shell._get_completions_experimental
         completions = list(self._get_completions(namespace_id, code, len(code) if cursor_pos is None else cursor_pos))
         comps = [
@@ -285,13 +295,25 @@ class App(Ipylab):
         "Start the 'ipylab' Python kernel."
         return self.operation("startIyplabKernel", {"restart": restart})
 
-    def get_namespace(self, name="", objects: dict | None = None):
-        "Get the 'globals' namespace stored for name."
-        if name not in self.namespaces:
-            self.namespaces[name] = LastUpdatedDict()
-        ns = self.namespaces[name]
-        for objs in ipylab.plugin_manager.hook.default_namespace_objects(namespace_id=name, app=self):
-            ns.update(objs)
+    def get_namespace(self, namespace_id="", **objects) -> LastUpdatedDict:
+        """Get the namespace corresponding to namespace_id.
+        The namespace is a dictionary that maintains the order by which items are added.
+
+        Default oubjects are added to the namespace via the plugin hook `default_namespace_objects`.
+
+        Note:
+            To remove a namespace call `ipylab.app.namespaces.pop(<namespace_id>)`.
+
+        Parameters
+        ----------
+            objects:
+                Additional objects to add to the namespace.
+        """
+        ns = self.namespaces.get(namespace_id)
+        if ns is None:
+            self.namespaces[namespace_id] = ns = LastUpdatedDict()
+            for objs in ipylab.plugin_manager.hook.default_namespace_objects(namespace_id=namespace_id, app=self):
+                ns.update(objs)
         if objects:
             ns.update(objects)
         return ns

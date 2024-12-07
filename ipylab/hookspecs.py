@@ -47,7 +47,7 @@ def default_namespace_objects(namespace_id: str, app: ipylab.App) -> dict[str, A
     """
     Called when loading a namespace.
 
-    You can use this to customise the objects available in the namespace."""
+    Use this to add objects to the namespace."""
 
 
 @hookspec(firstresult=True)
