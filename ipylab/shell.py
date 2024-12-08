@@ -12,7 +12,8 @@ from traitlets import Container, Instance, Unicode
 import ipylab
 from ipylab import Area, InsertMode, Ipylab, ShellConnection, Transform, pack
 from ipylab.common import IpylabKwgs, Obj, TaskHookType
-from ipylab.ipylab import IpylabBase
+from ipylab.ipylab import IpylabBase, Readonly
+from ipylab.log_viewer import LogViewer
 
 if TYPE_CHECKING:
     from asyncio import Task
@@ -21,7 +22,13 @@ if TYPE_CHECKING:
     from ipylab.common import TaskHooks
 
 
-__all__ = ["Shell"]
+__all__ = ["Shell", "ConsoleConnection"]
+
+
+class ConsoleConnection(ShellConnection):
+    "A connection intended for a JupyterConsole"
+
+    # TODO: add methods
 
 
 class Shell(Ipylab):
@@ -33,8 +40,10 @@ class Shell(Ipylab):
     ipylab_base = IpylabBase(Obj.IpylabModel, "app.shell").tag(sync=True)
     current_widget_id = Unicode(read_only=True).tag(sync=True)
 
+    log_viewer = Readonly(LogViewer)
+
     connections: Container[tuple[ShellConnection, ...]] = TypedTuple(trait=Instance(ShellConnection))
-    console = Instance(ShellConnection, default_value=None, allow_none=True)
+    console: Instance[ConsoleConnection | None] = Instance(ConsoleConnection, default_value=None, allow_none=True)  # type: ignore
 
     def add(
         self,
@@ -143,9 +152,8 @@ class Shell(Ipylab):
         objects: dict | None = None,
         reset_shell=False,
         hooks: TaskHookType = None,
-    ) -> Task[ShellConnection]:
-        """Open/activate a Jupyterlab console for this python kernel shell
-        (path=app.vpath).
+    ) -> Task[ConsoleConnection]:
+        """Open/activate a Jupyterlab console for this python kernel shell (path=app.vpath).
 
         Parameters
         ----------
@@ -166,7 +174,7 @@ class Shell(Ipylab):
             objects_ = {"ref": ref_} | (objects or {})
             args = {"path": ipylab.app.vpath, "insertMode": insertMode, "activate": activate, "ref": f"{pack(ref_)}.id"}
             kwgs = IpylabKwgs(
-                transform=Transform.connection,
+                transform={"transform": Transform.connection, "cid": ConsoleConnection.to_cid(ipylab.app.vpath)},
                 toObject=["args[ref]"],
                 hooks={
                     "trait_add_rev": [(self, "console")],

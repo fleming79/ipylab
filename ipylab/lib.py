@@ -36,8 +36,7 @@ async def autostart(app: ipylab.App) -> None | Awaitable[None]:
         cmd = await app.commands.add_command("Open console", app.shell.open_console)
         await app.context_menu.add_item(command=cmd, rank=70)
     if "Show log viewer" in app.DEFAULT_COMMANDS:
-        if app.log_viewer:
-            cmd = await app.commands.add_command("Show log viewer", app.log_viewer.add_to_shell)
+        cmd = await app.commands.add_command("Show log viewer", app.shell.log_viewer.add_to_shell)
         await app.context_menu.add_item(command=cmd, rank=71)
 
 

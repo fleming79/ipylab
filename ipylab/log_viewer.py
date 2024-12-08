@@ -12,7 +12,7 @@ from traitlets import directional_link, link, observe
 import ipylab
 from ipylab.common import SVGSTR_TEST_TUBE, Area, InsertMode
 from ipylab.ipylab import Readonly
-from ipylab.log import IpylabLogHandler, LogLevel
+from ipylab.log import LogLevel
 from ipylab.simple_output import AutoScroll, SimpleOutput
 from ipylab.widgets import Icon, Panel
 
@@ -21,7 +21,8 @@ if TYPE_CHECKING:
     from asyncio import Task
 
     from ipylab.connection import ShellConnection
-    from ipylab.jupyterfrontend import App
+
+__all__ = ["LogViewer"]
 
 
 class LogViewer(Panel):
@@ -36,7 +37,14 @@ class LogViewer(Panel):
         options=[(v.name.capitalize(), v) for v in LogLevel],
         layout={"width": "max-content"},
     )
-    buffer_size = Readonly(BoundedIntText, description="Buffer size", min=1, max=1e6, layout={"width": "max-content"})
+    buffer_size = Readonly(
+        BoundedIntText,
+        description="Buffer size",
+        min=1,
+        max=1e6,
+        layout={"width": "max-content"},
+        created=lambda c: c["obj"].observe(c["owner"]._observe_buffer_size, "value"),  # noqa: SLF001
+    )
     button_show_send_dialog = Readonly(
         Button,
         description="📪",
@@ -48,7 +56,7 @@ class LogViewer(Panel):
     button_clear = Readonly(
         Button,
         description="⌧",
-        tooltip="Clear output",
+        tooltip="Clear log",
         layout={"width": "auto"},
     )
     autoscroll_enabled = Readonly(
@@ -58,38 +66,37 @@ class LogViewer(Panel):
         tooltip="Scroll to the most recent logs.",
         layout={"width": "auto"},
     )
-    box_controls = Readonly(
+    _default_header_children = (
+        "info",
+        "autoscroll_enabled",
+        "log_level",
+        "buffer_size",
+        "button_clear",
+        "button_show_send_dialog",
+    )
+    header = Readonly(
         HBox,
+        children=lambda owner: [w for v in owner._default_header_children if (w := getattr(owner, v, None))],  # noqa: SLF001
         layout={"justify_content": "space-between", "flex": "0 0 auto"},
+        dynamic=["children"],
     )
     output = Readonly(SimpleOutput)
-    autoscroll_widget = Readonly(AutoScroll)
+    autoscroll_widget = Readonly(AutoScroll, content=lambda v: v.output, dynamic=["content"])
 
-    def __init__(self, app: App, handler: IpylabLogHandler, buffersize=100):
+    def __init__(self, buffersize=100):
         self._records = collections.deque(maxlen=buffersize)
-        self.info.value = f"<b>Vpath: {app.vpath}</b>"
-        self.title.label = f"Log: {app.vpath}"
         self.title.icon = Icon(name="ipylab-test_tube", svgstr=SVGSTR_TEST_TUBE)
+        super().__init__(children=[self.header, self.autoscroll_widget])
         self.buffer_size.value = buffersize
-        self.box_controls.children = [
-            self.info,
-            self.autoscroll_enabled,
-            self.log_level,
-            self.buffer_size,
-            self.button_clear,
-            self.button_show_send_dialog,
-        ]
-        self.autoscroll_widget.content = self.output
-        super().__init__(children=[self.box_controls, self.autoscroll_widget])
-
-        self.buffer_size.observe(self._observe_buffer_size, "value")
-        handler.register_callback(self._add_record)
+        app = ipylab.app
         link((self.autoscroll_widget, "enabled"), (self.autoscroll_enabled, "value"))
         link((app, "log_level"), (self.log_level, "value"))
         link((self.buffer_size, "value"), (self.output, "max_outputs"))
         directional_link(
             (self.output, "length"), (self.buffer_size, "tooltip"), transform=lambda size: f"Current size: {size}"
         )
+        if app.logging_handler:
+            app.logging_handler.register_callback(self._add_record)
         self.button_show_send_dialog.on_click(self._button_on_click)
         self.button_clear.on_click(self._button_on_click)
 
@@ -103,6 +110,8 @@ class LogViewer(Panel):
             self.output.push(*(rec.output for rec in self._records))
         else:
             self.output.clear()
+        self.info.value = f"<b>Vpath: {ipylab.app.vpath}</b>"
+        self.title.label = f"Log: {ipylab.app.vpath}"
 
     def _add_record(self, record: logging.LogRecord):
         self._records.append(record)
@@ -138,6 +147,7 @@ class LogViewer(Panel):
                 hooks={"callbacks": [lambda _: self.button_show_send_dialog.set_trait("disabled", False)]},
             )
         elif b is self.button_clear:
+            self._records.clear()
             self.output.clear(wait=False)
 
     async def _show_send_dialog(self):

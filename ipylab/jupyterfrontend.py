@@ -22,12 +22,10 @@ from ipylab.dialog import Dialog
 from ipylab.ipylab import IpylabBase, Readonly
 from ipylab.launcher import Launcher
 from ipylab.log import IpylabLogFormatter, IpylabLogHandler, LogLevel
-from ipylab.log_viewer import LogViewer
 from ipylab.menu import ContextMenu, MainMenu
 from ipylab.notification import NotificationManager
 from ipylab.sessions import SessionManager
 from ipylab.shell import Shell
-from ipylab.widgets import Panel
 
 if TYPE_CHECKING:
     from typing import ClassVar
@@ -91,17 +89,14 @@ class App(Ipylab):
     launcher = Readonly(Launcher)
     main_menu = Readonly(MainMenu)
     command_pallet = Readonly(CommandPalette)
-    context_menu = Readonly(ContextMenu, sub_attrs=["commands"], commands=lambda app: app.commands)
+    context_menu = Readonly(ContextMenu, commands=lambda app: app.commands, dynamic=["commands"])
     sessions = Readonly(SessionManager)
 
     logging_handler: Instance[IpylabLogHandler | None] = Instance(IpylabLogHandler, allow_none=True)  # type: ignore
-    log_viewer: Instance[LogViewer | None] = Instance(Panel, allow_none=True)  # type: ignore
     log_level = UseEnum(LogLevel, LogLevel.ERROR)
 
     namespaces: Container[dict[str, LastUpdatedDict]] = Dict(read_only=True)  # type: ignore
     _completers: Container[dict[str, IPC.IPCompleter]] = Dict(read_only=True)  # type: ignore
-
-    _hidden: ClassVar = {"_ih", "_oh", "_dh", "In", "Out", "get_ipython", "exit", "quit", "open"}
 
     @classmethod
     @override
@@ -117,12 +112,6 @@ class App(Ipylab):
         handler = IpylabLogHandler(self.log_level)
         handler.setFormatter(IpylabLogFormatter(fmt=fmt, style="{", datefmt="%H:%M:%S"))
         return handler
-
-    @default("log_viewer")
-    def _default_log_viewer(self):
-        if self.logging_handler:
-            return LogViewer(self, self.logging_handler)
-        return None
 
     @observe("_ready", "log_level")
     def _app_observe_ready(self, change):

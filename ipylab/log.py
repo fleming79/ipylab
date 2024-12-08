@@ -88,6 +88,7 @@ class IpylabLoggerAdapter(logging.LoggerAdapter):
 class IpylabLogHandler(logging.Handler):
     _log_notify_task: Task | None = None
     _loggers: ClassVar[weakref.WeakSet[logging.Logger]] = weakref.WeakSet()
+    formatter: IpylabLogFormatter
 
     def __init__(self, level: LogLevel) -> None:
         super().__init__(level)
@@ -109,8 +110,6 @@ class IpylabLogHandler(logging.Handler):
     def emit(self, record):
         std_ = "stderr" if record.levelno >= LogLevel.ERROR else "stdout"
         record.output = {"output_type": "stream", "name": std_, "text": self.format(record)}
-        if std_ == "stderr":
-            ipylab.app.log_viewer  # Touch for a log_viewer  # noqa: B018
         self._callbacks(record)
 
     def register_callback(self, callback, *, remove=False):
@@ -127,11 +126,9 @@ class IpylabLogHandler(logging.Handler):
 
 
 class IpylabLogFormatter(logging.Formatter):
-    itb = None
-
     def __init__(self, *, colors: dict[LogLevel, ANSIColors] = COLORS, reset=ANSIColors.reset, **kwargs) -> None:
         """Initialize the formatter with specified format strings."""
-        self.colors = COLORS | colors
+        self.colors = colors
         self.reset = reset
         super().__init__(**kwargs)
         self.tb_formatter = FormattedTB()
