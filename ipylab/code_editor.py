@@ -6,6 +6,7 @@ from __future__ import annotations
 import inspect
 from typing import NotRequired, TypedDict
 
+from IPython.core import completer as IPC  # noqa: N812
 from ipywidgets import DOMWidget, register
 from traitlets import Callable, Dict, Instance, Unicode, default
 
@@ -25,6 +26,59 @@ mime_types = (
     "text/json",
     "application/json",
 )
+
+
+class IpylabCompleter(IPC.IPCompleter):
+    @default("disable_matchers")
+    def _default_disable_matchers(self):
+        return [
+            "IPCompleter.latex_name_matcher",
+            "IPCompleter.unicode_name_matcher",
+            "back_latex_name_matcher",
+            "back_unicode_name_matcher",
+            "IPCompleter.fwd_unicode_matcher",
+            "IPCompleter.magic_config_matcher",
+            "IPCompleter.magic_color_matcher",
+            "IPCompleter.magic_matcher",
+            "IPCompleter.file_matcher",
+        ]
+
+    def do_complete(self, code: str, cursor_pos: int):
+        """Completions provided by IPython completer, using Jedi for different namespaces."""
+        # Adapted from IPython Shell._get_completions_experimental
+        matches = []
+        comps = []
+        with IPC.provisionalcompleter():
+            completions_ = list(self.completions(code, cursor_pos))
+            if completions_:
+                new_start = min(c.start for c in completions_)
+                new_end = max(c.end for c in completions_)
+                for c in completions_:
+                    comp = IPC.Completion(
+                        new_start,
+                        new_end,
+                        code[new_start : c.start] + c.text + code[c.end : new_end],
+                        type=c.type,
+                        _origin=c._origin,  # noqa: SLF001
+                        signature=c.signature,
+                    )
+                    matches.append(comp.text)
+                    comps.append(
+                        {
+                            "start": comp.start,
+                            "end": comp.end,
+                            "text": comp.text,
+                            "type": comp.type,
+                            "signature": comp.signature,
+                        }
+                    )
+        return {
+            "matches": matches,
+            "cursor_start": comps[0]["start"] if comps else cursor_pos,
+            "cursor_end": comps[0]["end"] if comps else cursor_pos,
+            "metadata": {"_jupyter_types_experimental": comps},
+            "status": "ok",
+        }
 
 
 class CodeEditorOptions(TypedDict):
@@ -55,9 +109,9 @@ class CodeEditor(Ipylab, DOMWidget):
     The completer is invoked with `Tab` by default. Use completer_invoke_keys to change.
 
     `evaluate` and `do_complete` can be overloaded as required.
+    Adjust `completer.disable_matchers` as required.
     """
 
-    # TODO: connect code completion
     _model_name = Unicode("CodeEditorModel").tag(sync=True)
     _view_name = Unicode("CodeEditorView").tag(sync=True)
 
@@ -65,6 +119,8 @@ class CodeEditor(Ipylab, DOMWidget):
     mime_type = Unicode("text/plain", help="syntax style").tag(sync=True)
     key_bindings = Dict().tag(sync=True)
     editor_options: Instance[CodeEditorOptions] = Dict().tag(sync=True)  # type: ignore
+
+    completer = Instance(IpylabCompleter, ())
 
     namespace_id = Unicode("")
     evaluate = Callable()
@@ -87,15 +143,16 @@ class CodeEditor(Ipylab, DOMWidget):
     async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list):
         match operation:
             case "requestComplete":
-                return await self.do_complete(payload["code"], payload["cursor_pos"])  # type: ignore
+                return self.do_complete(payload["code"], payload["cursor_pos"])  # type: ignore
             case "evaluateCode":
-                await self.evaluate(payload["code"] or self.value, self.namespace_id)
+                await self.evaluate(payload["code"])
                 return True
 
         return await super()._do_operation_for_frontend(operation, payload, buffers)
 
-    async def evaluate_code(self, code: str, namespace_id: str):
-        ns = ipylab.app.get_namespace(namespace_id)
+    async def evaluate_code(self, code: str):
+        code = code or self.value
+        ns = ipylab.app.get_namespace(self.namespace_id)
         wait = code.startswith("await")
         try:
             result = eval(code.removeprefix("await").strip(), ns)  # noqa: S307
@@ -107,6 +164,7 @@ class CodeEditor(Ipylab, DOMWidget):
         else:
             return result
 
-    async def _do_complete(self, code: str, cursor_pos: int):
+    def _do_complete(self, code: str, cursor_pos: int):
         """Handle a completion request."""
-        return ipylab.app._do_complete(self.namespace_id, code, cursor_pos)  # noqa: SLF001
+        self.completer.namespace = ipylab.app.get_namespace(self.namespace_id)
+        return self.completer.do_complete(code, cursor_pos)

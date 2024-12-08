@@ -48,18 +48,18 @@ class ReadonlyCreated(Generic[T], TypedDict):
 
 
 class Readonly(Generic[T]):
-    __slots__ = ["name", "instances", "klass", "kwgs", "dynamic", "created"]
+    __slots__ = ["name", "instances", "klass", "args", "kwgs", "dynamic", "created"]
 
     def __init__(
         self,
         klass: type[T],
+        *args,
         dynamic: list[str] | None = None,
         created: Callable[[ReadonlyCreated[T]]] | str = "",
         **kwgs,
     ):
         """Define an instance of `klass` as a cached read only property.
-
-        `kwgs` are used to instantiate `klass`.
+        `args` and `kwgs` are used to instantiate `klass`.
 
         Parameters:
         ----------
@@ -87,6 +87,7 @@ class Readonly(Generic[T]):
                     raise ValueError(msg)
         self.created = created
         self.dynamic = dynamic
+        self.args = args
         self.klass = klass
         self.kwgs = kwgs
         self.instances = weakref.WeakKeyDictionary()
@@ -103,7 +104,7 @@ class Readonly(Generic[T]):
                 kwgs = kwgs.copy()
                 for k in self.dynamic:
                     kwgs[k] = kwgs[k](obj)
-            self.instances[obj] = self.klass(**kwgs)
+            self.instances[obj] = self.klass(*self.args, **kwgs)
             try:
                 if self.created:
                     created = getattr(obj, self.created) if isinstance(self.created, str) else self.created
@@ -112,6 +113,10 @@ class Readonly(Generic[T]):
                 if log := getattr(obj, "log", None):
                     log.exception("Callback `created` failed", obj=self.created)
         return self.instances[obj]
+
+    def __set__(self, obj, value):
+        msg = f"Setting {obj.__class__.__name__}.{self.name} is forbidden!"
+        raise AttributeError(msg)
 
 
 class Response(asyncio.Event):
