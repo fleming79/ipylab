@@ -12,7 +12,7 @@ from ipylab.ipylab import Ipylab
 
 if TYPE_CHECKING:
     from asyncio import Task
-    from typing import Unpack
+    from typing import Any, Unpack
 
     from IPython.display import TextDisplayObject
 
@@ -52,7 +52,7 @@ class SimpleOutput(Ipylab, DOMWidget):
         except AttributeError:
             return None
 
-    def _pack_outputs(self, outputs: tuple[dict[str, str] | Widget | str | TextDisplayObject, ...]):
+    def _pack_outputs(self, outputs: tuple[dict[str, str] | Widget | str | TextDisplayObject | Any, ...]):
         outputs_ = []
         fmt = self.format
         for output in outputs:
@@ -70,7 +70,7 @@ class SimpleOutput(Ipylab, DOMWidget):
             outputs_.append(output_)
         return outputs_
 
-    def push(self, *outputs: dict[str, str] | Widget | str | TextDisplayObject):
+    def push(self, *outputs: dict[str, str] | Widget | str | TextDisplayObject | Any):
         """Add one or more items to the output.
         Consecutive `streams` of the same type are placed in the same 'output' up to `max_outputs`.
         Outputs passed as dicts are assumed to be correctly packed as `repr_mime` data.
@@ -84,7 +84,9 @@ class SimpleOutput(Ipylab, DOMWidget):
             True: Will delay clearing until next output is added."""
         self.send({"clear": wait})
 
-    def set(self, *outputs: dict[str, str] | Widget | str | TextDisplayObject, **kwgs: Unpack[IpylabKwgs]) -> Task[int]:
+    def set(
+        self, *outputs: dict[str, str] | Widget | str | TextDisplayObject | Any, **kwgs: Unpack[IpylabKwgs]
+    ) -> Task[int]:
         """Set the output explicitly by first clearing and then adding the outputs."""
         return self.operation("setOutputs", {"outputs": self._pack_outputs(outputs)}, **kwgs)
 
