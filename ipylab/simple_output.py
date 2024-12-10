@@ -33,9 +33,7 @@ if TYPE_CHECKING:
 class SimpleOutput(Ipylab, DOMWidget):
     """An output with no prompts designed to accept frequent additions.
 
-    The interface differs from Ipywidgets.Output widget in almost every way.
-
-    Note: Automatic widget restoration is not implemented.
+    Note: Widget restoration is not provided.
     """
 
     _model_name = Unicode("SimpleOutputModel").tag(sync=True)
@@ -53,44 +51,44 @@ class SimpleOutput(Ipylab, DOMWidget):
             return None
 
     def _pack_outputs(self, outputs: tuple[dict[str, str] | Widget | str | TextDisplayObject | Any, ...]):
-        outputs_ = []
         fmt = self.format
         for output in outputs:
             if isinstance(output, dict):
-                output_ = output
+                yield output
             elif isinstance(output, str):
-                output_ = {"output_type": "stream", "name": "stdout", "text": output}
+                yield {"output_type": "stream", "name": "stdout", "text": output}
             elif hasattr(output, "_repr_mimebundle_") and callable(output._repr_mimebundle_):  # type: ignore
-                output_ = output._repr_mimebundle_()  # type: ignore
+                yield output._repr_mimebundle_()  # type: ignore
             elif fmt:
                 data, metadata = fmt(output)
-                output_ = {"output_type": "display_data", "data": data, "metadata": metadata}
+                yield {"output_type": "display_data", "data": data, "metadata": metadata}
             else:
-                output_ = {"output_type": "display_data", "data": repr(output)}
-            outputs_.append(output_)
-        return outputs_
+                yield {"output_type": "display_data", "data": repr(output)}
 
-    def push(self, *outputs: dict[str, str] | Widget | str | TextDisplayObject | Any) -> Self:
+    def push(self, *outputs: dict[str, str] | Widget | str | TextDisplayObject | Any, clear=False) -> Self:
         """Add one or more items to the output.
         Consecutive `streams` of the same type are placed in the same 'output' up to `max_outputs`.
         Outputs passed as dicts are assumed to be correctly packed as `repr_mime` data.
-        """
-        if outputs_ := self._pack_outputs(outputs):
-            self.send({"add": outputs_})
-        return self
 
-    def clear(self, *, wait=False) -> Self:
-        """Clear the output.
-        wait: bool
-            True: Will delay clearing until next output is added."""
-        self.send({"clear": wait})
+        Parameters
+        ----------
+        reset : bool
+            Prior output is removed before adding output."""
+
+        items = list(self._pack_outputs(outputs))
+        if items or clear:
+            self.send({"add": items, "clear": clear})
         return self
 
     def set(
         self, *outputs: dict[str, str] | Widget | str | TextDisplayObject | Any, **kwgs: Unpack[IpylabKwgs]
     ) -> Task[int]:
-        """Set the output explicitly by first clearing and then adding the outputs."""
-        return self.operation("setOutputs", {"outputs": self._pack_outputs(outputs)}, **kwgs)
+        """Set the output explicitly by first clearing and then adding the outputs.
+
+        Compared to `push`, this ensures the frontend is ready. The task will
+        only complete once the output has been added in the frontend.
+        """
+        return self.operation("setOutputs", {"items": list(self._pack_outputs(outputs))}, **kwgs)
 
 
 @register

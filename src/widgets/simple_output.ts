@@ -72,12 +72,10 @@ export class SimpleOutputModel extends IpylabModel {
     super.setReady();
   }
 
-  protected async onCustomMessage(msg: any) {
+  async onCustomMessage(msg: any) {
     const content = typeof msg === 'string' ? JSON.parse(msg) : msg;
     if ('add' in content) {
-      this.add(content.add);
-    } else if ('clear' in content) {
-      this.outputAreaModel.clear(content.clear);
+      this.add(content.add, content.clear);
     } else {
       await super.onCustomMessage(content);
     }
@@ -109,13 +107,15 @@ export class SimpleOutputModel extends IpylabModel {
     }
   }
 
-  async setOutputs({ outputs }: { outputs: Array<IOutput> }) {
-    this.outputAreaModel.clear(true);
-    this.add(outputs);
+  async setOutputs({ items }: { items: Array<IOutput> }) {
+    this.add(items, true);
     return this.outputAreaModel.length;
   }
 
-  add(items: Array<IOutput>) {
+  add(items: Array<IOutput>, clear: boolean) {
+    if (clear) {
+      this.outputAreaModel.clear(false);
+    }
     for (const output of items) {
       this.outputAreaModel.add(output);
     }

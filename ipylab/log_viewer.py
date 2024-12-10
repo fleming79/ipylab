@@ -105,11 +105,8 @@ class LogViewer(Panel):
 
     @observe("connections")
     def _observe_connections(self, _):
-        if self.connections:
-            self.output.clear()
-            self.output.push(*(rec.output for rec in self._records))
-        else:
-            self.output.clear()
+        if self.connections and len(self.connections) == 1:
+            self.output.push(*(rec.output for rec in self._records), clear=True)
         self.info.value = f"<b>Vpath: {ipylab.app.vpath}</b>"
         self.title.label = f"Log: {ipylab.app.vpath}"
 
@@ -148,7 +145,7 @@ class LogViewer(Panel):
             )
         elif b is self.button_clear:
             self._records.clear()
-            self.output.clear(wait=False)
+            self.output.push(clear=True)
 
     async def _show_send_dialog(self):
         # TODO: make a formatter to simplify the message with obj and owner)
