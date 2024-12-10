@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self
 
 from ipywidgets import DOMWidget, Widget, register
 from traitlets import Bool, Callable, Enum, Int, Unicode, default
@@ -70,19 +70,21 @@ class SimpleOutput(Ipylab, DOMWidget):
             outputs_.append(output_)
         return outputs_
 
-    def push(self, *outputs: dict[str, str] | Widget | str | TextDisplayObject | Any):
+    def push(self, *outputs: dict[str, str] | Widget | str | TextDisplayObject | Any) -> Self:
         """Add one or more items to the output.
         Consecutive `streams` of the same type are placed in the same 'output' up to `max_outputs`.
         Outputs passed as dicts are assumed to be correctly packed as `repr_mime` data.
         """
         if outputs_ := self._pack_outputs(outputs):
             self.send({"add": outputs_})
+        return self
 
-    def clear(self, *, wait=False):
+    def clear(self, *, wait=False) -> Self:
         """Clear the output.
         wait: bool
             True: Will delay clearing until next output is added."""
         self.send({"clear": wait})
+        return self
 
     def set(
         self, *outputs: dict[str, str] | Widget | str | TextDisplayObject | Any, **kwgs: Unpack[IpylabKwgs]
