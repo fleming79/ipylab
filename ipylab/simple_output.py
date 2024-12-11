@@ -108,7 +108,7 @@ class AutoScroll(WidgetBase, DOMWidget):
 
     enabled = Bool().tag(sync=True)
     mode = Enum(["start", "end"], "end").tag(sync=True)
-    sentinel_text = Unicode(help="Provided for debugging purposes").tag(sync=True)
+    sentinel_text = Unicode(".", help="Provided for debugging purposes").tag(sync=True)
 
     @observe("enabled")
     def _observe(self, _):

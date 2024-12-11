@@ -32,6 +32,7 @@ dependencies = [
   "ipython>=8.2",
   "jupyterlab_widgets>=3.0.11",
   "pluggy~=1.1",
+  "bracelogger",
   "typing_extensions; python_version < '3.12'",
 ]
 dynamic = ["version", "description", "authors", "urls", "keywords"]

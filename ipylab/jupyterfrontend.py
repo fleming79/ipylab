@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import functools
 import inspect
 from collections import OrderedDict
@@ -133,8 +134,14 @@ class App(Ipylab):
 
     @override
     async def ready(self):
-        if not self._ready_event._value:  # type: ignore # noqa: SLF001
-            await self._ready_event.wait()
+        try:
+            if not self._ready_event._value:  # type: ignore # noqa: SLF001
+                await self._ready_event.wait()
+        except RuntimeError:
+            if self.comm.__class__.__name__ == "DummyComm":
+                self.log.info("No frontend")
+                await asyncio.sleep(1e9)
+            raise
 
     @override
     async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list) -> Any:

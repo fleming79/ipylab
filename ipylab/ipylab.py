@@ -406,10 +406,16 @@ class Ipylab(WidgetBase):
             raise
 
     async def ready(self):
-        if not ipylab.app._ready_event._value:  # type: ignore # noqa: SLF001
-            await ipylab.app.ready()
-        if not self._ready_event._value:  # type: ignore  # noqa: SLF001
-            await self._ready_event.wait()
+        try:
+            if not ipylab.app._ready_event._value:  # type: ignore # noqa: SLF001
+                await ipylab.app.ready()
+            if not self._ready_event._value:  # type: ignore  # noqa: SLF001
+                await self._ready_event.wait()
+        except RuntimeError:
+            if self.comm.__class__.__name__ == "DummyComm":
+                self.log.info("No frontend")
+                await asyncio.sleep(1e9)
+            raise
 
     def on_ready(self, callback, remove=False):  # noqa: FBT002
         if remove:

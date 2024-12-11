@@ -61,9 +61,9 @@ class LogViewer(Panel):
     )
     autoscroll_enabled = Readonly(
         Checkbox,
-        description="Scroll",
+        description="Auto scroll",
         indent=False,
-        tooltip="Scroll to the most recent logs.",
+        tooltip="Automatically scroll to the most recent logs.",
         layout={"width": "auto"},
     )
     _default_header_children = (
