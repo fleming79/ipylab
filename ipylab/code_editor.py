@@ -7,7 +7,7 @@ import inspect
 from typing import NotRequired, TypedDict
 
 from IPython.core import completer as IPC  # noqa: N812
-from ipywidgets import DOMWidget, register
+from ipywidgets import DOMWidget, ValueWidget, register
 from traitlets import Callable, Dict, Instance, Unicode, default
 
 import ipylab
@@ -100,7 +100,7 @@ class CodeEditorOptions(TypedDict):
 
 
 @register
-class CodeEditor(Ipylab, DOMWidget):
+class CodeEditor(Ipylab, DOMWidget, ValueWidget):
     """A Widget for code editing.
 
     Code completion is provided for Python code for the specified namespace.
