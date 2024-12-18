@@ -12,7 +12,7 @@ from ipywidgets import register, widget_serialization
 from ipywidgets.widgets.trait_types import InstanceDict
 from ipywidgets.widgets.widget_description import DescriptionStyle
 from ipywidgets.widgets.widget_string import _String
-from traitlets import Callable, Dict, Instance, Unicode, default
+from traitlets import Callable, Dict, Instance, Int, Unicode, default
 
 import ipylab
 from ipylab._compat.typing import override
@@ -189,6 +189,7 @@ class CodeEditor(Ipylab, _String):
     mime_type = Unicode("text/plain", help="syntax style").tag(sync=True)
     key_bindings = Dict().tag(sync=True)
     editor_options: Instance[CodeEditorOptions] = Dict().tag(sync=True)  # type: ignore
+    update_throttle_ms = Int(100, help="The limit at which frontend changes are synchronised").tag(sync=True)
     placeholder = None  # Presently not available
 
     completer = Readonly(
@@ -203,7 +204,13 @@ class CodeEditor(Ipylab, _String):
 
     @default("key_bindings")
     def _default_key_bindings(self):
-        return ipylab.plugin_manager.hook.default_editor_key_bindings(app=ipylab.app, obj=self)
+        return {
+            "invoke_completer": ["Tab"],
+            "invoke_tooltip": ["Shift Tab"],
+            "evaluate": ["Shift Enter"],
+            "undo": ["Ctrl Z"],
+            "redo": ["Ctrl Shift Z"],
+        } | ipylab.plugin_manager.hook.default_editor_key_bindings(app=ipylab.app, obj=self)
 
     @default("evaluate")
     def _default_evaluate(self):
@@ -220,3 +227,6 @@ class CodeEditor(Ipylab, _String):
                 await self.evaluate(payload["code"])
                 return True
         return await super()._do_operation_for_frontend(operation, payload, buffers)
+
+    def clear_undo_history(self):
+        self.send({"clearUndoHistory": True})

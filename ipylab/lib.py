@@ -52,7 +52,7 @@ def ready(obj: Ipylab):
 
 @hookimpl
 def default_editor_key_bindings(app: ipylab.App, obj: ipylab.CodeEditor):  # noqa: ARG001
-    return {"invoke_completer": ["Tab"], "invoke_tooltip": ["Shift Tab"], "evaluate": ["Shift Enter"]}
+    return {}
 
 
 @hookimpl

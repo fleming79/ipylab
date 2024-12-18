@@ -97,19 +97,39 @@ export class CodeEditorModel extends IpylabModel {
       this
     );
   }
+
+  async onCustomMessage(msg: any) {
+    const content = typeof msg === 'string' ? JSON.parse(msg) : msg;
+    if (content.clearUndoHistory) {
+      this.editorModel.sharedModel.clearUndoHistory();
+    } else {
+      await super.onCustomMessage(content);
+    }
+  }
+
   onSharedModelSourceChange() {
-    const value = this.editorModel.sharedModel.getSource();
-    if (this.get('value') !== value) {
-      this.set('value', value);
-      this.save_changes();
+    if (!this._syncRequired) {
+      this._syncRequired = true;
+      setTimeout(() => {
+        if (this._syncRequired) {
+          const value = this.editorModel.sharedModel.getSource();
+          if (value !== this.get('value')) {
+            this.set('value', value);
+            this.save_changes();
+          }
+          this._syncRequired = false;
+        }
+      }, this.get('update_throttle_ms'));
     }
   }
 
   onValueChange() {
     const value = this.get('value');
-    if (value !== this.editorModel.sharedModel.source) {
+    this._syncRequired = true;
+    if (this.editorModel.sharedModel.getSource() !== value) {
       this.editorModel.sharedModel.setSource(value);
     }
+    this._syncRequired = false;
   }
 
   updateMimeType() {
@@ -122,23 +142,39 @@ export class CodeEditorModel extends IpylabModel {
     return super.close(comm_closed);
   }
   editorModel: CodeEditor.IModel;
+  _syncRequired = false;
 }
 
 export class CodeEditorView extends StringView {
   render() {
     super.render();
+    this.luminoWidget.id = `ipylab-CodeEditor-${UUID.uuid4()}`;
+    this.className = this.luminoWidget.id;
     this.editorWidget = new IpylabCodeEditorWrapper({
       view: this,
       factory: IpylabModel.editorServices.factoryService.newInlineEditor,
       model: this.model.editorModel
     });
     this.editorWidget.id = this.editorWidget.id || UUID.uuid4();
+    this.editorWidget.addClass(this.className);
     this.model.on('change:mimeType', this.updateCompleter, this);
     this.model.on('change:completer_invoke_keys', this.updateCompleter, this);
     this.model.on('change:editor_options', this.updateEditorOptions, this);
     this.updateCompleter();
     this.updateEditorOptions();
     this.el.appendChild(this.editorWidget.node);
+
+    // Initialize the command registry with the bindings.
+    const useCapture = true;
+
+    // Setup the keydown listener for the editor.
+    this.editorWidget.node.addEventListener(
+      'keydown',
+      event => {
+        Private.commands.processKeydownEvent(event);
+      },
+      useCapture
+    );
   }
 
   remove() {
@@ -152,6 +188,7 @@ export class CodeEditorView extends StringView {
   private updateCompleter() {
     if (!this.model.editorModel.mimeType.toLowerCase().includes('python')) {
       this.disposeCompleter();
+      this._loadCommands();
       return;
     }
     this._updateCompleter();
@@ -164,9 +201,7 @@ export class CodeEditorView extends StringView {
     // Set up a completer.
 
     if (!this.handler) {
-      const widget = this.editorWidget;
-      this.className = `ipylab-CodeEditor-${widget.id}`;
-      const editor = widget.editor;
+      const editor = this.editorWidget.editor;
       const model = new CompleterModel();
       // const completer = new Completer({ editor, model });
       const completer = new IpylabCompleter({ editor, model, showDoc: true });
@@ -174,7 +209,7 @@ export class CodeEditorView extends StringView {
       const provider = new IpylabCompleterProvider(this);
       const reconciliator = new ProviderReconciliator({
         context: {
-          widget: widget,
+          widget: this.editorWidget,
           editor
         },
         providers: [provider],
@@ -183,24 +218,9 @@ export class CodeEditorView extends StringView {
       this.handler = new CompletionHandler({ completer, reconciliator });
       this.handler.editor = editor;
 
-      // Hide the widget when it first loads.
-      // completer.hide();
       completer.addClass('jp-ThemedContainer');
       completer.addClass(this.className);
       Widget.attach(completer, document.body);
-      widget.addClass(this.className);
-
-      // Initialize the command registry with the bindings.
-      const useCapture = true;
-
-      // Setup the keydown listener for the document.
-      widget.node.addEventListener(
-        'keydown',
-        event => {
-          Private.commands.processKeydownEvent(event);
-        },
-        useCapture
-      );
 
       this._disposeCompleter = () => {
         model.dispose();
@@ -209,7 +229,7 @@ export class CodeEditorView extends StringView {
         delete this.handler;
       };
     }
-    this._updateCommands();
+    this._loadCommands();
   }
 
   disposeCompleter() {
@@ -220,89 +240,139 @@ export class CodeEditorView extends StringView {
   }
 
   disposeCommands() {
-    this.cmdInvoke?.dispose();
-    this.kbInvoke?.dispose();
-    this.kbTooltipInvoke?.dispose();
-    this.kbTooltipDismiss?.dispose();
-    this.kbCompleterSelect?.dispose();
-    this.kbEvaluate?.dispose();
+    this.disposables.forEach(obj => obj.dispose());
+    this.disposables.clear();
     this.tooltip?.dispose();
   }
 
-  _updateCommands() {
+  _loadCommands() {
     // Add the commands.
     this.disposeCommands();
+
     const cmdInvokeId = `${this.className}:invoke-completer`;
     const cmdTooltip = `${this.className}:tooltip-invoke`;
     const cmdEvaluate = `${this.className}:evaluate-code`;
+    const cmdUndo = `${this.className}:undo`;
+    const cmdRedo = `${this.className}:redo`;
 
     const selector = `.${this.className}`;
     const keyBindings: any = this.model.get('key_bindings');
 
-    this.cmdInvoke = Private.commands.addCommand(cmdInvokeId, {
-      execute: () => {
-        this.handler.invoke();
-      }
-    });
-
-    this.kbInvoke = Private.commands.addKeyBinding({
-      selector,
-      keys: keyBindings['invoke_completer'],
-      command: cmdInvokeId
-    });
-    this.kbTooltipInvoke = Private.commands.addKeyBinding({
-      selector,
-      keys: keyBindings['invoke_tooltip'],
-      command: cmdTooltip
-    });
-
-    Private.commands.addCommand(cmdTooltip, {
-      execute: async () => {
-        const editor = this.editorWidget.editor;
-        const code = editor.model.sharedModel.getSource();
-        const position = editor.getCursorPosition();
-        const cursor_pos = Text.jsIndexToCharIndex(
-          editor.getOffsetAt(position),
-          code
-        );
-        const msg = await this.model.scheduleOperation(
-          'requestInspect',
-          {
-            code,
-            cursor_pos
-          },
-          'auto'
-        );
-        this.tooltip?.dispose();
-        if (msg) {
-          this.tooltip = new Tooltip({
-            anchor: this.editorWidget,
-            bundle: msg.data,
-            editor: this.editorWidget.editor,
-            rendermime: IpylabModel.rendermime as any
-          });
-          this.tooltip.addClass(this.className);
-          Widget.attach(this.tooltip, document.body);
+    // Undo
+    this.disposables.add(
+      Private.commands.addCommand(cmdUndo, {
+        execute: async () => {
+          this.model.editorModel.sharedModel.undo();
         }
-      }
-    });
+      })
+    );
+    this.disposables.add(
+      Private.commands.addKeyBinding({
+        selector,
+        keys: keyBindings['undo'],
+        command: cmdUndo
+      })
+    );
 
-    // Evaluate selected code
-    Private.commands.addCommand(cmdEvaluate, {
-      execute: async () => {
-        const editor = this.editorWidget.editor;
-        const selection = editor.getSelection();
-        const start = editor.getOffsetAt(selection.start);
-        const end = editor.getOffsetAt(selection.end);
-        const code = editor.model.sharedModel.getSource().substring(start, end);
-        await this.model.scheduleOperation('evaluateCode', { code }, 'auto');
-      }
-    });
-    this.kbEvaluate = Private.commands.addKeyBinding({
-      selector,
-      keys: keyBindings['evaluate'],
-      command: cmdEvaluate
-    });
+    // Redo
+    this.disposables.add(
+      Private.commands.addCommand(cmdRedo, {
+        execute: async () => {
+          this.model.editorModel.sharedModel.redo();
+        }
+      })
+    );
+    this.disposables.add(
+      Private.commands.addKeyBinding({
+        selector,
+        keys: keyBindings['redo'],
+        command: cmdRedo
+      })
+    );
+
+    if (!this.model.editorModel.mimeType.toLowerCase().includes('python')) {
+      return;
+    }
+
+    // Invoke completer
+    this.disposables.add(
+      Private.commands.addCommand(cmdInvokeId, {
+        execute: () => {
+          this.handler.invoke();
+        }
+      })
+    );
+    this.disposables.add(
+      Private.commands.addKeyBinding({
+        selector,
+        keys: keyBindings['invoke_completer'],
+        command: cmdInvokeId
+      })
+    );
+
+    // Invoke tooltip (inspect)
+    this.disposables.add(
+      Private.commands.addCommand(cmdTooltip, {
+        execute: async () => {
+          const editor = this.editorWidget.editor;
+          const code = editor.model.sharedModel.getSource();
+          const position = editor.getCursorPosition();
+          const cursor_pos = Text.jsIndexToCharIndex(
+            editor.getOffsetAt(position),
+            code
+          );
+          const msg = await this.model.scheduleOperation(
+            'requestInspect',
+            {
+              code,
+              cursor_pos
+            },
+            'auto'
+          );
+          this.tooltip?.dispose();
+          if (msg) {
+            this.tooltip = new Tooltip({
+              anchor: this.editorWidget,
+              bundle: msg.data,
+              editor: this.editorWidget.editor,
+              rendermime: IpylabModel.rendermime as any
+            });
+            this.tooltip.addClass(this.className);
+            Widget.attach(this.tooltip, document.body);
+          }
+        }
+      })
+    );
+    this.disposables.add(
+      Private.commands.addKeyBinding({
+        selector,
+        keys: keyBindings['invoke_tooltip'],
+        command: cmdTooltip
+      })
+    );
+
+    // Evaluate
+    this.disposables.add(
+      Private.commands.addCommand(cmdEvaluate, {
+        execute: async () => {
+          const editor = this.editorWidget.editor;
+          const selection = editor.getSelection();
+          const start = editor.getOffsetAt(selection.start);
+          const end = editor.getOffsetAt(selection.end);
+          const code = editor.model.sharedModel
+            .getSource()
+            .substring(start, end);
+          await this.model.scheduleOperation('evaluateCode', { code }, 'auto');
+        }
+      })
+    );
+    this.disposables.add(
+      Private.commands.addKeyBinding({
+        selector,
+        keys: keyBindings['evaluate'],
+        command: cmdEvaluate
+      })
+    );
   }
 
   updateEditorOptions() {
@@ -315,14 +385,10 @@ export class CodeEditorView extends StringView {
   _completerEnabled = false;
   className: string;
   handler?: CompletionHandler;
-  cmdInvoke?: IDisposable;
-  kbInvoke?: IDisposable;
-  kbTooltipInvoke?: IDisposable;
-  kbTooltipDismiss?: IDisposable;
-  kbCompleterSelect?: IDisposable;
   tooltip?: Tooltip;
-  kbEvaluate?: IDisposable;
+
   _disposeCompleter?: () => void;
+  disposables = new Set<IDisposable>();
 }
 
 export const KERNEL_PROVIDER_ID = 'CompletionProvider:ipylab:kernel';
