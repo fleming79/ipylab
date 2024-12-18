@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import inspect
 from typing import TYPE_CHECKING, Unpack
 
@@ -139,9 +140,10 @@ class Shell(Ipylab):
 
     def add_objects_to_ipython_namespace(self, objects: dict, *, reset=False):
         "Load objects into the IPython/console namespace."
-        if reset:
-            self.comm.kernel.shell.reset()  # type: ignore
-        self.comm.kernel.shell.push(objects)  # type: ignore
+        with contextlib.suppress(AttributeError):
+            if reset:
+                self.comm.kernel.shell.reset()  # type: ignore
+            self.comm.kernel.shell.push(objects)  # type: ignore
 
     def open_console(
         self,

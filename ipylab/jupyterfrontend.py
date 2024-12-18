@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import functools
 import inspect
 from collections import OrderedDict
@@ -169,7 +170,8 @@ class App(Ipylab):
         evaluate = options["evaluate"]
         if isinstance(evaluate, str):
             evaluate = {"payload": evaluate}
-        ns = self.get_namespace(options.get("namespace_id", ""), buffers=buffers)
+        namespace_id = options.get("namespace_id", "")
+        ns = self.get_namespace(namespace_id, buffers=buffers)
         for name, expression in evaluate.items():
             try:
                 result = eval(expression, ns)  # noqa: S307
@@ -196,6 +198,8 @@ class App(Ipylab):
         if payload is not None:
             ns["_call_count"] = n = ns.get("_call_count", 0) + 1
             ns[f"payload_{n}"] = payload
+        if namespace_id == "":
+            self.shell.add_objects_to_ipython_namespace(ns)
         return {"payload": payload, "buffers": buffers}
 
     def shutdown_kernel(self, vpath: str | None = None):
@@ -215,6 +219,8 @@ class App(Ipylab):
         Note:
             To remove a namespace call `ipylab.app.namespaces.pop(<namespace_id>)`.
 
+        The default namespace ("") will also load objects from `shell.user_ns`.
+
         Parameters
         ----------
             objects:
@@ -227,6 +233,9 @@ class App(Ipylab):
                 ns.update(objs)
         if objects:
             ns.update(objects)
+        if namespace_id == "":
+            with contextlib.suppress(AttributeError):
+                ns.update(self.comm.kernel.shell.user_ns)  # type: ignore
         return ns
 
     def evaluate(
@@ -260,11 +269,9 @@ class App(Ipylab):
             Once evaluation is complete, the symbols named `payload` and `buffers` will be returned.
         vpath:
             The path of kernel session where to perform the evaluation.
-        globals:
-            The globals namespace includes the follow symbols:
-            * ipylab
-            * ipywidgets
-            * ipw (ipywidgets)
+        namespace_id:
+            The namespace where to perform evaluation.
+            The default namespace will also update the shell.user_ns after successful evaluation.
         """
         kwgs = {"evaluate": evaluate, "vpath": vpath, "namespace_id": namespace_id}
         return self.operation("evaluate", kwgs, **kwargs)

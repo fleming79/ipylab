@@ -1,7 +1,7 @@
 // Copyright (c) ipylab contributors
 // Distributed under the terms of the Modified BSD License.
 
-import { DOMWidgetView } from '@jupyter-widgets/base';
+import { StringView } from '@jupyter-widgets/controls';
 import { createStandaloneCell, SourceChange } from '@jupyter/ydoc';
 import { CodeEditor, CodeEditorWrapper } from '@jupyterlab/codeeditor';
 import {
@@ -19,8 +19,8 @@ import { JSONObject, UUID } from '@lumino/coreutils';
 import { IDisposable } from '@lumino/disposable';
 import { Message } from '@lumino/messaging';
 import { Widget } from '@lumino/widgets';
-import $ from 'jquery';
 import { IpylabModel } from './ipylab';
+import { Tooltip } from '@jupyterlab/tooltip';
 
 class IpylabCodeEditorWrapper extends CodeEditorWrapper {
   constructor(options: CodeEditorWrapper.IOptions & { view: CodeEditorView }) {
@@ -124,29 +124,21 @@ export class CodeEditorModel extends IpylabModel {
   editorModel: CodeEditor.IModel;
 }
 
-export class CodeEditorView extends DOMWidgetView {
-  _createElement(tagName: string): HTMLElement {
-    this.luminoWidget = new IpylabCodeEditorWrapper({
+export class CodeEditorView extends StringView {
+  render() {
+    super.render();
+    this.editorWidget = new IpylabCodeEditorWrapper({
       view: this,
       factory: IpylabModel.editorServices.factoryService.newInlineEditor,
       model: this.model.editorModel
     });
-    this.luminoWidget.id = this.luminoWidget.id || UUID.uuid4();
+    this.editorWidget.id = this.editorWidget.id || UUID.uuid4();
     this.model.on('change:mimeType', this.updateCompleter, this);
     this.model.on('change:completer_invoke_keys', this.updateCompleter, this);
     this.model.on('change:editor_options', this.updateEditorOptions, this);
     this.updateCompleter();
     this.updateEditorOptions();
-    return this.luminoWidget.node;
-  }
-
-  _setElement(el: HTMLElement): void {
-    if (this.el || el !== this.luminoWidget.node) {
-      throw new Error('Cannot reset the DOM element.');
-    }
-
-    this.el = this.luminoWidget.node;
-    this.$el = $(this.luminoWidget.node);
+    this.el.appendChild(this.editorWidget.node);
   }
 
   remove() {
@@ -154,6 +146,7 @@ export class CodeEditorView extends DOMWidgetView {
     this.model.off('change:completer_invoke_keys', this.updateCompleter, this);
     this.model.off('change:editor_options', this.updateEditorOptions, this);
     this.disposeCompleter();
+    this.disposeCommands();
     super.remove();
   }
   private updateCompleter() {
@@ -171,7 +164,7 @@ export class CodeEditorView extends DOMWidgetView {
     // Set up a completer.
 
     if (!this.handler) {
-      const widget = this.luminoWidget;
+      const widget = this.editorWidget;
       this.className = `ipylab-CodeEditor-${widget.id}`;
       const editor = widget.editor;
       const model = new CompleterModel();
@@ -189,6 +182,7 @@ export class CodeEditorView extends DOMWidgetView {
       });
       this.handler = new CompletionHandler({ completer, reconciliator });
       this.handler.editor = editor;
+
       // Hide the widget when it first loads.
       // completer.hide();
       completer.addClass('jp-ThemedContainer');
@@ -213,8 +207,6 @@ export class CodeEditorView extends DOMWidgetView {
         completer.dispose();
         this.handler?.dispose();
         delete this.handler;
-        this.cmdInvoke?.dispose();
-        this.kbInvoke?.dispose();
       };
     }
     this._updateCommands();
@@ -227,15 +219,21 @@ export class CodeEditorView extends DOMWidgetView {
     }
   }
 
-  _updateCommands() {
-    // Add the commands.
+  disposeCommands() {
     this.cmdInvoke?.dispose();
     this.kbInvoke?.dispose();
+    this.kbTooltipInvoke?.dispose();
+    this.kbTooltipDismiss?.dispose();
     this.kbCompleterSelect?.dispose();
     this.kbEvaluate?.dispose();
+    this.tooltip?.dispose();
+  }
 
-    // Invoke completer
+  _updateCommands() {
+    // Add the commands.
+    this.disposeCommands();
     const cmdInvokeId = `${this.className}:invoke-completer`;
+    const cmdTooltip = `${this.className}:tooltip-invoke`;
     const cmdEvaluate = `${this.className}:evaluate-code`;
 
     const selector = `.${this.className}`;
@@ -252,11 +250,47 @@ export class CodeEditorView extends DOMWidgetView {
       keys: keyBindings['invoke_completer'],
       command: cmdInvokeId
     });
+    this.kbTooltipInvoke = Private.commands.addKeyBinding({
+      selector,
+      keys: keyBindings['invoke_tooltip'],
+      command: cmdTooltip
+    });
+
+    Private.commands.addCommand(cmdTooltip, {
+      execute: async () => {
+        const editor = this.editorWidget.editor;
+        const code = editor.model.sharedModel.getSource();
+        const position = editor.getCursorPosition();
+        const cursor_pos = Text.jsIndexToCharIndex(
+          editor.getOffsetAt(position),
+          code
+        );
+        const msg = await this.model.scheduleOperation(
+          'requestInspect',
+          {
+            code,
+            cursor_pos
+          },
+          'auto'
+        );
+        this.tooltip?.dispose();
+        if (msg) {
+          this.tooltip = new Tooltip({
+            anchor: this.editorWidget,
+            bundle: msg.data,
+            editor: this.editorWidget.editor,
+            rendermime: IpylabModel.rendermime as any
+          });
+          this.tooltip.addClass(this.className);
+          Widget.attach(this.tooltip, document.body);
+        }
+      }
+    });
 
     // Evaluate selected code
     Private.commands.addCommand(cmdEvaluate, {
       execute: async () => {
-        const editor = this.luminoWidget.editor;
+        const editor = this.editorWidget.editor;
         const selection = editor.getSelection();
         const start = editor.getOffsetAt(selection.start);
         const end = editor.getOffsetAt(selection.end);
@@ -273,17 +307,20 @@ export class CodeEditorView extends DOMWidgetView {
 
   updateEditorOptions() {
     const options = this.model.get('editor_options');
-    this.luminoWidget.editor.setOptions(options);
+    this.editorWidget.editor.setOptions(options);
   }
 
   model: CodeEditorModel;
-  luminoWidget: IpylabCodeEditorWrapper;
+  editorWidget: IpylabCodeEditorWrapper;
   _completerEnabled = false;
   className: string;
   handler?: CompletionHandler;
   cmdInvoke?: IDisposable;
   kbInvoke?: IDisposable;
+  kbTooltipInvoke?: IDisposable;
+  kbTooltipDismiss?: IDisposable;
   kbCompleterSelect?: IDisposable;
+  tooltip?: Tooltip;
   kbEvaluate?: IDisposable;
   _disposeCompleter?: () => void;
 }
@@ -370,10 +407,6 @@ export class IpylabCompleterProvider implements ICompletionProvider {
 
       const position = editor.getCursorPosition();
       let offset = Text.jsIndexToCharIndex(editor.getOffsetAt(position), code);
-      const kernel = this._view.model.kernel;
-      if (!code || !kernel) {
-        return item;
-      }
       if (patch) {
         const { start, value } = patch;
         code = code.substring(0, start) + value;
@@ -385,7 +418,13 @@ export class IpylabCompleterProvider implements ICompletionProvider {
         cursor_pos: offset,
         detail_level: 0
       };
-      const msg = await kernel.requestInspect(contents);
+
+      const msg = await this._view.model.scheduleOperation(
+        'requestInspect',
+        contents,
+        'auto'
+      );
+
       const value = msg.content;
       if (value.status !== 'ok' || !value.found) {
         return item;

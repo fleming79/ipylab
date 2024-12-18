@@ -4,15 +4,22 @@
 from __future__ import annotations
 
 import inspect
-from typing import NotRequired, TypedDict
+from typing import TYPE_CHECKING, Any, NotRequired, TypedDict
 
 from IPython.core import completer as IPC  # noqa: N812
-from ipywidgets import DOMWidget, ValueWidget, register
+from IPython.utils.tokenutil import token_at_cursor
+from ipywidgets import register, widget_serialization
+from ipywidgets.widgets.trait_types import InstanceDict
+from ipywidgets.widgets.widget_description import DescriptionStyle
+from ipywidgets.widgets.widget_string import _String
 from traitlets import Callable, Dict, Instance, Unicode, default
 
 import ipylab
 from ipylab._compat.typing import override
-from ipylab.ipylab import Ipylab
+from ipylab.ipylab import Ipylab, Readonly
+
+if TYPE_CHECKING:
+    from IPython.core.interactiveshell import InteractiveShell
 
 mime_types = (
     "text/plain",
@@ -29,6 +36,9 @@ mime_types = (
 
 
 class IpylabCompleter(IPC.IPCompleter):
+    code_editor: Instance[CodeEditor] = Instance("ipylab.CodeEditor")
+    shell: InteractiveShell  # Needs to be set
+
     @default("disable_matchers")
     def _default_disable_matchers(self):
         return [
@@ -43,9 +53,13 @@ class IpylabCompleter(IPC.IPCompleter):
             "IPCompleter.file_matcher",
         ]
 
+    def update_namespace(self):
+        self.namespace = ipylab.app.get_namespace(self.code_editor.namespace_id)
+
     def do_complete(self, code: str, cursor_pos: int):
         """Completions provided by IPython completer, using Jedi for different namespaces."""
         # Adapted from IPython Shell._get_completions_experimental
+        self.update_namespace()
         matches = []
         comps = []
         with IPC.provisionalcompleter():
@@ -80,6 +94,63 @@ class IpylabCompleter(IPC.IPCompleter):
             "status": "ok",
         }
 
+    def _object_inspect_mime(self, oname: str, detail_level=0, omit_sections=()):
+        """Get object info as a mimebundle of formatted representations.
+
+        A mimebundle is a dictionary, keyed by mime-type.
+        It must always have the key `'text/plain'`.
+        """
+        # Extracted from ipykernel Shell
+        # Required to specify the namespace
+        self.update_namespace()
+        namespaces = ((self.code_editor.namespace_id, self.namespace),)
+        with self.shell.builtin_trap:
+            info = self.shell._object_find(oname, namespaces)  # noqa: SLF001
+            if info.found:
+                return self.shell.inspector._get_info(  # noqa: SLF001
+                    info.obj,
+                    oname,
+                    info=info,
+                    detail_level=detail_level,
+                    formatter=None,
+                    omit_sections=omit_sections,
+                )
+            raise KeyError(oname)
+
+    def do_inspect(self, code, cursor_pos, detail_level=0, omit_sections=()):
+        """Handle code inspection."""
+        name = token_at_cursor(code, cursor_pos)
+
+        reply_content: dict[str, Any] = {"status": "ok"}
+        reply_content["data"] = {}
+        reply_content["metadata"] = {}
+        try:
+            bundle = self._object_inspect_mime(name, detail_level=detail_level, omit_sections=omit_sections)
+            reply_content["data"].update(bundle)
+            if not self.shell.enable_html_pager:
+                reply_content["data"].pop("text/html")
+            reply_content["found"] = True
+        except KeyError:
+            reply_content["found"] = False
+        return reply_content
+
+    async def evaluate(self, code: str):
+        code = code or self.code_editor.value
+        self.update_namespace()
+        ns = self.namespace
+        wait = code.startswith("await")
+        try:
+            result = eval(code.removeprefix("await").strip(), ns)  # noqa: S307
+            if wait or inspect.iscoroutine(result):
+                result = await result
+            if not self.code_editor.namespace_id:
+                ipylab.app.shell.add_objects_to_ipython_namespace(ns)
+        except SyntaxError:
+            exec(code, ns, ns)  # noqa: S102
+            return next(reversed(ns.values()))
+        else:
+            return result
+
 
 class CodeEditorOptions(TypedDict):
     autoClosingBrackets: NotRequired[bool]  # False
@@ -100,7 +171,7 @@ class CodeEditorOptions(TypedDict):
 
 
 @register
-class CodeEditor(Ipylab, DOMWidget, ValueWidget):
+class CodeEditor(Ipylab, _String):
     """A Widget for code editing.
 
     Code completion is provided for Python code for the specified namespace.
@@ -114,57 +185,38 @@ class CodeEditor(Ipylab, DOMWidget, ValueWidget):
 
     _model_name = Unicode("CodeEditorModel").tag(sync=True)
     _view_name = Unicode("CodeEditorView").tag(sync=True)
-
-    value = Unicode().tag(sync=True)
+    style = InstanceDict(DescriptionStyle, help="Styling customizations").tag(sync=True, **widget_serialization)
     mime_type = Unicode("text/plain", help="syntax style").tag(sync=True)
     key_bindings = Dict().tag(sync=True)
     editor_options: Instance[CodeEditorOptions] = Dict().tag(sync=True)  # type: ignore
+    placeholder = None  # Presently not available
 
-    completer = Instance(IpylabCompleter, ())
+    completer = Readonly(
+        IpylabCompleter,
+        code_editor=lambda c: c,
+        shell=lambda c: c.comm.kernel.shell,
+        dynamic=["code_editor", "shell"],
+    )
 
     namespace_id = Unicode("")
     evaluate = Callable()
-    do_complete = Callable()
 
     @default("key_bindings")
     def _default_key_bindings(self):
-        # default is {"invoke_completer": ["Tab"], "evaluate": ["Shift Enter"]}
         return ipylab.plugin_manager.hook.default_editor_key_bindings(app=ipylab.app, obj=self)
 
     @default("evaluate")
     def _default_evaluate(self):
-        return self.evaluate_code
-
-    @default("do_complete")
-    def _default_complete_request(self):
-        return self._do_complete
+        return self.completer.evaluate
 
     @override
     async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list):
         match operation:
             case "requestComplete":
-                return self.do_complete(payload["code"], payload["cursor_pos"])  # type: ignore
+                return self.completer.do_complete(payload["code"], payload["cursor_pos"])  # type: ignore
+            case "requestInspect":
+                return self.completer.do_inspect(payload["code"], payload["cursor_pos"])  # type: ignore
             case "evaluateCode":
                 await self.evaluate(payload["code"])
                 return True
-
         return await super()._do_operation_for_frontend(operation, payload, buffers)
-
-    async def evaluate_code(self, code: str):
-        code = code or self.value
-        ns = ipylab.app.get_namespace(self.namespace_id)
-        wait = code.startswith("await")
-        try:
-            result = eval(code.removeprefix("await").strip(), ns)  # noqa: S307
-            if wait or inspect.iscoroutine(result):
-                result = await result
-        except SyntaxError:
-            exec(code, ns, ns)  # noqa: S102
-            return next(reversed(ns.values()))
-        else:
-            return result
-
-    def _do_complete(self, code: str, cursor_pos: int):
-        """Handle a completion request."""
-        self.completer.namespace = ipylab.app.get_namespace(self.namespace_id)
-        return self.completer.do_complete(code, cursor_pos)
