@@ -83,14 +83,10 @@ export class CodeEditorModel extends IpylabModel {
 
   initialize(attributes: any, options: any): void {
     super.initialize(attributes, options);
-    this.on('change:value', this.onValueChange);
     this.on('change:mime_type', this.updateMimeType);
     this.editorModel = new CodeEditor.Model({
       mimeType: this.get('mime_type'),
-      sharedModel: createStandaloneCell({
-        cell_type: 'code',
-        source: this.get('value')
-      })
+      sharedModel: createStandaloneCell({ cell_type: 'code', source: '' })
     });
     this.editorModel.sharedModel.changed.connect(
       this.onSharedModelSourceChange,
@@ -98,38 +94,37 @@ export class CodeEditorModel extends IpylabModel {
     );
   }
 
-  async onCustomMessage(msg: any) {
-    const content = typeof msg === 'string' ? JSON.parse(msg) : msg;
-    if (content.clearUndoHistory) {
-      this.editorModel.sharedModel.clearUndoHistory();
-    } else {
-      await super.onCustomMessage(content);
+  async operation(op: string, payload: any): Promise<any> {
+    switch (op) {
+      case 'clearUndoHistory':
+        return this.editorModel.sharedModel.clearUndoHistory();
+      case 'setValue':
+        this._syncRequired = true;
+        // Clear first for better reliability with plugins.
+        this.editorModel.sharedModel.setSource('');
+        this.editorModel.sharedModel.setSource(payload.value);
+        this._syncRequired = false;
+        return true;
+      default:
+        return await super.operation(op, payload);
     }
   }
 
   onSharedModelSourceChange() {
     if (!this._syncRequired) {
       this._syncRequired = true;
-      setTimeout(() => {
+      setTimeout(async () => {
         if (this._syncRequired) {
-          const value = this.editorModel.sharedModel.getSource();
-          if (value !== this.get('value')) {
-            this.set('value', value);
-            this.save_changes();
+          try {
+            const value = this.editorModel.sharedModel.getSource();
+            const payload = { sync: this.get('_sync'), value };
+            await this.scheduleOperation('setValue', payload, 'auto');
+          } finally {
+            this._syncRequired = false;
           }
-          this._syncRequired = false;
         }
       }, this.get('update_throttle_ms'));
     }
-  }
-
-  onValueChange() {
-    const value = this.get('value');
-    this._syncRequired = true;
-    if (this.editorModel.sharedModel.getSource() !== value) {
-      this.editorModel.sharedModel.setSource(value);
-    }
-    this._syncRequired = false;
   }
 
   updateMimeType() {
@@ -162,6 +157,7 @@ export class CodeEditorView extends StringView {
     this.model.on('change:editor_options', this.updateEditorOptions, this);
     this.updateCompleter();
     this.updateEditorOptions();
+    this.editorWidget.addClass('ipylab-CodeEditor');
     this.el.appendChild(this.editorWidget.node);
 
     // Initialize the command registry with the bindings.
@@ -192,6 +188,20 @@ export class CodeEditorView extends StringView {
       return;
     }
     this._updateCompleter();
+  }
+
+  /**
+   * Handle message sent to the front end.
+   *
+   * Used to focus or blur the widget.
+   */
+
+  handle_message(content: any): void {
+    if (content.do === 'focus') {
+      this.editorWidget.editor.focus();
+    } else if (content.do === 'blur') {
+      this.editorWidget.editor.blur();
+    }
   }
 
   /**
@@ -321,12 +331,10 @@ export class CodeEditorView extends StringView {
             editor.getOffsetAt(position),
             code
           );
+          const payload = { code, cursor_pos };
           const msg = await this.model.scheduleOperation(
             'requestInspect',
-            {
-              code,
-              cursor_pos
-            },
+            payload,
             'auto'
           );
           this.tooltip?.dispose();

@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import inspect
+from asyncio import Task
 from typing import TYPE_CHECKING, Any, NotRequired, TypedDict
 
 from IPython.core import completer as IPC  # noqa: N812
@@ -12,7 +14,7 @@ from ipywidgets import register, widget_serialization
 from ipywidgets.widgets.trait_types import InstanceDict
 from ipywidgets.widgets.widget_description import DescriptionStyle
 from ipywidgets.widgets.widget_string import _String
-from traitlets import Callable, Dict, Instance, Int, Unicode, default
+from traitlets import Callable, Dict, Instance, Int, Unicode, default, observe
 
 import ipylab
 from ipylab._compat.typing import override
@@ -174,6 +176,10 @@ class CodeEditorOptions(TypedDict):
 class CodeEditor(Ipylab, _String):
     """A Widget for code editing.
 
+    The entire value is sent as a custom message between frontend and backend.
+    The backend (Python) version is assumed to be the correct version in the event
+    of overlapping messages.
+
     Code completion is provided for Python code for the specified namespace.
     The default namespace '' corresponds to the shell namespace.
 
@@ -189,8 +195,13 @@ class CodeEditor(Ipylab, _String):
     mime_type = Unicode("text/plain", help="syntax style").tag(sync=True)
     key_bindings = Dict().tag(sync=True)
     editor_options: Instance[CodeEditorOptions] = Dict().tag(sync=True)  # type: ignore
-    update_throttle_ms = Int(100, help="The limit at which frontend changes are synchronised").tag(sync=True)
+    update_throttle_ms = Int(100, help="The limit at which changes are synchronised").tag(sync=True)
+    _sync = Int(0).tag(sync=True)
     placeholder = None  # Presently not available
+
+    value = Unicode()
+    _update_task: None | Task = None
+    _setting_value = False
 
     completer = Readonly(
         IpylabCompleter,
@@ -216,6 +227,25 @@ class CodeEditor(Ipylab, _String):
     def _default_evaluate(self):
         return self.completer.evaluate
 
+    @observe("value")
+    def _observe_value(self, _):
+        if not self._setting_value and not self._update_task:
+            # We use throttling to ensure there isn't a backlog of changes to synchronise.
+            # When the value is set in Python, we the shared model in the frontend should exactly reflect it.
+            async def send_value():
+                try:
+                    while True:
+                        self._sync = self._sync + 1
+                        value = self.value
+                        await self.operation("setValue", {"sync": self._sync, "value": value})
+                        await asyncio.sleep(self.update_throttle_ms / 1e3)
+                        if self.value == value:
+                            return
+                finally:
+                    self._update_task = None
+
+            self._update_task = self.to_task(send_value(), "Send value to frontend")
+
     @override
     async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list):
         match operation:
@@ -226,7 +256,20 @@ class CodeEditor(Ipylab, _String):
             case "evaluateCode":
                 await self.evaluate(payload["code"])
                 return True
+            case "setValue":
+                if self._update_task:
+                    await self._update_task
+                # Only set the value when a valid sync is provided
+                # sync is done
+                if payload["sync"] == self._sync:
+                    self._setting_value = True
+                    try:
+                        self.value = payload["value"]
+                    finally:
+                        self._setting_value = False
+                return self.value == payload["value"]
+
         return await super()._do_operation_for_frontend(operation, payload, buffers)
 
     def clear_undo_history(self):
-        self.send({"clearUndoHistory": True})
+        return self.operation("clearUndoHistory")
