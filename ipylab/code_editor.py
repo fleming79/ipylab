@@ -5,16 +5,17 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import typing
 from asyncio import Task
 from typing import TYPE_CHECKING, Any, NotRequired, TypedDict
 
 from IPython.core import completer as IPC  # noqa: N812
 from IPython.utils.tokenutil import token_at_cursor
-from ipywidgets import register, widget_serialization
+from ipywidgets import Layout, register, widget_serialization
 from ipywidgets.widgets.trait_types import InstanceDict
 from ipywidgets.widgets.widget_description import DescriptionStyle
 from ipywidgets.widgets.widget_string import _String
-from traitlets import Callable, Dict, Instance, Int, Unicode, default, observe
+from traitlets import Callable, Container, Dict, Instance, Int, Unicode, default, observe
 
 import ipylab
 from ipylab._compat.typing import override
@@ -185,7 +186,7 @@ class CodeEditor(Ipylab, _String):
 
     The completer is invoked with `Tab` by default. Use completer_invoke_keys to change.
 
-    `evaluate` and `do_complete` can be overloaded as required.
+    `evaluate` and `load_value` can be overloaded as required.
     Adjust `completer.disable_matchers` as required.
     """
 
@@ -197,6 +198,8 @@ class CodeEditor(Ipylab, _String):
     editor_options: Instance[CodeEditorOptions] = Dict().tag(sync=True)  # type: ignore
     update_throttle_ms = Int(100, help="The limit at which changes are synchronised").tag(sync=True)
     _sync = Int(0).tag(sync=True)
+
+    layout = InstanceDict(Layout, kw={"overflow": "hidden"}).tag(sync=True, **widget_serialization)
     placeholder = None  # Presently not available
 
     value = Unicode()
@@ -211,7 +214,8 @@ class CodeEditor(Ipylab, _String):
     )
 
     namespace_id = Unicode("")
-    evaluate = Callable()
+    evaluate: Container[typing.Callable[[str], typing.Coroutine]] = Callable()  # type: ignore
+    load_value: Container[typing.Callable[[str], None]] = Callable()  # type: ignore
 
     @default("key_bindings")
     def _default_key_bindings(self):
@@ -227,6 +231,10 @@ class CodeEditor(Ipylab, _String):
     def _default_evaluate(self):
         return self.completer.evaluate
 
+    @default("load_value")
+    def _default_load_value(self):
+        return lambda value: self.set_trait("value", value)
+
     @observe("value")
     def _observe_value(self, _):
         if not self._setting_value and not self._update_task:
@@ -235,9 +243,9 @@ class CodeEditor(Ipylab, _String):
             async def send_value():
                 try:
                     while True:
-                        self._sync = self._sync + 1
                         value = self.value
-                        await self.operation("setValue", {"sync": self._sync, "value": value})
+                        await self.operation("setValue", {"value": value})
+                        self._sync = self._sync + 1
                         await asyncio.sleep(self.update_throttle_ms / 1e3)
                         if self.value == value:
                             return
@@ -264,7 +272,7 @@ class CodeEditor(Ipylab, _String):
                 if payload["sync"] == self._sync:
                     self._setting_value = True
                     try:
-                        self.value = payload["value"]
+                        self.load_value(payload["value"])
                     finally:
                         self._setting_value = False
                 return self.value == payload["value"]

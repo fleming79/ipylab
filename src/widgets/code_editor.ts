@@ -100,8 +100,6 @@ export class CodeEditorModel extends IpylabModel {
         return this.editorModel.sharedModel.clearUndoHistory();
       case 'setValue':
         this._syncRequired = true;
-        // Clear first for better reliability with plugins.
-        this.editorModel.sharedModel.setSource('');
         this.editorModel.sharedModel.setSource(payload.value);
         this._syncRequired = false;
         return true;
@@ -151,13 +149,13 @@ export class CodeEditorView extends StringView {
       model: this.model.editorModel
     });
     this.editorWidget.id = this.editorWidget.id || UUID.uuid4();
-    this.editorWidget.addClass(this.className);
     this.model.on('change:mimeType', this.updateCompleter, this);
     this.model.on('change:completer_invoke_keys', this.updateCompleter, this);
     this.model.on('change:editor_options', this.updateEditorOptions, this);
     this.updateCompleter();
     this.updateEditorOptions();
     this.editorWidget.addClass('ipylab-CodeEditor');
+    this.editorWidget.addClass(this.className);
     this.el.appendChild(this.editorWidget.node);
 
     // Initialize the command registry with the bindings.
