@@ -333,11 +333,12 @@ class Ipylab(WidgetBase):
         # Unfortunately it looks like Javascript Promises can't be cancelled.
         # https://stackoverflow.com/questions/30233302/promise-is-it-possible-to-force-cancel-a-promise#30235261
 
-    def _on_custom_msg(self, _, msg: str, buffers: list):
-        if not isinstance(msg, str):
+    def _on_custom_msg(self, _, msg: dict, buffers: list):
+        content = msg.get("ipylab")
+        if not content:
             return
         try:
-            c = json.loads(msg)
+            c = json.loads(content)
             if "ipylab_PY" in c:
                 error = self._to_frontend_error(c) if "error" in c else None
                 self._pending_operations.pop(c["ipylab_PY"]).set(c.get("payload"), error)
@@ -358,7 +359,7 @@ class Ipylab(WidgetBase):
             return IpylabFrontendError(msg)
         return IpylabFrontendError(error)
 
-    async def _do_operation_for_fe(self, ipylab_FE: str, operation: str, payload: dict, buffers: list):
+    async def _do_operation_for_fe(self, ipylab_FE: str, operation: str, payload: dict, buffers: list | None):
         """Handle operation requests from the frontend and reply with a result."""
         content: dict[str, Any] = {"ipylab_FE": ipylab_FE}
         buffers = []
@@ -373,7 +374,7 @@ class Ipylab(WidgetBase):
         except Exception:
             self.log.exception("Operation for frontend error", obj={"operation": operation, "payload": payload})
         finally:
-            self.send(content, buffers)
+            self._ipylab_send(content, buffers)
 
     async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list):
         """Perform an operation for a custom message with an ipylab_FE uuid."""
@@ -384,7 +385,7 @@ class Ipylab(WidgetBase):
         return self.operation("genericOperation", kwgs, **kwargs)
 
     def close(self):
-        self.send({"close": True})
+        self._ipylab_send({"close": True})
         super().close()
 
     def ensure_run(self, aw: Callable | Awaitable | None) -> None:
@@ -439,9 +440,9 @@ class Ipylab(WidgetBase):
         # see: _observe_comm for removal
         self._has_attrs_mappings.add((obj, name))
 
-    def send(self, content, buffers=None):
+    def _ipylab_send(self, content, buffers: list | None = None):
         try:
-            super().send(json.dumps(content, default=pack), buffers)
+            self.send({"ipylab": json.dumps(content, default=pack)}, buffers)
         except Exception:
             self.log.exception("Send error", obj=content)
             raise
@@ -517,7 +518,7 @@ class Ipylab(WidgetBase):
         self._pending_operations[ipylab_PY] = response = Response()
 
         async def _operation(content: dict):
-            self.send(content)
+            self._ipylab_send(content)
             payload = await response.wait()
             return Transform.transform_payload(content["transform"], payload)
 

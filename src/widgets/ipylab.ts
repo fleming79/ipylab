@@ -88,7 +88,7 @@ export class IpylabModel extends DOMWidgetModel {
       [base, subpath] = this.toBaseAndSubpath(this.get('ipylab_base'), 'this');
       base = getNestedProperty({ obj: base, subpath, nullIfMissing: true });
       if (!base) {
-        this.send({
+        this.ipylabSend({
           error: `Invalid ipylab_base '${this.get('ipylab_base')}'!`
         });
         this.close();
@@ -120,7 +120,7 @@ export class IpylabModel extends DOMWidgetModel {
     this._pendingOperations.clear();
     comm_closed = comm_closed || !this.commAvailable;
     if (!comm_closed) {
-      this.send({ closed: true });
+      this.ipylabSend({ closed: true });
     }
     Object.defineProperty(this, 'base', { value: null });
     return super.close(true);
@@ -135,7 +135,7 @@ export class IpylabModel extends DOMWidgetModel {
   /**
    * Send a custom msg over the comm.
    */
-  send(
+  ipylabSend(
     content: any,
     callbacks?: ICallbacks,
     buffers?: ArrayBuffer[] | ArrayBufferView[]
@@ -150,7 +150,7 @@ export class IpylabModel extends DOMWidgetModel {
       }
       content = toJSONsubstituteCylic(content);
     }
-    super.send(content, callbacks, buffers);
+    this.send({ ipylab: content }, callbacks, buffers);
   }
 
   /**
@@ -171,7 +171,7 @@ export class IpylabModel extends DOMWidgetModel {
     // with the key `ipylab_FE`.
     const opDone = new PromiseDelegate();
     this._pendingOperations.set(ipylab_FE, opDone);
-    this.send({ ipylab_FE, operation, payload });
+    this.ipylabSend({ ipylab_FE, operation, payload });
     const result: any = await opDone.promise;
     return await this.transformObject(result, transform);
   }
@@ -217,6 +217,12 @@ export class IpylabModel extends DOMWidgetModel {
     }
   }
 
+  protected onCustomMessage(msg: any) {
+    if (msg.ipylab) {
+      this._onBackendMessage(JSON.parse(msg.ipylab));
+    }
+  }
+
   /**
    * Handle messages
    * 1. Response to requested operation sent to Python (ipylab_FE).
@@ -226,8 +232,7 @@ export class IpylabModel extends DOMWidgetModel {
    *
    * @param msg
    */
-  protected async onCustomMessage(msg: any) {
-    const content = typeof msg === 'string' ? JSON.parse(msg) : msg;
+  private async _onBackendMessage(content: any) {
     if (content.ipylab_FE) {
       // Result of an operation request sent to Python.
       const op = this._pendingOperations.get(content.ipylab_FE);
@@ -268,9 +273,13 @@ export class IpylabModel extends DOMWidgetModel {
         obj = obj.payload;
       }
       const payload = (await this.transformObject(obj, transform)) ?? null;
-      this.send({ ipylab_PY, operation, payload }, null, buffers);
+      this.ipylabSend({ ipylab_PY, operation, payload }, null, buffers);
     } catch (e) {
-      this.send({ operation, ipylab_PY, error: `${(e as Error).message}` });
+      this.ipylabSend({
+        operation,
+        ipylab_PY,
+        error: `${(e as Error).message}`
+      });
       console.error(e);
     }
   }

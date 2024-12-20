@@ -73,11 +73,10 @@ export class SimpleOutputModel extends IpylabModel {
   }
 
   async onCustomMessage(msg: any) {
-    const content = typeof msg === 'string' ? JSON.parse(msg) : msg;
-    if ('add' in content) {
-      this.add(content.add, content.clear);
+    if (msg.add) {
+      this.add(msg.add, msg.clear);
     } else {
-      await super.onCustomMessage(content);
+      super.onCustomMessage(msg);
     }
   }
 
