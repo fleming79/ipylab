@@ -6,7 +6,7 @@ from __future__ import annotations
 import collections
 from typing import TYPE_CHECKING
 
-from ipywidgets import HTML, BoundedIntText, Button, Checkbox, Combobox, Dropdown, HBox, Output, Select, VBox
+from ipywidgets import HTML, BoundedIntText, Button, Checkbox, Combobox, Dropdown, HBox, Select, VBox
 from traitlets import directional_link, link, observe
 
 import ipylab
@@ -42,7 +42,7 @@ class LogViewer(Panel):
         description="Buffer size",
         min=1,
         max=1e6,
-        layout={"width": "max-content"},
+        layout={"width": "max-content", "flex": "0 0 auto"},
         created=lambda c: c["obj"].observe(c["owner"]._observe_buffer_size, "value"),  # noqa: SLF001
     )
     button_show_send_dialog = Readonly(
@@ -51,20 +51,20 @@ class LogViewer(Panel):
         tooltip="Send the record to the console.\n"
         "The record has the properties 'owner' and 'obj'attached "
         "which may be of interest for debugging purposes.",
-        layout={"width": "auto"},
+        layout={"width": "auto", "flex": "0 0 auto"},
     )
     button_clear = Readonly(
         Button,
         description="⌧",
         tooltip="Clear log",
-        layout={"width": "auto"},
+        layout={"width": "auto", "flex": "0 0 auto"},
     )
     autoscroll_enabled = Readonly(
         Checkbox,
         description="Auto scroll",
         indent=False,
         tooltip="Automatically scroll to the most recent logs.",
-        layout={"width": "auto"},
+        layout={"width": "auto", "flex": "0 0 auto"},
     )
     _default_header_children = (
         "info",
@@ -162,8 +162,7 @@ class LogViewer(Panel):
             layout={"width": "auto"},
             options=tuple(options),
         )
-        output = Output()
-        body = VBox([select, search, output])
+        body = VBox([select, search])
 
         def observe(change: dict):
             if change["owner"] is select:
