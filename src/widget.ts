@@ -5,6 +5,7 @@ import { AutoscrollModel, AutoscrollView } from './widgets/autoscroll';
 import { CodeEditorModel, CodeEditorView } from './widgets/code_editor';
 import { CommandRegistryModel } from './widgets/commands';
 import { ConnectionModel, ShellConnectionModel } from './widgets/connection';
+import { CSSStyleSheetModel } from './widgets/cssstylesheet';
 import { DialogModel } from './widgets/dialog';
 import { JupyterFrontEndModel } from './widgets/frontend';
 import { IconModel, IconView } from './widgets/icon';
@@ -23,6 +24,7 @@ export {
   CodeEditorView,
   CommandRegistryModel,
   ConnectionModel,
+  CSSStyleSheetModel,
   DialogModel,
   IconModel,
   IconView,

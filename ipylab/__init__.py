@@ -13,11 +13,13 @@ from ipylab.notification import NotificationType, NotifyAction
 from ipylab.widgets import Icon, Panel, SplitPanel
 from ipylab.code_editor import CodeEditor
 from ipylab.simple_output import SimpleOutput
+from ipylab.css_stylesheet import CSSStyleSheet
 
 __all__ = [
     "__version__",
     "CodeEditor",
     "Connection",
+    "CSSStyleSheet",
     "ShellConnection",
     "SimpleOutput",
     "Panel",

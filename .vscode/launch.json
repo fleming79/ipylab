@@ -56,12 +56,32 @@
       "presentation": {
         "hidden": false
       }
+    },
+    {
+      "name": "IPylab frontend with Chrome",
+      "type": "chrome",
+      "request": "launch",
+      "timeout": 180000,
+      "url": "http://localhost:9999",
+      // set webroot to the parent dir of your project's top level package.json
+      "webRoot": "${workspaceFolder}",
+      "pathMapping": {
+        "url": "webpack://ipylab/src",
+        "path": "${workspaceFolder}/src"
+      },
+      "presentation": {
+        "hidden": true
+      }
     }
   ],
   "compounds": [
     {
       "name": "Debug IPylab with firefox",
       "configurations": ["Ipylab", "IPylab frontend with Firefox"]
+    },
+    {
+      "name": "Debug Ipylab with Chrome",
+      "configurations": ["Ipylab", "IPylab frontend with Chrome"]
     }
   ]
 }
