@@ -12,8 +12,8 @@ from traitlets import Container, Instance, Unicode
 
 import ipylab
 from ipylab import Area, InsertMode, Ipylab, ShellConnection, Transform, pack
-from ipylab.common import IpylabKwgs, Obj, TaskHookType
-from ipylab.ipylab import IpylabBase, Readonly
+from ipylab.common import IpylabKwgs, Obj, Readonly, TaskHookType
+from ipylab.ipylab import IpylabBase
 from ipylab.log_viewer import LogViewer
 
 if TYPE_CHECKING:

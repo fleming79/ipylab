@@ -11,9 +11,9 @@ from traitlets import Container, Instance, Union
 import ipylab
 from ipylab._compat.typing import override
 from ipylab.commands import APP_COMMANDS_NAME, CommandRegistry
-from ipylab.common import Obj
+from ipylab.common import Obj, Readonly
 from ipylab.connection import InfoConnection
-from ipylab.ipylab import Ipylab, IpylabBase, Readonly, Transform
+from ipylab.ipylab import Ipylab, IpylabBase, Transform
 
 if TYPE_CHECKING:
     from asyncio import Task

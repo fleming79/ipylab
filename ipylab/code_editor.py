@@ -19,7 +19,8 @@ from traitlets import Callable, Container, Dict, Instance, Int, Unicode, default
 
 import ipylab
 from ipylab._compat.typing import override
-from ipylab.ipylab import Ipylab, Readonly
+from ipylab.common import Readonly
+from ipylab.ipylab import Ipylab
 
 if TYPE_CHECKING:
     from IPython.core.interactiveshell import InteractiveShell

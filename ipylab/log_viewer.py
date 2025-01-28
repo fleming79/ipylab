@@ -10,8 +10,7 @@ from ipywidgets import HTML, BoundedIntText, Button, Checkbox, Combobox, Dropdow
 from traitlets import directional_link, link, observe
 
 import ipylab
-from ipylab.common import SVGSTR_TEST_TUBE, Area, InsertMode
-from ipylab.ipylab import Readonly
+from ipylab.common import SVGSTR_TEST_TUBE, Area, InsertMode, Readonly
 from ipylab.log import LogLevel
 from ipylab.simple_output import AutoScroll, SimpleOutput
 from ipylab.widgets import Icon, Panel

@@ -5,31 +5,48 @@ from __future__ import annotations
 
 import inspect
 import typing
+import weakref
+from collections import OrderedDict
 from collections.abc import Awaitable, Callable
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict
+from typing import TYPE_CHECKING, Any, Generic, Literal, NotRequired, TypedDict, TypeVar
 
 import pluggy
 from ipywidgets import Widget, widget_serialization
 from traitlets import HasTraits
 
 import ipylab
+from ipylab._compat.typing import override
 
-__all__ = ["Area", "Obj", "InsertMode", "Transform", "TransformType", "hookimpl", "pack", "IpylabKwgs", "TaskHookType"]
+__all__ = [
+    "Area",
+    "Obj",
+    "InsertMode",
+    "Transform",
+    "TransformType",
+    "hookimpl",
+    "pack",
+    "IpylabKwgs",
+    "TaskHookType",
+    "LastUpdatedDict",
+    "Readonly",
+    "ReadonlyCreate",
+    "ReadonlyCreated",
+]
 
 hookimpl = pluggy.HookimplMarker("ipylab")  # Used for plugins
 
 SVGSTR_TEST_TUBE = '<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 392.493 392.493" xml:space="preserve" fill="#000000"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <polygon style="fill:#FFFFFF;" points="83.2,99.123 169.697,185.62 300.477,185.62 148.687,33.701 "></polygon> <g> <path style="fill:#56ACE0;" d="M21.851,348.917c0,12.024,9.826,21.786,21.786,21.786s21.786-9.826,21.786-21.786 c0-7.111-10.214-25.794-21.786-43.184C32,323.123,21.851,341.806,21.851,348.917z"></path> <path style="fill:#56ACE0;" d="M31.677,218.59c0,6.594,5.301,11.895,11.895,11.895s11.895-5.301,11.895-11.895 c-0.065-3.491-5.042-13.382-11.895-24.113C36.784,205.143,31.741,215.034,31.677,218.59z"></path> </g> <path style="fill:#194F82;" d="M372.622,226.864L164.073,18.315c3.943-4.267,3.879-10.925-0.323-15.063 c-3.62-3.556-10.02-5.042-15.451,0L52.687,98.864c-4.267,4.267-4.267,11.119,0,15.451c4.202,4.202,10.796,4.267,15.063,0.323 l208.549,208.55c25.471,27.345,73.503,25.729,96.259,0C399.127,296.618,399.127,253.499,372.622,226.864z M83.2,99.123 l65.422-65.358l151.919,151.919h-130.78L83.2,99.123z M357.172,307.737c-15.321,16.356-44.8,19.846-65.358,0L191.483,207.406 h130.844l34.844,34.844C375.208,260.351,375.208,289.701,357.172,307.737z"></path> <path style="fill:#FFC10D;" d="M357.172,307.737c18.036-18.036,18.036-47.386,0-65.422l-34.844-34.909H191.483l100.331,100.331 C312.436,327.584,341.851,324.093,357.172,307.737z"></path> <g> <path style="fill:#194F82;" d="M34.844,280.327C29.026,288.149,0,328.295,0,348.917c0,24.048,19.653,43.572,43.636,43.572 s43.572-19.523,43.572-43.572c0-20.622-29.026-60.768-34.844-68.59C48.291,274.767,39.046,274.767,34.844,280.327z M43.636,370.767 c-12.024,0-21.786-9.826-21.786-21.786c0-7.111,10.214-25.794,21.786-43.184c11.572,17.325,21.786,36.008,21.786,43.184 C65.422,360.941,55.661,370.767,43.636,370.767z"></path> <path style="fill:#194F82;" d="M43.636,252.335c18.618,0,33.745-15.127,33.745-33.681c0-15.063-19.071-41.956-24.954-49.842 c-4.073-5.56-13.382-5.56-17.519,0c-5.883,7.887-24.954,34.78-24.954,49.842C9.891,237.272,25.018,252.335,43.636,252.335z M43.636,194.541c6.853,10.731,11.895,20.622,11.895,24.113c0,6.594-5.301,11.895-11.895,11.895s-11.96-5.301-11.96-11.895 C31.741,215.163,36.784,205.272,43.636,194.541z"></path> </g> </g></svg>'
 
+T = TypeVar("T")
+
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
-    from typing import TypeVar, overload
+    from typing import overload
 
     from traitlets import HasTraits
 
     from ipylab.ipylab import Ipylab
-
-    T = TypeVar("T")
 
     @overload
     def pack(obj: Widget) -> str: ...
@@ -242,3 +259,137 @@ def trait_tuple_add(owner: HasTraits, name: str, value: Any):
     items = getattr(owner, name)
     if value not in items:
         owner.set_trait(name, (*items, value))
+
+
+class LastUpdatedDict(OrderedDict):
+    """Store items in the order the keys were last added.
+
+    mode: Literal["first", "last"]
+        The end to shift the last added key."""
+
+    # ref: https://docs.python.org/3/library/collections.html#ordereddict-examples-and-recipes
+    _updating = False
+    _last = True
+
+    def __init__(self, *args, mode: Literal["first", "last"] = "last", **kwargs):
+        self._last = mode == "last"
+        super().__init__(*args, **kwargs)
+
+    def __setitem__(self, key, value):
+        super().__setitem__(key, value)
+        if not self._updating:
+            self.move_to_end(key, self._last)
+
+    @override
+    def update(self, m, **kwargs):
+        self._updating = True
+        try:
+            super().update(m, **kwargs)
+        finally:
+            self._updating = False
+
+
+class ReadonlyCreate(Generic[T], TypedDict):
+    "A TypedDict relevant to Readonly"
+
+    name: str
+    klass: type[T]
+    owner: Any
+    args: tuple
+    kwgs: dict
+
+
+class ReadonlyCreated(Generic[T], TypedDict):
+    "A TypedDict relevant to Readonly"
+
+    name: str
+    obj: T
+    owner: Any
+
+
+class Readonly(Generic[T]):
+    __slots__ = ["name", "instances", "klass", "args", "kwgs", "dynamic", "create", "created"]
+
+    def __init__(
+        self,
+        klass: type[T],
+        *args,
+        dynamic: list[str] | None = None,
+        create: Callable[[ReadonlyCreate[T]], T] | str = "",
+        created: Callable[[ReadonlyCreated[T]]] | str = "",
+        **kwgs,
+    ):
+        """Define an instance of `klass` as a cached read only property.
+        `args` and `kwgs` are used to instantiate `klass`.
+
+        Parameters:
+        ----------
+
+        dynamic: list[str]:
+            A list of argument names to call during creation. It is called with obj (owner)
+            as an argument.
+
+        create: Callable[[ReadonlyCreated], T] | str
+            A function or method name to call to create the instance of klass.
+
+        created: Callable[[ReadonlyCreatedDict], None] | str
+            A function or method name to call after the instance is created.
+
+        **kwgs:
+            `kwgs` to pass when instantiating `klass`. Arguments listed in dynamic
+            are first called with obj as an argument to obtain the value to
+            substitute in place of the dynamic function.
+        """
+        if callable(create) and len(inspect.signature(create).parameters) != 1:
+            msg = "'create' must be a callable the accepts one argument."
+            raise ValueError(msg)
+        if callable(created) and len(inspect.signature(created).parameters) != 1:
+            msg = "'created' must be a callable the accepts one argument."
+            raise ValueError(msg)
+        if dynamic:
+            for k in dynamic:
+                if not callable(kwgs[k]) or len(inspect.signature(kwgs[k]).parameters) != 1:
+                    msg = f"Argument'{k}' must a callable that accepts one argument."
+                    raise ValueError(msg)
+        self.created = created
+        self.create = create
+        self.dynamic = dynamic
+        self.args = args
+        self.klass = klass
+        self.kwgs = kwgs
+        self.instances = weakref.WeakKeyDictionary()
+
+    def __set_name__(self, owner_cls, name: str):
+        self.name = name
+
+    def __get__(self, obj, objtype=None) -> T:
+        if obj is None:
+            return self  # type: ignore
+        if obj not in self.instances:
+            kwgs = self.kwgs
+            if self.dynamic:
+                kwgs = kwgs.copy()
+                for k in self.dynamic:
+                    kwgs[k] = kwgs[k](obj)
+            if self.create:
+                create = getattr(obj, self.create) if isinstance(self.create, str) else self.create
+                kw = ReadonlyCreate(name=self.name, klass=self.klass, owner=obj, args=self.args, kwgs=kwgs)
+                instance = create(kw)
+                if not isinstance(instance, self.klass):
+                    msg = f"Expected {self.klass} but {create=} returned {type(instance)}"
+                    raise TypeError(msg)
+            else:
+                instance = self.klass(*self.args, **kwgs)
+            self.instances[obj] = instance
+            try:
+                if self.created:
+                    created = getattr(obj, self.created) if isinstance(self.created, str) else self.created
+                    created(ReadonlyCreated(owner=obj, obj=instance, name=self.name))
+            except Exception:
+                if log := getattr(obj, "log", None):
+                    log.exception("Callback `created` failed", obj=self.created)
+        return self.instances[obj]
+
+    def __set__(self, obj, value):
+        msg = f"Setting {obj.__class__.__name__}.{self.name} is forbidden!"
+        raise AttributeError(msg)

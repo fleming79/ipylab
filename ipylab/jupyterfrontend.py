@@ -7,8 +7,7 @@ import asyncio
 import contextlib
 import functools
 import inspect
-from collections import OrderedDict
-from typing import TYPE_CHECKING, Any, Literal, Unpack
+from typing import TYPE_CHECKING, Any, Unpack
 
 from ipywidgets import Widget, register
 from traitlets import Bool, Container, Dict, Instance, Unicode, UseEnum, default, observe
@@ -17,9 +16,9 @@ import ipylab
 from ipylab import Ipylab
 from ipylab._compat.typing import override
 from ipylab.commands import APP_COMMANDS_NAME, CommandPalette, CommandRegistry
-from ipylab.common import IpylabKwgs, Obj, to_selector
+from ipylab.common import IpylabKwgs, LastUpdatedDict, Obj, Readonly, to_selector
 from ipylab.dialog import Dialog
-from ipylab.ipylab import IpylabBase, Readonly
+from ipylab.ipylab import IpylabBase
 from ipylab.launcher import Launcher
 from ipylab.log import IpylabLogFormatter, IpylabLogHandler, LogLevel
 from ipylab.menu import ContextMenu, MainMenu
@@ -29,34 +28,6 @@ from ipylab.shell import Shell
 
 if TYPE_CHECKING:
     from typing import ClassVar
-
-
-class LastUpdatedDict(OrderedDict):
-    """Store items in the order the keys were last added.
-
-    mode: Literal["first", "last"]
-        The end to shift the last added key."""
-
-    # ref: https://docs.python.org/3/library/collections.html#ordereddict-examples-and-recipes
-    _updating = False
-    _last = True
-
-    def __init__(self, *args, mode: Literal["first", "last"] = "last", **kwargs):
-        self._last = mode == "last"
-        super().__init__(*args, **kwargs)
-
-    def __setitem__(self, key, value):
-        super().__setitem__(key, value)
-        if not self._updating:
-            self.move_to_end(key, self._last)
-
-    @override
-    def update(self, m, **kwargs):
-        self._updating = True
-        try:
-            super().update(m, **kwargs)
-        finally:
-            self._updating = False
 
 
 @register

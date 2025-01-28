@@ -9,14 +9,24 @@ import inspect
 import json
 import uuid
 import weakref
-from typing import TYPE_CHECKING, Any, Generic, TypedDict, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from ipywidgets import Widget, register
 from traitlets import Bool, Container, Dict, HasTraits, Instance, Set, TraitError, TraitType, Unicode, default, observe
 
 import ipylab
 import ipylab._frontend as _fe
-from ipylab.common import IpylabKwgs, Obj, TaskHooks, TaskHookType, Transform, TransformType, pack, trait_tuple_add
+from ipylab.common import (
+    IpylabKwgs,
+    Obj,
+    Readonly,
+    TaskHooks,
+    TaskHookType,
+    Transform,
+    TransformType,
+    pack,
+    trait_tuple_add,
+)
 from ipylab.log import IpylabLoggerAdapter
 
 if TYPE_CHECKING:
@@ -25,7 +35,7 @@ if TYPE_CHECKING:
     from typing import ClassVar, Self, Unpack
 
 
-__all__ = ["Ipylab", "WidgetBase", "Readonly", "ReadonlyCreated"]
+__all__ = ["Ipylab", "WidgetBase"]
 
 T = TypeVar("T")
 L = TypeVar("L", bound="Ipylab")
@@ -39,84 +49,6 @@ class IpylabBase(TraitType[tuple[str, str], None]):
         "The 'mapping' to the 'base' in the frontend."
         self._trait = Unicode()
         super().__init__((base, subpath))
-
-
-class ReadonlyCreated(Generic[T], TypedDict):
-    name: str
-    obj: T
-    owner: Any
-
-
-class Readonly(Generic[T]):
-    __slots__ = ["name", "instances", "klass", "args", "kwgs", "dynamic", "created"]
-
-    def __init__(
-        self,
-        klass: type[T],
-        *args,
-        dynamic: list[str] | None = None,
-        created: Callable[[ReadonlyCreated[T]]] | str = "",
-        **kwgs,
-    ):
-        """Define an instance of `klass` as a cached read only property.
-        `args` and `kwgs` are used to instantiate `klass`.
-
-        Parameters:
-        ----------
-
-        dynamic: list[str]:
-            A list of argument names to call during creation. It is called with obj (owner)
-            as an argument.
-
-        created: Callable[ReadonlyCreatedDict] | str
-            A function to call when the instance is created.
-            If it is a non-empty string, it will call the method on the `owner` with that name.
-
-        **kwgs:
-            `kwgs` to pass when instantiating `klass`. Arguments listed in dynamic
-            are first called with obj as an argument to obtain the value to
-            substitute in place of the dynamic function.
-        """
-        if callable(created) and len(inspect.signature(created).parameters) != 1:
-            msg = "'created' must be a callable the accepts two arguments."
-            raise ValueError(msg)
-        if dynamic:
-            for k in dynamic:
-                if not callable(kwgs[k]) or len(inspect.signature(kwgs[k]).parameters) != 1:
-                    msg = f"Argument'{k}' must a callable that accepts one argument."
-                    raise ValueError(msg)
-        self.created = created
-        self.dynamic = dynamic
-        self.args = args
-        self.klass = klass
-        self.kwgs = kwgs
-        self.instances = weakref.WeakKeyDictionary()
-
-    def __set_name__(self, owner_cls, name: str):
-        self.name = name
-
-    def __get__(self, obj, objtype=None) -> T:
-        if obj is None:
-            return self  # type: ignore
-        if obj not in self.instances:
-            kwgs = self.kwgs
-            if self.dynamic:
-                kwgs = kwgs.copy()
-                for k in self.dynamic:
-                    kwgs[k] = kwgs[k](obj)
-            self.instances[obj] = self.klass(*self.args, **kwgs)
-            try:
-                if self.created:
-                    created = getattr(obj, self.created) if isinstance(self.created, str) else self.created
-                    created(ReadonlyCreated(owner=obj, obj=self.instances[obj], name=self.name))
-            except Exception:
-                if log := getattr(obj, "log", None):
-                    log.exception("Callback `created` failed", obj=self.created)
-        return self.instances[obj]
-
-    def __set__(self, obj, value):
-        msg = f"Setting {obj.__class__.__name__}.{self.name} is forbidden!"
-        raise AttributeError(msg)
 
 
 class Response(asyncio.Event):
