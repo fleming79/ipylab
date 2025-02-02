@@ -29,9 +29,9 @@ __all__ = [
     "IpylabKwgs",
     "TaskHookType",
     "LastUpdatedDict",
-    "Readonly",
-    "ReadonlyCreate",
-    "ReadonlyCreated",
+    "Fixed",
+    "FixedCreate",
+    "FixedCreated",
 ]
 
 hookimpl = pluggy.HookimplMarker("ipylab")  # Used for plugins
@@ -289,8 +289,8 @@ class LastUpdatedDict(OrderedDict):
             self._updating = False
 
 
-class ReadonlyCreate(Generic[T], TypedDict):
-    "A TypedDict relevant to Readonly"
+class FixedCreate(Generic[T], TypedDict):
+    "A TypedDict relevant to Fixed"
 
     name: str
     klass: type[T]
@@ -299,15 +299,15 @@ class ReadonlyCreate(Generic[T], TypedDict):
     kwgs: dict
 
 
-class ReadonlyCreated(Generic[T], TypedDict):
-    "A TypedDict relevant to Readonly"
+class FixedCreated(Generic[T], TypedDict):
+    "A TypedDict relevant to Fixed"
 
     name: str
     obj: T
     owner: Any
 
 
-class Readonly(Generic[T]):
+class Fixed(Generic[T]):
     __slots__ = ["name", "instances", "klass", "args", "kwgs", "dynamic", "create", "created"]
 
     def __init__(
@@ -315,8 +315,8 @@ class Readonly(Generic[T]):
         klass: type[T],
         *args,
         dynamic: list[str] | None = None,
-        create: Callable[[ReadonlyCreate[T]], T] | str = "",
-        created: Callable[[ReadonlyCreated[T]]] | str = "",
+        create: Callable[[FixedCreate[T]], T] | str = "",
+        created: Callable[[FixedCreated[T]]] | str = "",
         **kwgs,
     ):
         """Define an instance of `klass` as a cached read only property.
@@ -329,10 +329,10 @@ class Readonly(Generic[T]):
             A list of argument names to call during creation. It is called with obj (owner)
             as an argument.
 
-        create: Callable[[ReadonlyCreated], T] | str
+        create: Callable[[FixedCreated], T] | str
             A function or method name to call to create the instance of klass.
 
-        created: Callable[[ReadonlyCreatedDict], None] | str
+        created: Callable[[FixedCreatedDict], None] | str
             A function or method name to call after the instance is created.
 
         **kwgs:
@@ -373,7 +373,7 @@ class Readonly(Generic[T]):
                     kwgs[k] = kwgs[k](obj)
             if self.create:
                 create = getattr(obj, self.create) if isinstance(self.create, str) else self.create
-                kw = ReadonlyCreate(name=self.name, klass=self.klass, owner=obj, args=self.args, kwgs=kwgs)
+                kw = FixedCreate(name=self.name, klass=self.klass, owner=obj, args=self.args, kwgs=kwgs)
                 instance = create(kw)
                 if not isinstance(instance, self.klass):
                     msg = f"Expected {self.klass} but {create=} returned {type(instance)}"
@@ -384,7 +384,7 @@ class Readonly(Generic[T]):
             try:
                 if self.created:
                     created = getattr(obj, self.created) if isinstance(self.created, str) else self.created
-                    created(ReadonlyCreated(owner=obj, obj=instance, name=self.name))
+                    created(FixedCreated(owner=obj, obj=instance, name=self.name))
             except Exception:
                 if log := getattr(obj, "log", None):
                     log.exception("Callback `created` failed", obj=self.created)

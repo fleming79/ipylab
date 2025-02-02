@@ -12,7 +12,7 @@ from traitlets import Container, Instance, Unicode
 
 import ipylab
 from ipylab import Area, InsertMode, Ipylab, ShellConnection, Transform, pack
-from ipylab.common import IpylabKwgs, Obj, Readonly, TaskHookType
+from ipylab.common import Fixed, IpylabKwgs, Obj, TaskHookType
 from ipylab.ipylab import IpylabBase
 from ipylab.log_viewer import LogViewer
 
@@ -41,7 +41,7 @@ class Shell(Ipylab):
     ipylab_base = IpylabBase(Obj.IpylabModel, "app.shell").tag(sync=True)
     current_widget_id = Unicode(read_only=True).tag(sync=True)
 
-    log_viewer = Readonly(LogViewer)
+    log_viewer = Fixed(LogViewer)
 
     connections: Container[tuple[ShellConnection, ...]] = TypedTuple(trait=Instance(ShellConnection))
     console: Instance[ConsoleConnection | None] = Instance(ConsoleConnection, default_value=None, allow_none=True)  # type: ignore

@@ -3,10 +3,10 @@ from ipywidgets import TypedTuple
 from traitlets import HasTraits, Unicode
 
 from ipylab.common import (
+    Fixed,
+    FixedCreate,
+    FixedCreated,
     LastUpdatedDict,
-    Readonly,
-    ReadonlyCreate,
-    ReadonlyCreated,
     Transform,
     TransformDictAdvanced,
     TransformDictConnection,
@@ -172,10 +172,10 @@ class TestTransformPayload:
         assert result == payload
 
 
-class TestReadonly:
+class TestFixed:
     def test_readonly_basic(self):
         class TestOwner:
-            test_instance = Readonly(TestClass, 42)
+            test_instance = Fixed(TestClass, 42)
 
         owner = TestOwner()
         instance = owner.test_instance
@@ -185,7 +185,7 @@ class TestReadonly:
     def test_readonly_dynamic(self):
         class TestOwner:
             value: int
-            test_instance = Readonly(TestClass, value=lambda obj: obj.value, dynamic=["value"])
+            test_instance = Fixed(TestClass, value=lambda obj: obj.value, dynamic=["value"])
 
         owner = TestOwner()
         owner.value = 100
@@ -194,7 +194,7 @@ class TestReadonly:
 
     def test_readonly_create_function(self):
         class TestOwner:
-            test_instance = Readonly(TestClass, create=lambda info: TestClass(**info["kwgs"]), value=200)
+            test_instance = Fixed(TestClass, create=lambda info: TestClass(**info["kwgs"]), value=200)
 
         owner = TestOwner()
         instance = owner.test_instance
@@ -203,9 +203,9 @@ class TestReadonly:
 
     def test_readonly_create_method(self):
         class TestOwner:
-            test_instance = Readonly(TestClass, create="_create_callback", value=200)
+            test_instance = Fixed(TestClass, create="_create_callback", value=200)
 
-            def _create_callback(self, info: ReadonlyCreate):
+            def _create_callback(self, info: FixedCreate):
                 assert info["owner"] is self
                 assert info["klass"] is TestClass
                 assert info["kwgs"] == {"value": 200}
@@ -218,9 +218,9 @@ class TestReadonly:
 
     def test_readonly_created_callback_method(self):
         class TestOwner:
-            test_instance = Readonly(TestClass, created="instance_created", value=300)
+            test_instance = Fixed(TestClass, created="instance_created", value=300)
 
-            def instance_created(self, info: ReadonlyCreated):
+            def instance_created(self, info: FixedCreated):
                 assert isinstance(info["obj"], TestClass)
                 assert info["obj"].value == 300
                 assert info["owner"] is self
@@ -231,7 +231,7 @@ class TestReadonly:
 
     def test_readonly_forbidden_set(self):
         class TestOwner:
-            test_instance = Readonly(TestClass, 42)
+            test_instance = Fixed(TestClass, 42)
 
         owner = TestOwner()
         with pytest.raises(AttributeError, match="Setting TestOwner.test_instance is forbidden!"):

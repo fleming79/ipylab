@@ -17,9 +17,9 @@ from traitlets import Bool, Container, Dict, HasTraits, Instance, Set, TraitErro
 import ipylab
 import ipylab._frontend as _fe
 from ipylab.common import (
+    Fixed,
     IpylabKwgs,
     Obj,
-    Readonly,
     TaskHooks,
     TaskHookType,
     Transform,
@@ -98,13 +98,13 @@ class Ipylab(WidgetBase):
     _async_widget_base_init_complete = False
     _single_map: ClassVar[dict[Hashable, str]] = {}  # single_key : model_id
     _single_models: ClassVar[dict[str, Self]] = {}  #  model_id   : Widget
-    _ready_event = Readonly(asyncio.Event)
+    _ready_event = Fixed(asyncio.Event)
     _comm = None
 
     _pending_operations: Dict[str, Response] = Dict()
     _tasks: Container[set[asyncio.Task]] = Set()
     _has_attrs_mappings: Container[set[tuple[HasTraits, str]]] = Set()
-    close_extras: Readonly[weakref.WeakSet[Widget]] = Readonly(weakref.WeakSet)
+    close_extras: Fixed[weakref.WeakSet[Widget]] = Fixed(weakref.WeakSet)
     log = Instance(IpylabLoggerAdapter, read_only=True)
 
     @classmethod

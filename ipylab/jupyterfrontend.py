@@ -16,7 +16,7 @@ import ipylab
 from ipylab import Ipylab
 from ipylab._compat.typing import override
 from ipylab.commands import APP_COMMANDS_NAME, CommandPalette, CommandRegistry
-from ipylab.common import IpylabKwgs, LastUpdatedDict, Obj, Readonly, to_selector
+from ipylab.common import Fixed, IpylabKwgs, LastUpdatedDict, Obj, to_selector
 from ipylab.dialog import Dialog
 from ipylab.ipylab import IpylabBase
 from ipylab.launcher import Launcher
@@ -42,15 +42,15 @@ class App(Ipylab):
     vpath = Unicode(read_only=True).tag(sync=True)
     per_kernel_widget_manager_detected = Bool(read_only=True).tag(sync=True)
 
-    shell = Readonly(Shell)
-    dialog = Readonly(Dialog)
-    notification = Readonly(NotificationManager)
-    commands = Readonly(CommandRegistry, name=APP_COMMANDS_NAME)
-    launcher = Readonly(Launcher)
-    main_menu = Readonly(MainMenu)
-    command_pallet = Readonly(CommandPalette)
-    context_menu = Readonly(ContextMenu, commands=lambda app: app.commands, dynamic=["commands"])
-    sessions = Readonly(SessionManager)
+    shell = Fixed(Shell)
+    dialog = Fixed(Dialog)
+    notification = Fixed(NotificationManager)
+    commands = Fixed(CommandRegistry, name=APP_COMMANDS_NAME)
+    launcher = Fixed(Launcher)
+    main_menu = Fixed(MainMenu)
+    command_pallet = Fixed(CommandPalette)
+    context_menu = Fixed(ContextMenu, commands=lambda app: app.commands, dynamic=["commands"])
+    sessions = Fixed(SessionManager)
 
     logging_handler: Instance[IpylabLogHandler | None] = Instance(IpylabLogHandler, allow_none=True)  # type: ignore
     log_level = UseEnum(LogLevel, LogLevel.ERROR)

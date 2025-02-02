@@ -11,7 +11,7 @@ from traitlets import Container, Instance, Union
 import ipylab
 from ipylab._compat.typing import override
 from ipylab.commands import APP_COMMANDS_NAME, CommandRegistry
-from ipylab.common import Obj, Readonly
+from ipylab.common import Fixed, Obj
 from ipylab.connection import InfoConnection
 from ipylab.ipylab import Ipylab, IpylabBase, Transform
 
@@ -146,14 +146,14 @@ class MainMenu(Menu):
 
     ipylab_base = IpylabBase(Obj.IpylabModel, "mainMenu").tag(sync=True)
 
-    file_menu = Readonly(BuiltinMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.fileMenu"))
-    edit_menu = Readonly(BuiltinMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.editMenu"))
-    view_menu = Readonly(BuiltinMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.viewMenu"))
-    run_menu = Readonly(BuiltinMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.runMenu"))
-    kernel_menu = Readonly(BuiltinMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.kernelMenu"))
-    tabs_menu = Readonly(BuiltinMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.tabsMenu"))
-    settings_menu = Readonly(BuiltinMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.settingsMenu"))
-    help_menu = Readonly(BuiltinMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.helpMenu"))
+    file_menu = Fixed(BuiltinMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.fileMenu"))
+    edit_menu = Fixed(BuiltinMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.editMenu"))
+    view_menu = Fixed(BuiltinMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.viewMenu"))
+    run_menu = Fixed(BuiltinMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.runMenu"))
+    kernel_menu = Fixed(BuiltinMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.kernelMenu"))
+    tabs_menu = Fixed(BuiltinMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.tabsMenu"))
+    settings_menu = Fixed(BuiltinMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.settingsMenu"))
+    help_menu = Fixed(BuiltinMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.helpMenu"))
 
     @classmethod
     @override

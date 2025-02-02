@@ -10,7 +10,7 @@ from ipywidgets import HTML, BoundedIntText, Button, Checkbox, Combobox, Dropdow
 from traitlets import directional_link, link, observe
 
 import ipylab
-from ipylab.common import SVGSTR_TEST_TUBE, Area, InsertMode, Readonly
+from ipylab.common import SVGSTR_TEST_TUBE, Area, Fixed, InsertMode
 from ipylab.log import LogLevel
 from ipylab.simple_output import AutoScroll, SimpleOutput
 from ipylab.widgets import Icon, Panel
@@ -29,14 +29,14 @@ class LogViewer(Panel):
 
     _log_notify_task: None | Task = None
     _updating = False
-    info = Readonly(HTML, layout={"flex": "1 0 auto", "margin": "0px 20px 0px 20px"})
-    log_level = Readonly(
+    info = Fixed(HTML, layout={"flex": "1 0 auto", "margin": "0px 20px 0px 20px"})
+    log_level = Fixed(
         Dropdown,
         description="Level",
         options=[(v.name.capitalize(), v) for v in LogLevel],
         layout={"width": "max-content"},
     )
-    buffer_size = Readonly(
+    buffer_size = Fixed(
         BoundedIntText,
         description="Buffer size",
         min=1,
@@ -44,7 +44,7 @@ class LogViewer(Panel):
         layout={"width": "max-content", "flex": "0 0 auto"},
         created=lambda c: c["obj"].observe(c["owner"]._observe_buffer_size, "value"),  # noqa: SLF001
     )
-    button_show_send_dialog = Readonly(
+    button_show_send_dialog = Fixed(
         Button,
         description="📪",
         tooltip="Send the record to the console.\n"
@@ -52,13 +52,13 @@ class LogViewer(Panel):
         "which may be of interest for debugging purposes.",
         layout={"width": "auto", "flex": "0 0 auto"},
     )
-    button_clear = Readonly(
+    button_clear = Fixed(
         Button,
         description="⌧",
         tooltip="Clear log",
         layout={"width": "auto", "flex": "0 0 auto"},
     )
-    autoscroll_enabled = Readonly(
+    autoscroll_enabled = Fixed(
         Checkbox,
         description="Auto scroll",
         indent=False,
@@ -73,14 +73,14 @@ class LogViewer(Panel):
         "button_clear",
         "button_show_send_dialog",
     )
-    header = Readonly(
+    header = Fixed(
         HBox,
         children=lambda owner: [w for v in owner._default_header_children if (w := getattr(owner, v, None))],  # noqa: SLF001
         layout={"justify_content": "space-between", "flex": "0 0 auto"},
         dynamic=["children"],
     )
-    output = Readonly(SimpleOutput)
-    autoscroll_widget = Readonly(AutoScroll, content=lambda v: v.output, dynamic=["content"])
+    output = Fixed(SimpleOutput)
+    autoscroll_widget = Fixed(AutoScroll, content=lambda v: v.output, dynamic=["content"])
 
     def __init__(self, buffersize=100):
         self._records = collections.deque(maxlen=buffersize)

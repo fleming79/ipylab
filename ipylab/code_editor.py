@@ -19,7 +19,7 @@ from traitlets import Callable, Container, Dict, Instance, Int, Unicode, default
 
 import ipylab
 from ipylab._compat.typing import override
-from ipylab.common import Readonly
+from ipylab.common import Fixed
 from ipylab.ipylab import Ipylab
 
 if TYPE_CHECKING:
@@ -207,7 +207,7 @@ class CodeEditor(Ipylab, _String):
     _update_task: None | Task = None
     _setting_value = False
 
-    completer = Readonly(
+    completer = Fixed(
         IpylabCompleter,
         code_editor=lambda c: c,
         shell=lambda c: c.comm.kernel.shell,
