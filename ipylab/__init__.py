@@ -1,19 +1,19 @@
 # Copyright (c) ipylab contributors.
 # Distributed under the terms of the Modified BSD License.
 
-from __future__ import annotations  # noqa: I001
+from __future__ import annotations
 
-from ipylab._frontend import module_version as __version__
-from ipylab.common import Area, InsertMode, Obj, Transform, hookimpl, pack, to_selector
-from ipylab.ipylab import Ipylab
-from ipylab.connection import Connection, ShellConnection
 from ipylab import menu
+from ipylab._frontend import module_version as __version__
+from ipylab.code_editor import CodeEditor
+from ipylab.common import Area, Fixed, InsertMode, Obj, Transform, hookimpl, pack, to_selector
+from ipylab.connection import Connection, ShellConnection
+from ipylab.css_stylesheet import CSSStyleSheet
+from ipylab.ipylab import Ipylab
 from ipylab.jupyterfrontend import App, JupyterFrontEnd
 from ipylab.notification import NotificationType, NotifyAction
-from ipylab.widgets import Icon, Panel, SplitPanel
-from ipylab.code_editor import CodeEditor
 from ipylab.simple_output import SimpleOutput
-from ipylab.css_stylesheet import CSSStyleSheet
+from ipylab.widgets import Icon, Panel, SplitPanel
 
 __all__ = [
     "__version__",
@@ -26,6 +26,7 @@ __all__ = [
     "SplitPanel",
     "Icon",
     "Area",
+    "Fixed",
     "NotificationType",
     "NotifyAction",
     "InsertMode",
