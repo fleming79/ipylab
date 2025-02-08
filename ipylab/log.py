@@ -8,7 +8,6 @@ import weakref
 from enum import IntEnum, StrEnum
 from typing import TYPE_CHECKING, Any, ClassVar
 
-import bracelogger
 from IPython.core.ultratb import FormattedTB
 from ipywidgets import CallbackDispatcher
 
@@ -74,7 +73,7 @@ def truncated_repr(obj: Any, maxlen=120, tail="…") -> str:
 
 class IpylabLoggerAdapter(logging.LoggerAdapter):
     def __init__(self, name: str, owner: Any) -> None:
-        logger = bracelogger.get_logger(name)
+        logger = logging.getLogger(name)
         if handler := ipylab.app.logging_handler:
             handler._add_logger(logger)  # noqa: SLF001
         super().__init__(logger)

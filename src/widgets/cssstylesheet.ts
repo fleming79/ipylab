@@ -74,7 +74,7 @@ export class CSSStyleSheetModel extends IpylabModel {
   }
 
   /**
-   * Geta list of the global css variables.
+   * Get a list of the global css variables.
    */
   listVariables(): Record<string, string> {
     const list: Record<string, string> = {};
