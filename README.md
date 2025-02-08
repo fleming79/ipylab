@@ -59,6 +59,32 @@ You can install using `pip`:
 pip install ipylab
 ```
 
+### Per kernel widget manager
+
+The current behaviour of IpyWidgets requires a Notebook or Console to create the
+Widget. Once the Notebook or Console Panel is closed, the widget comms is closed
+making the widget unavailable.
+
+This [Pull Request](https://github.com/jupyter-widgets/ipywidgets/pull/3922) modifies
+the widget manager so widgets can be created without requiring a Notebook or Console
+to be open.
+
+Wheels in the `/pkg/` folder were built using this [source](https://github.com/fleming79/ipywidgets/tree/weakref-and-per-kernel-widget-manager)
+combining [Per-kernel-widget-manager](https://github.com/jupyter-widgets/ipywidgets/pull/3922)
+and [weakref](https://github.com/fleming79/ipywidgets/tree/weakref).
+
+These versions enable:
+* Widget restoration when the page is reloaded.
+* Starting new kernels and opening widgets from those kernels.
+* autostart plugins - Run code when Jupyterlab is started.
+* Viewing widgets from kernels inside from other kernels.
+
+```bash
+# For per-kernel-widget-manager support (Install modified version of ipywidgets, jupyterlab_widgets & widgetsnbextension)
+
+pip install --no-binary --force-reinstall ipylab[per-kernel-widget-manager]
+```
+
 Or with `mamba` / `conda`:
 
 ```bash
@@ -94,7 +120,7 @@ mamba create -n ipylab -c conda-forge nodejs python=3.11 -y
 conda activate ipylab
 
 # install the Python package
-pip install -e ".[dev]"
+pip install -e .[dev,per-kernel-widget-manager,test] # (with per-kernel-widget-manager)
 
 # link the extension files
 jupyter labextension develop . --overwrite
@@ -119,7 +145,7 @@ jlpm lint:check
 
 ### VS code debugging
 
-A config file is included to debug ipylab with Firefox.
+A config file is included to debug ipylab with Firefox or Chrome.
 
 ## Related projects
 

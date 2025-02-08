@@ -25,7 +25,6 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
 ]
 
-
 dependencies = [
   "jupyterlab>=4.1",
   "ipywidgets>=8.1.5",
@@ -39,12 +38,20 @@ dynamic = ["version", "description", "authors", "urls", "keywords"]
 [project.optional-dependencies]
 dev = ["hatch", "ruff", "pre-commit"]
 test = ["pytest"]
+per-kernel-widget-manager = [
+  "widgetsnbextension @ {root:uri}/pkg/widgetsnbextension-4.0.13-py3-none-any.whl",
+  "jupyterlab_widgets @ {root:uri}/pkg/jupyterlab_widgets-3.0.13-py3-none-any.whl",
+  "ipywidgets @ {root:uri}/pkg/ipywidgets-8.1.5-py3-none-any.whl",
+]
 
 [project.scripts]
 ipylab = "ipylab:plugin_manager.hook.launch_jupyterlab"
 
 [tool.hatch.version]
 source = "nodejs"
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.hatch.metadata.hooks.nodejs]
 fields = ["description", "authors", "urls"]
