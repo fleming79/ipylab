@@ -30,7 +30,7 @@
       "args": [
         "--notebook-dir=examples",
         "--no-browser",
-        "--ServerApp.token=''",
+        "--IdentityProvider.token=''",
         "--port=9999"
       ],
       "cwd": "${workspaceFolder}",

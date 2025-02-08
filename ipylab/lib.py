@@ -24,7 +24,7 @@ def launch_jupyterlab():
     from jupyterlab.labapp import LabApp
 
     if not sys.argv:
-        sys.argv = ["--ServerApp.token=''"]
+        sys.argv = ["--IdentityProvider.token=''"]
     sys.exit(LabApp.launch_instance())
 
 
