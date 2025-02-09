@@ -60,23 +60,41 @@ class Shell(Ipylab):
         hooks: TaskHookType = None,
         **args,
     ) -> Task[ShellConnection]:
-        """
-        Add a widget to the shell.
+        """Add a widget to the shell.
 
-        obj
-        ---
+        If the widget is already in the shell, it may be moved or activated.
 
-        When `obj` is NOT a Widget it is assumed `obj` should be evaluated in a python kernel.
-            vpath: str | dict[literal['title':str]]
-                **Only relevant for 'evaluate'**
-                The 'virtual' path for the app. A new kernel will be created if a session
-                doesn't exist with the same path.
-                If a dict is provided, a text_dialog will be used to obtain the vpath with the
-                hook `vpath_getter`.
+        To multiple instances of the same widget in the shell provide a new cid
+        with `cid=ShellConnection.to_cid()`.
+
+        Parameters
+        ---------
+        obj:
+            When `obj` is NOT a Widget it is assumed `obj` should be evaluated
+            in a python kernel.
+        area: Area
+            The area in the shell where to put obj.
+        activate: bool
+            Activate the widget once it is added to the shell.
+        mode: InsertMode
+            The insert mode.
+        rank: int
+            The rank to apply to the widget.
+        ref: ShellConnection
+            A connection to a widget in the shell. By default the current active
+            widget is used as a reference.
+        vpath: str | dict[literal['title':str]]
+            **Only relevant for 'evaluate'**
+            The 'virtual' path for the app. A new kernel will be created if a session
+            doesn't exist with the same path.
+            If a dict is provided, a text_dialog will be used to obtain the vpath
+            with the hook `vpath_getter`.
 
             Note:
-            The result (payload) of evaluate must be a Widget with a view and NOT a ShellConnection.
-
+            The result (payload) of evaluate must be a Widget with a view and
+            NOT a ShellConnection.
+        options:
+            Other options not including
 
         Basic example
         -------------
@@ -159,7 +177,6 @@ class Shell(Ipylab):
 
         Parameters
         ----------
-
         ref: ShellConnection | str
             The ShellConnection or `id` of the widget in the shell.
         objects: dict

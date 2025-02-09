@@ -321,17 +321,16 @@ class Ipylab(WidgetBase):
         super().close()
 
     def ensure_run(self, aw: Callable | Awaitable | None) -> None:
-        """Ensure the aw is run.
+        """Ensure aw is run.
 
+        Parameters
+        ----------
         aw: Callable | Awaitable | None
             `aw` can be a function that accepts either no arguments or one keyword argument 'obj'.
         """
         try:
             if callable(aw):
-                try:
-                    aw = aw(self)
-                except TypeError:
-                    aw = aw()
+                aw = aw(self) if len(inspect.signature(len).parameters) == 1 else aw()
             if inspect.iscoroutine(aw):
                 self.to_task(aw, f"Ensure run {aw}")
         except Exception:

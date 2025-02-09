@@ -19,11 +19,13 @@ from traitlets import Callable, Container, Dict, Instance, Int, Unicode, default
 
 import ipylab
 from ipylab._compat.typing import override
-from ipylab.common import Fixed
+from ipylab.common import Fixed, LastUpdatedDict
 from ipylab.ipylab import Ipylab
 
 if TYPE_CHECKING:
     from IPython.core.interactiveshell import InteractiveShell
+
+    __all__ = ["CodeEditor", "CodeEditorOptions"]
 
 mime_types = (
     "text/plain",
@@ -41,7 +43,9 @@ mime_types = (
 
 class IpylabCompleter(IPC.IPCompleter):
     code_editor: Instance[CodeEditor] = Instance("ipylab.CodeEditor")
-    shell: InteractiveShell  # Needs to be set
+    if TYPE_CHECKING:
+        shell: InteractiveShell  # Set in IPV.IPCompleter.__init__
+        namespace: LastUpdatedDict
 
     @default("disable_matchers")
     def _default_disable_matchers(self):
@@ -139,6 +143,7 @@ class IpylabCompleter(IPC.IPCompleter):
         return reply_content
 
     async def evaluate(self, code: str):
+        """Evaluate code in the code editor namespace."""
         code = code or self.code_editor.value
         self.update_namespace()
         ns = self.namespace

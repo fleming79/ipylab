@@ -57,7 +57,17 @@ if TYPE_CHECKING:
 
 
 def pack(obj):
-    "Return serialized obj if it is a Widget or string if code else passes through."
+    """Pack obj in a format usable in the frontend.
+
+    Only widgets and source are packed, all other objects are passed without
+    modification.
+
+    Normally it is unnecessary to pack widgets or code because it is done
+    automatically. It may be useful to use pack in connection with `toObject`
+    to specify the frontend to extract a parameter in the frontend.
+
+    See `app.shell.add` for an example of where pack is used.
+    """
 
     if isinstance(obj, Widget):
         return widget_serialization["to_json"](obj, None)

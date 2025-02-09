@@ -32,7 +32,10 @@ if TYPE_CHECKING:
 
 @register
 class App(Ipylab):
-    "A connection to the 'app' in the frontend. A singleton (per kernel) not to be subclassed."
+    """A connection to the 'app' in the frontend.
+
+    A singleton (per kernel) not to be subclassed or closed.
+    """
 
     SINGLE = True
     DEFAULT_COMMANDS: ClassVar = {"Open console", "Show log viewer"}
@@ -131,7 +134,7 @@ class App(Ipylab):
         return await super()._do_operation_for_frontend(operation, payload, buffers)
 
     async def _evaluate(self, options: dict, buffers: list):
-        """Evaluate code corresponding to a call from 'evaluate'.
+        """Evaluate code.
 
         A call to this method should originate from either:
          1. An `evaluate` method call from a subclass of `Ipylab` from kernel via
@@ -183,14 +186,18 @@ class App(Ipylab):
 
     def get_namespace(self, namespace_id="", **objects) -> LastUpdatedDict:
         """Get the namespace corresponding to namespace_id.
-        The namespace is a dictionary that maintains the order by which items are added.
 
-        Default oubjects are added to the namespace via the plugin hook `default_namespace_objects`.
+        The namespace is a dictionary that maintains the order by which items
+        are added.
+
+        Default oubjects are added to the namespace via the plugin hook
+        `default_namespace_objects`.
 
         Note:
             To remove a namespace call `ipylab.app.namespaces.pop(<namespace_id>)`.
 
-        The default namespace ("") will also load objects from `shell.user_ns`.
+        The default namespace `""` will also load objects from `shell.user_ns` if
+        the kernel is an ipykernel (the default kernel provided in Jupyterlab).
 
         Parameters
         ----------
@@ -213,19 +220,19 @@ class App(Ipylab):
         self,
         evaluate: dict[str, str | inspect._SourceObjectType] | str,
         *,
-        vpath="",
+        vpath: str,
         namespace_id="",
         **kwargs: Unpack[IpylabKwgs],
     ):
-        """Evaluate code in a Python kernel.
+        """Evaluate code asynchronously in a Python kernel.
 
-        If `vpath` isn't provided a session matching the path will be used, possibly prompting for a kernel.
+        Parameters
+        ----------
+        evaluate: dict[str, str | function | module] | str
+            An expression to evaluate or execute or mapping of values to expressions.
 
-        evaluate:
-            An expression to evaluate or execute.
-
-            The evaluation expression will also be called and or awaited until the returned symbol is no
-            longer callable or awaitable.
+            The evaluation expression will also be called and or awaited
+            until the returned symbol is no longer callable or awaitable.
             String:
                 If it is string it will be evaluated and returned.
             Dict: Advanced usage:

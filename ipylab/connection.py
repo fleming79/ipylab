@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 @register
 class Connection(Ipylab):
-    """This class provides a connection to an object (disposable) in the Frontend.
+    """This class provides a connection to an object in the Frontend.
 
     `Connection` and subclasses of `Connection` are used extensiviely in ipylab
     to provide a connection to an object in the frontend (Javascript).
@@ -30,7 +30,7 @@ class Connection(Ipylab):
     set as `Transform.connection` and also for `Transform.auto` when the payload
     looks like it is `disposable`.
 
-    Each subclass of `Connection` is designated a prefix derived from the subclass
+    Each subclass of `Connection` is designated a `prefix` derived from the subclass
     name. Creating a new object will create an instance of the correct class
     according to the `cid`. Only one instance of an object will exist per `cid`
     in a kernel.
@@ -142,7 +142,7 @@ Connection._CLASS_DEFINITIONS[Connection.prefix.strip(Connection._SEP)] = Connec
 
 
 class InfoConnection(Connection):
-    "A connection with info and auto_dispose enabled"
+    "A connection with info and auto_dispose enabled."
 
     info = Dict(help="info about the item")
     auto_dispose = Bool(True).tag(sync=True)
@@ -154,7 +154,7 @@ class InfoConnection(Connection):
 
 
 class ShellConnection(Connection):
-    "Provides a connection to a widget loaded in the shell"
+    "A connection to a widget loaded in the shell."
 
     _model_name = Unicode("ShellConnectionModel").tag(sync=True)
     auto_dispose = Bool(True).tag(sync=True)

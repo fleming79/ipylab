@@ -266,13 +266,14 @@ class CommandRegistry(Ipylab):
     ) -> Task[CommandConnection]:
         """Add a python command that can be executed by Jupyterlab.
 
-        The `id` in the command registry is the `cid` of the CommnadConnection.
+        The `cid` of the CommnandConnection is used as the `id` in the App
+        command registry.
 
         The `cid` is constructed from:
 
         1. registry name: The name of this command registry [Jupyterlab]
         2. vpath: The virtual 'path' of the app.
-        3. name:
+        3. name: The name of the command to lookup locally.
 
         If a cid (id) already exists, the existing CommandConnection will be closed prior
         to adding the new command.
@@ -282,7 +283,7 @@ class CommandRegistry(Ipylab):
         execute:
 
         args: dict | None
-            Mapping of default arguments to provide.
+            Mapping of default arguments to provide when executing the command.
         kwgs:
             Additional ICommandOptions can be passed as kwgs
 
@@ -325,12 +326,19 @@ class CommandRegistry(Ipylab):
         return self.to_task(add_command(), hooks=hooks)
 
     def execute(self, command_id: str | CommandConnection, args: dict | None = None, **kwargs: Unpack[IpylabKwgs]):
-        """Execute a command in the registry.
+        """Execute a command registered in the frontend command registry returning
+        the result.
 
-        `args` are passed to the command.
+        Parameters
+        ----------
+        command_id: str | CommandConnection
+            The id of the command in the command registry or the
+            `CommandConnection` of a previously added command.
+        args: dict | None
+          `args` are used when executing
 
-        see: https://github.com/jtpio/ipylab/issues/128#issuecomment-1683097383 for hints
-        about what args can be used.
+        see https://github.com/jtpio/ipylab/issues/128#issuecomment-1683097383
+        for hints on how to determine what args can be used.
         """
 
         async def execute_command():

@@ -59,6 +59,12 @@ You can install using `pip`:
 pip install ipylab
 ```
 
+Or with `mamba` / `conda`:
+
+```bash
+mamba install -c conda-forge ipylab
+```
+
 ### Per kernel widget manager
 
 The current behaviour of IpyWidgets requires a Notebook or Console to create the
@@ -83,12 +89,6 @@ These versions enable:
 # For per-kernel-widget-manager support (Install modified version of ipywidgets, jupyterlab_widgets & widgetsnbextension)
 
 pip install --no-binary --force-reinstall ipylab[per-kernel-widget-manager]
-```
-
-Or with `mamba` / `conda`:
-
-```bash
-mamba install -c conda-forge ipylab
 ```
 
 ## Running the examples locally

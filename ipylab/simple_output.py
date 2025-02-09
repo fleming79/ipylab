@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 class SimpleOutput(Ipylab, DOMWidget):
     """An output with no prompts designed to accept frequent additions.
 
-    Note: Widget restoration is not provided.
+    Note: Widget restoration is not supported.
     """
 
     _model_name = Unicode("SimpleOutputModel").tag(sync=True)
@@ -67,13 +67,17 @@ class SimpleOutput(Ipylab, DOMWidget):
 
     def push(self, *outputs: dict[str, str] | Widget | str | TextDisplayObject | Any, clear=False) -> Self:
         """Add one or more items to the output.
+
         Consecutive `streams` of the same type are placed in the same 'output' up to `max_outputs`.
         Outputs passed as dicts are assumed to be correctly packed as `repr_mime` data.
 
         Parameters
         ----------
-        reset : bool
-            Prior output is removed before adding output."""
+        outputs:
+            Items to be displayed.
+        clear : bool
+            Clear existing outputs prior to adding the outputs.
+        """
 
         items = list(self._pack_outputs(outputs))
         if items or clear:
@@ -85,8 +89,14 @@ class SimpleOutput(Ipylab, DOMWidget):
     ) -> Task[int]:
         """Set the output explicitly by first clearing and then adding the outputs.
 
-        Compared to `push`, this ensures the frontend is ready. The task will
-        only complete once the output has been added in the frontend.
+        Compared to `push`, this is performed asynchronously and will wait for
+        the frontend to be ready. The task will complete after the output has been
+        added in the frontend.
+
+        Parameters
+        ----------
+        outputs:
+            Items to be displayed.
         """
         return self.operation("setOutputs", {"items": list(self._pack_outputs(outputs))}, **kwgs)
 

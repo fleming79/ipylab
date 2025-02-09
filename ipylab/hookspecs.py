@@ -17,22 +17,20 @@ if TYPE_CHECKING:
 
 @hookspec(firstresult=True)
 def launch_jupyterlab():
-    "Start Jupyterlab"
+    """A hook called to start Jupyterlab.
+
+    This is called by with the shell command `ipylab`.
+    """
 
 
 @hookspec()
-def ready(obj: ipylab.Ipylab) -> None | Awaitable[None]:
-    """
-    Called by `obj` when it is ready.
-
-    Return a coro or awaitable for it to run as a new task belonging to obj.
-    """
+async def ready(obj: ipylab.Ipylab) -> None | Awaitable[None]:
+    """A hook that is called by `obj` when it is ready."""
 
 
 @hookspec(historic=True)
 async def autostart(app: ipylab.App) -> None | Awaitable[None]:
-    """
-    Called when the `app` is ready.
+    """A hook that is called when the `app` is ready.
 
     Historic
     --------
@@ -44,21 +42,17 @@ async def autostart(app: ipylab.App) -> None | Awaitable[None]:
 
 @hookspec
 def default_namespace_objects(namespace_id: str, app: ipylab.App) -> dict[str, Any]:  # type: ignore
-    """
-    Called when loading a namespace.
-
-    Use this to add objects to the namespace."""
+    "A hook to specify additional namespace objects when a namespace is loaded."
 
 
 @hookspec(firstresult=True)
 def vpath_getter(app: ipylab.App, kwgs: dict) -> Awaitable[str] | str:  # type: ignore
-    """
-    Resolve with a request for a vpath.
+    """A hook called during `app.shell.add` when `evaluate` is code and `vpath`
+    is passed as a dict.
 
-    This is used in conjunction with `app.shell.add` enabling customisation of the vpath.
-
-    vpath is the 'virtual path' for a session.
-    """
+    This hook provides for dynamic determination of the vpath/kernel to use when
+    adding 'evaluate' code to the shell. The default behaviour is prompt the user
+    for a path."""
 
 
 @hookspec(firstresult=True)
