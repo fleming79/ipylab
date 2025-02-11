@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 @register
 class Connection(Ipylab):
-    """This class provides a connection to an object in the Frontend.
+    """This class provides a connection to an object in the frontend.
 
     `Connection` and subclasses of `Connection` are used extensiviely in ipylab
     to provide a connection to an object in the frontend (Javascript).

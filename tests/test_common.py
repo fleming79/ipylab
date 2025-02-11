@@ -1,3 +1,8 @@
+# Copyright (c) ipylab contributors.
+# Distributed under the terms of the Modified BSD License.
+
+from __future__ import annotations
+
 import pytest
 from ipywidgets import TypedTuple
 from traitlets import HasTraits, Unicode
@@ -16,7 +21,7 @@ from ipylab.common import (
 from ipylab.connection import Connection
 
 
-class TestClass:
+class CommonTestClass:
     def __init__(self, value):
         self.value = value
 
@@ -175,64 +180,64 @@ class TestTransformPayload:
 class TestFixed:
     def test_readonly_basic(self):
         class TestOwner:
-            test_instance = Fixed(TestClass, 42)
+            test_instance = Fixed(CommonTestClass, 42)
 
         owner = TestOwner()
         instance = owner.test_instance
-        assert isinstance(instance, TestClass)
+        assert isinstance(instance, CommonTestClass)
         assert instance.value == 42
 
     def test_readonly_dynamic(self):
         class TestOwner:
             value: int
-            test_instance = Fixed(TestClass, value=lambda obj: obj.value, dynamic=["value"])
+            test_instance = Fixed(CommonTestClass, value=lambda obj: obj.value, dynamic=["value"])
 
         owner = TestOwner()
         owner.value = 100
-        assert isinstance(owner.test_instance, TestClass)
+        assert isinstance(owner.test_instance, CommonTestClass)
         assert owner.test_instance.value == 100
 
     def test_readonly_create_function(self):
         class TestOwner:
-            test_instance = Fixed(TestClass, create=lambda info: TestClass(**info["kwgs"]), value=200)
+            test_instance = Fixed(CommonTestClass, create=lambda info: CommonTestClass(**info["kwgs"]), value=200)
 
         owner = TestOwner()
         instance = owner.test_instance
-        assert isinstance(instance, TestClass)
+        assert isinstance(instance, CommonTestClass)
         assert instance.value == 200
 
     def test_readonly_create_method(self):
         class TestOwner:
-            test_instance = Fixed(TestClass, create="_create_callback", value=200)
+            test_instance = Fixed(CommonTestClass, create="_create_callback", value=200)
 
             def _create_callback(self, info: FixedCreate):
                 assert info["owner"] is self
-                assert info["klass"] is TestClass
+                assert info["klass"] is CommonTestClass
                 assert info["kwgs"] == {"value": 200}
-                return TestClass(*info["args"], **info["kwgs"])
+                return CommonTestClass(*info["args"], **info["kwgs"])
 
         owner = TestOwner()
         instance = owner.test_instance
-        assert isinstance(instance, TestClass)
+        assert isinstance(instance, CommonTestClass)
         assert instance.value == 200
 
     def test_readonly_created_callback_method(self):
         class TestOwner:
-            test_instance = Fixed(TestClass, created="instance_created", value=300)
+            test_instance = Fixed(CommonTestClass, created="instance_created", value=300)
 
             def instance_created(self, info: FixedCreated):
-                assert isinstance(info["obj"], TestClass)
+                assert isinstance(info["obj"], CommonTestClass)
                 assert info["obj"].value == 300
                 assert info["owner"] is self
 
         owner = TestOwner()
-        assert isinstance(owner.test_instance, TestClass)
+        assert isinstance(owner.test_instance, CommonTestClass)
         assert owner.test_instance.value == 300
 
     def test_readonly_forbidden_set(self):
         class TestOwner:
-            test_instance = Fixed(TestClass, 42)
+            test_instance = Fixed(CommonTestClass, 42)
 
         owner = TestOwner()
         with pytest.raises(AttributeError, match="Setting TestOwner.test_instance is forbidden!"):
-            owner.test_instance = TestClass(100)
+            owner.test_instance = CommonTestClass(100)

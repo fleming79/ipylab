@@ -87,7 +87,7 @@ def to_selector(*args, prefix="ipylab"):
 
 
 class Obj(StrEnum):
-    "The objects available to use as 'obj' in the Frontend."
+    "The objects available to use as 'obj' in the frontend."
 
     this = "this"
     base = "base"
@@ -124,7 +124,7 @@ class InsertMode(StrEnum):
 
 class Transform(StrEnum):
     """An eumeration of transformations to apply to the result of an operation
-    performed on the Frontend prior to returning to Python and transformation
+    performed on the frontend prior to returning to Python and transformation
     of the result in python.
 
     Transformations that require parameters can be specified as dict with the key `transform`.

@@ -21,11 +21,12 @@ jobs:
       - name: Build the extension
         run: |
           set -eux
-          pip install .[dev]
+          pip install .[dev,test]
 
           jupyter labextension list
           jupyter labextension list 2>&1 | grep -ie "ipylab.*OK"
           python -m jupyterlab.browser_check
+          pytest -v
 
       - name: Package the extension
         run: |

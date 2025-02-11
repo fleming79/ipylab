@@ -37,7 +37,7 @@ dynamic = ["version", "description", "authors", "urls", "keywords"]
 
 [project.optional-dependencies]
 dev = ["hatch", "ruff", "pre-commit"]
-test = ["pytest"]
+test = ["pytest", "anyio", "pytest-cov", "pytest-mock"]
 per-kernel-widget-manager = [
   "widgetsnbextension @ {root:uri}/pkg/widgetsnbextension-4.0.13-py3-none-any.whl",
   "jupyterlab_widgets @ {root:uri}/pkg/jupyterlab_widgets-3.0.13-py3-none-any.whl",

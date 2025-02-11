@@ -166,7 +166,7 @@ class Shell(Ipylab):
     def open_console(
         self,
         *,
-        insertMode=InsertMode.split_bottom,
+        mode=InsertMode.split_bottom,
         activate=True,
         ref: ShellConnection | str = "",
         objects: dict | None = None,
@@ -191,7 +191,12 @@ class Shell(Ipylab):
             if not isinstance(ref_, ShellConnection):
                 ref_ = await self.connect_to_widget(ref_)
             objects_ = {"ref": ref_} | (objects or {})
-            args = {"path": ipylab.app.vpath, "insertMode": insertMode, "activate": activate, "ref": f"{pack(ref_)}.id"}
+            args = {
+                "path": ipylab.app.vpath,
+                "insertMode": InsertMode(mode),
+                "activate": activate,
+                "ref": f"{pack(ref_)}.id",
+            }
             kwgs = IpylabKwgs(
                 transform={"transform": Transform.connection, "cid": ConsoleConnection.to_cid(ipylab.app.vpath)},
                 toObject=["args[ref]"],

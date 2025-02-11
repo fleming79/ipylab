@@ -84,7 +84,7 @@ class WidgetBase(Widget):
 
 @register
 class Ipylab(WidgetBase):
-    """The base class for Ipylab which has a corresponding Frontend."""
+    """The base class for Ipylab which has a corresponding frontend."""
 
     SINGLE = False
 
@@ -275,7 +275,7 @@ class Ipylab(WidgetBase):
                 error = self._to_frontend_error(c) if "error" in c else None
                 self._pending_operations.pop(c["ipylab_PY"]).set(c.get("payload"), error)
             elif "ipylab_FE" in c:
-                self.to_task(self._do_operation_for_fe(c["ipylab_FE"], c["operation"], c["payload"], buffers))
+                return self.to_task(self._do_operation_for_fe(c["ipylab_FE"], c["operation"], c["payload"], buffers))
             elif "closed" in c:
                 self.close()
             else:

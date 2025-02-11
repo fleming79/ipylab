@@ -186,9 +186,9 @@ class LogViewer(Panel):
     def add_to_shell(
         self,
         *,
-        area: ipylab.Area = Area.main,
+        area=Area.main,
         activate: bool = True,
-        mode: ipylab.InsertMode = InsertMode.split_bottom,
+        mode=InsertMode.split_bottom,
         rank: int | None = None,
         ref: ipylab.ShellConnection | None = None,
         options: dict | None = None,

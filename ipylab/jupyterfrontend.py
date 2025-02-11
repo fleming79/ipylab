@@ -27,6 +27,7 @@ from ipylab.sessions import SessionManager
 from ipylab.shell import Shell
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
     from typing import ClassVar
 
 
@@ -129,52 +130,9 @@ class App(Ipylab):
                 if not isinstance(widget, Widget):
                     msg = f"Expected an Widget but got {type(widget)}"
                     raise TypeError(msg)
-                result["payload"] = await self.shell.add(widget, **payload)
-                return result
+                return await self.shell.add(widget, **payload)
+
         return await super()._do_operation_for_frontend(operation, payload, buffers)
-
-    async def _evaluate(self, options: dict, buffers: list):
-        """Evaluate code.
-
-        A call to this method should originate from either:
-         1. An `evaluate` method call from a subclass of `Ipylab` from kernel via
-            `jfem.evaluate` in the frontend.
-         2. A call in the frontend to `jfem.evaluate`.
-        """
-        evaluate = options["evaluate"]
-        if isinstance(evaluate, str):
-            evaluate = {"payload": evaluate}
-        namespace_id = options.get("namespace_id", "")
-        ns = self.get_namespace(namespace_id, buffers=buffers)
-        for name, expression in evaluate.items():
-            try:
-                result = eval(expression, ns)  # noqa: S307
-            except SyntaxError:
-                exec(expression, ns)  # noqa: S102
-                result = next(reversed(ns.values()))  # Requires: LastUpdatedDict
-            while callable(result) or inspect.isawaitable(result):
-                if callable(result):
-                    kwgs = {}
-                    for p in inspect.signature(result).parameters:
-                        if p in options:
-                            kwgs[p] = options[p]
-                        if p in ns:
-                            kwgs[p] = ns[p]
-                    # We use a partial so that we can evaluate with the same namespace.
-                    ns["_partial_call"] = functools.partial(result, **kwgs)
-                    result = eval("_partial_call()", ns)  # type: ignore # noqa: S307
-                    ns.pop("_partial_call")
-                while inspect.isawaitable(result):
-                    result = await result
-            ns[name] = result
-        buffers = ns.pop("buffers", [])
-        payload = ns.pop("payload", None)
-        if payload is not None:
-            ns["_call_count"] = n = ns.get("_call_count", 0) + 1
-            ns[f"payload_{n}"] = payload
-        if namespace_id == "":
-            self.shell.add_objects_to_ipython_namespace(ns)
-        return {"payload": payload, "buffers": buffers}
 
     def shutdown_kernel(self, vpath: str | None = None):
         "Shutdown the kernel"
@@ -187,8 +145,8 @@ class App(Ipylab):
     def get_namespace(self, namespace_id="", **objects) -> LastUpdatedDict:
         """Get the namespace corresponding to namespace_id.
 
-        The namespace is a dictionary that maintains the order by which items
-        are added.
+        The namespace is a `LastUpdatedDict` that maintains the order by which
+        items are added.
 
         Default oubjects are added to the namespace via the plugin hook
         `default_namespace_objects`.
@@ -201,6 +159,8 @@ class App(Ipylab):
 
         Parameters
         ----------
+            namespace_id: str
+                The identifier for the namespace to use in this kernel.
             objects:
                 Additional objects to add to the namespace.
         """
@@ -216,42 +176,135 @@ class App(Ipylab):
                 ns.update(self.comm.kernel.shell.user_ns)  # type: ignore
         return ns
 
+    async def _evaluate(self, options: dict[str, Any], buffers: list):
+        """Evaluate code for `evaluate`.
+
+        A call to this method should originate from a call to `evaluate` from
+        app in another kernel. The call is sent as a message via the frontend."""
+        evaluate = options["evaluate"]
+        if isinstance(evaluate, str):
+            evaluate = (evaluate,)
+        namespace_id = options.get("namespace_id", "")
+        ns = self.get_namespace(namespace_id, buffers=buffers)
+        for row in evaluate:
+            name, expression = ("payload", row) if isinstance(row, str) else row
+            try:
+                result = eval(expression, ns)  # noqa: S307
+            except SyntaxError:
+                exec(expression, ns)  # noqa: S102
+                result = next(reversed(ns.values()))  # Requires: LastUpdatedDict
+            if not name:
+                continue
+            while callable(result) or inspect.isawaitable(result):
+                if callable(result):
+                    kwgs = {}
+                    for p in inspect.signature(result).parameters:
+                        if p in options:
+                            kwgs[p] = options[p]
+                        elif p in ns:
+                            kwgs[p] = ns[p]
+                    # We use a partial so that we can evaluate with the same namespace.
+                    ns["_partial_call"] = functools.partial(result, **kwgs)
+                    result = eval("_partial_call()", ns)  # type: ignore # noqa: S307
+                    ns.pop("_partial_call")
+                if inspect.isawaitable(result):
+                    result = await result
+            if name:
+                ns[name] = result
+        buffers = ns.pop("buffers", [])
+        payload = ns.pop("payload", None)
+        if payload is not None:
+            ns["_call_count"] = n = ns.get("_call_count", 0) + 1
+            ns[f"payload_{n}"] = payload
+        if namespace_id == "":
+            self.shell.add_objects_to_ipython_namespace(ns)
+        return {"payload": payload, "buffers": buffers}
+
     def evaluate(
         self,
-        evaluate: dict[str, str | inspect._SourceObjectType] | str,
+        evaluate: str | inspect._SourceObjectType | Iterable[str | tuple[str, str | inspect._SourceObjectType]],
         *,
         vpath: str,
         namespace_id="",
+        kwgs: None | dict = None,
         **kwargs: Unpack[IpylabKwgs],
     ):
-        """Evaluate code asynchronously in a Python kernel.
+        """Evaluate code asynchronously in the 'vpath' Python kernel.
+
+        Execution is coordinated via the frontend and will evaluate/execute the
+        code specified. Most forms of expressions are acceptable. Awaitiables
+        will be awaited recursively prior to sending the result.
 
         Parameters
         ----------
-        evaluate: dict[str, str | function | module] | str
-            An expression to evaluate or execute or mapping of values to expressions.
+        evaluate: str | code | Iterable[str | tuple[str|None, str | code]]
+            An expression or list of expressions to evaluate.
 
-            The evaluation expression will also be called and or awaited
-            until the returned symbol is no longer callable or awaitable.
-            String:
-                If it is string it will be evaluated and returned.
-            Dict: Advanced usage:
-            A dictionary of `symbol name` to `expression` mappings to be evaluated in the kernel.
-            Each expression is evaluated in turn adding the symbol to the namespace.
+            The following combinations are acceptable:
+            1. code    # Shorthand version                  -> payload = code
+            2. [("payload", code)]                          -> payload = code
+            3. [("payload", code1), ("", code2), code3]     -> payload = code3
 
-            Expression can be a the name of a function or class. In which case it will be evaluated
-            using parameter names matching the signature of the function or class.
+            * Code is handled as a list of mappings of `symbol name` to expressions.
+            [(symbol name, expression), ...]
+            * The shorthand version is changed to a single element list automatically.
+            * `code` is changed to ("payload", code) automatically.
+            * The latest defined `"payload"` is the return value from evaluation.
 
-            ref: https://docs.python.org/3/library/functions.html#eval
+            Each expression will be evaluated and if a syntax error occurs in evaluation
+            it will instead be executed. The latest set symbol is taken as the execution
+            result.
 
-            Once evaluation is complete, the symbols named `payload` and `buffers` will be returned.
+            If the result is callable or awaitable it will be called or await recursively
+            until the result or awaitable is no longer callable or awaitable. To prevent this
+            make the symbol name an empty string.
+
+            References
+            ----------
+            * eval: https://docs.python.org/3/library/functions.html#eval
+            * exec: https://docs.python.org/3/library/functions.html#exec
+
+            Once evaluation is complete, the symbols named `payload` and `buffers`
+            will be returned.
         vpath:
-            The path of kernel session where to perform the evaluation.
+            The path of kernel session where the evaluation should take place.
         namespace_id:
             The namespace where to perform evaluation.
-            The default namespace will also update the shell.user_ns after successful evaluation.
+            The default namespace will also update the shell.user_ns after
+            successful evaluation.
+        kwgs: dict | None
+            Specify kwgs that may be used when calling a callable.
+            Note:The namespace is also searched.
+
+        Examples
+        --------
+        simple:
+        ``` python
+        task = app.evaluate(
+            "ipylab.app.shell.open_console",
+            vpath="test",
+            kwgs={"mode": ipylab.InsertMode.split_right, "activate": False},
+        )
+        # The task result will be a ShellConnection. Closing the connection should
+        # also close the console that was opened.
+        ```
+
+        Advanced example:
+        ``` python
+        async def do_something(widget, area):
+            p = iplab.panel(content=widget)
+            return p.add_to_shell()
+
+
+        task = app.evaluate(
+            [("widget", "ipw.Dropdown()"), do_something],
+            area=iplab.Area.right,
+            vpath="test",
+        )
+        # Task result should be a ShellConnection
+        ```
         """
-        kwgs = {"evaluate": evaluate, "vpath": vpath, "namespace_id": namespace_id}
+        kwgs = (kwgs or {}) | {"evaluate": evaluate, "vpath": vpath, "namespace_id": namespace_id}
         return self.operation("evaluate", kwgs, **kwargs)
 
 
