@@ -215,7 +215,7 @@ class CodeEditor(Ipylab, _String):
     completer = Fixed(
         IpylabCompleter,
         code_editor=lambda c: c,
-        shell=lambda c: c.comm.kernel.shell,
+        shell=lambda c: getattr(getattr(c.comm, "kernel", None), "shell", None),
         dynamic=["code_editor", "shell"],
     )
 
