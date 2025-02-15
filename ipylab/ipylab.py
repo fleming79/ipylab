@@ -98,12 +98,12 @@ class Ipylab(WidgetBase):
     _async_widget_base_init_complete = False
     _single_map: ClassVar[dict[Hashable, str]] = {}  # single_key : model_id
     _single_models: ClassVar[dict[str, Self]] = {}  #  model_id   : Widget
-    _ready_event = Fixed(asyncio.Event)
+    _ready_event: asyncio.Event | None = None
     _comm = None
 
     _pending_operations: Dict[str, Response] = Dict()
-    _tasks: Container[set[asyncio.Task]] = Set()
     _has_attrs_mappings: Container[set[tuple[HasTraits, str]]] = Set()
+    ipylab_tasks: Container[set[asyncio.Task]] = Set()
     close_extras: Fixed[weakref.WeakSet[Widget]] = Fixed(weakref.WeakSet)
     log = Instance(IpylabLoggerAdapter, read_only=True)
 
@@ -166,9 +166,9 @@ class Ipylab(WidgetBase):
     @observe("comm", "_ready")
     def _observe_comm(self, change: dict):
         if not self.comm:
-            for task in self._tasks:
+            for task in self.ipylab_tasks:
                 task.cancel()
-            self._tasks.clear()
+            self.ipylab_tasks.clear()
             for item in list(self.close_extras):
                 item.close()
             for obj, name in list(self._has_attrs_mappings):
@@ -183,13 +183,13 @@ class Ipylab(WidgetBase):
                 self._single_models.pop(change["old"].comm_id, None)  # type: ignore
         if change["name"] == "_ready":
             if self._ready:
-                self._ready_event.set()
+                if self._ready_event:
+                    self._ready_event.set()
                 for cb in ipylab.plugin_manager.hook.ready(obj=self):
                     self.ensure_run(cb)
                 for cb in self._on_ready_callbacks:
                     self.ensure_run(cb)
-
-            else:
+            elif self._ready_event:
                 self._ready_event.clear()
 
     def _check_closed(self):
@@ -260,7 +260,7 @@ class Ipylab(WidgetBase):
             raise ValueError(msg)
 
     def _task_done_callback(self, task: Task):
-        self._tasks.discard(task)
+        self.ipylab_tasks.discard(task)
         # TODO: It'd be great if we could cancel in the frontend.
         # Unfortunately it looks like Javascript Promises can't be cancelled.
         # https://stackoverflow.com/questions/30233302/promise-is-it-possible-to-force-cancel-a-promise#30235261
@@ -338,16 +338,20 @@ class Ipylab(WidgetBase):
             raise
 
     async def ready(self):
-        try:
-            if not ipylab.app._ready_event._value:  # type: ignore # noqa: SLF001
-                await ipylab.app.ready()
-            if not self._ready_event._value:  # type: ignore  # noqa: SLF001
-                await self._ready_event.wait()
-        except RuntimeError:
-            if self.comm.__class__.__name__ == "DummyComm":
-                self.log.info("No frontend")
-                await asyncio.sleep(1e9)
-            raise
+        if self is not ipylab.app and not ipylab.app._ready:  # noqa: SLF001
+            await ipylab.app.ready()
+        if not self._ready:  # type: ignore
+            if self._ready_event:
+                try:
+                    await self._ready_event.wait()
+                    # Event.wait is pinned to the event loop in which Event was created.
+                    # A Runtime error will occur when called from a different event loop.
+                except RuntimeError:
+                    pass
+                else:
+                    return
+            self._ready_event = asyncio.Event()
+            await self._ready_event.wait()
 
     def on_ready(self, callback, remove=False):  # noqa: FBT002
         if remove:
@@ -395,7 +399,7 @@ class Ipylab(WidgetBase):
 
         self._check_closed()
         task = asyncio.create_task(self._wrap_awaitable(aw, hooks), name=name)
-        self._tasks.add(task)
+        self.ipylab_tasks.add(task)
         task.add_done_callback(self._task_done_callback)
         return task
 

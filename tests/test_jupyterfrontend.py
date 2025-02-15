@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import json
 import uuid
 from typing import Any
@@ -81,8 +83,8 @@ async def test_app_evaluate(kw: dict[str, Any], result, mocker):
     import asyncio
 
     app = ipylab.app
-    ready = mocker.patch.object(ipylab.app, "ready")
-    send = mocker.patch.object(ipylab.app, "send")
+    ready = mocker.patch.object(app, "ready")
+    send = mocker.patch.object(app, "send")
 
     task1 = app.evaluate(**kw, vpath="irrelevant")
     await asyncio.sleep(0)
@@ -112,3 +114,20 @@ async def test_app_evaluate(kw: dict[str, Any], result, mocker):
 
     # Don't attempt to relay the result back
     task1.cancel()
+
+
+loops = set()
+
+
+@pytest.mark.parametrize("n", [1, 2])
+async def test_ready(n):
+    "Paramatised tests must be run consecutively."
+    # Normally not an issue, but when testing, it is possible for asyncio to
+    # use different loops. Running this test consecutively should use separate
+    # event loops.
+
+    loops.add(asyncio.get_running_loop())
+    assert len(loops) == n, "A new event loop should be provided per test."
+    with contextlib.suppress(asyncio.TimeoutError):
+        async with asyncio.timeout(1):
+            await ipylab.app.ready()

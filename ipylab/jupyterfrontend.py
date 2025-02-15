@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import contextlib
 import functools
 import inspect
@@ -107,17 +106,6 @@ class App(Ipylab):
     def selector(self):
         # Calling this before `_ready` is set will raise an attribute error.
         return self._selector
-
-    @override
-    async def ready(self):
-        try:
-            if not self._ready_event._value:  # type: ignore # noqa: SLF001
-                await self._ready_event.wait()
-        except RuntimeError:
-            if self.comm.__class__.__name__ == "DummyComm":
-                self.log.info("No frontend")
-                await asyncio.sleep(1e9)
-            raise
 
     @override
     async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list) -> Any:
