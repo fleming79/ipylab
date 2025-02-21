@@ -71,7 +71,7 @@ class App(Ipylab):
 
     @default("logging_handler")
     def _default_logging_handler(self):
-        fmt = "%(color)s%(level_symbol)s %(asctime)s.%(msecs)d %(name)s %(owner_rep)s:%(reset)s %(message)s\n"
+        fmt = "%(color)s%(level_symbol)s %(asctime)s.%(msecs)d %(name)s %(owner_rep)s: %(message)s %(reset)s\n"
         handler = IpylabLogHandler(self.log_level)
         handler.setFormatter(IpylabLogFormatter(fmt=fmt, style="%", datefmt="%H:%M:%S"))
         return handler

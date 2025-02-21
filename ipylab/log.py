@@ -81,7 +81,7 @@ class IpylabLoggerAdapter(logging.LoggerAdapter):
 
     def process(self, msg: Any, kwargs: dict[str, Any]) -> tuple[Any, dict[str, Any]]:
         obj = kwargs.pop("obj", None)
-        kwargs["extra"] = {"owner": self.owner_ref(), "obj": obj}
+        kwargs["extra"] = {"owner": self.owner_ref, "obj": obj}
         return msg, kwargs
 
 
@@ -138,9 +138,13 @@ class IpylabLogFormatter(logging.Formatter):
         record.level_symbol = level.name[0]
         record.color = self.colors[level]
         record.reset = self.reset
-        record.owner_rep = truncated_repr(getattr(record, "owner", ""), 120)
-        record.obj_rep = truncated_repr(getattr(record, "obj", ""), 120)
+        record.owner_rep = truncated_repr(self.get_ref(record, "owner"), 120)
+        record.obj_rep = truncated_repr(self.get_ref(record, "obj"), 120)
         return super().format(record)
+
+    def get_ref(self, record, key):
+        ref = getattr(record, key, None)
+        return ref() if key == "owner" and callable(ref) else ref
 
     def formatException(self, ei) -> str:  # noqa: N802
         if not ei[0]:
