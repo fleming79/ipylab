@@ -119,7 +119,7 @@ class Ipylab(WidgetBase):
 
     @default("log")
     def _default_log(self):
-        return IpylabLoggerAdapter("ipylab", owner=self)
+        return IpylabLoggerAdapter(self.__module__, owner=self)
 
     def __new__(cls, **kwgs) -> Self:
         model_id = kwgs.get("model_id") or cls._single_map.get(cls._single_key(kwgs)) if cls.SINGLE else None
