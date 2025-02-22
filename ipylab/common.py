@@ -9,14 +9,13 @@ import weakref
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Generic, Literal, NotRequired, TypedDict, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Literal, NotRequired, TypedDict, TypeVar, override
 
 import pluggy
 from ipywidgets import Widget, widget_serialization
 from traitlets import HasTraits
 
 import ipylab
-from ipylab._compat.typing import override
 
 __all__ = [
     "Area",

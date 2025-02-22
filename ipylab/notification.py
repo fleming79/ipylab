@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import inspect
 from enum import StrEnum
-from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict
+from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict, override
 
 import traitlets
 from ipywidgets import TypedTuple, register
@@ -13,7 +13,6 @@ from traitlets import Container, Instance, Unicode
 
 import ipylab
 from ipylab import Transform, pack
-from ipylab._compat.typing import override
 from ipylab.common import Obj, TaskHooks, TransformType
 from ipylab.connection import InfoConnection
 from ipylab.ipylab import Ipylab, IpylabBase

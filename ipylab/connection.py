@@ -5,12 +5,11 @@ from __future__ import annotations
 
 import uuid
 import weakref
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, override
 
 from ipywidgets import Widget, register
 from traitlets import Bool, Dict, Instance, Unicode, observe
 
-from ipylab._compat.typing import override
 from ipylab.ipylab import Ipylab
 
 if TYPE_CHECKING:

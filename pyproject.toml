@@ -10,7 +10,7 @@ build-backend = "hatchling.build"
 name = "ipylab"
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 classifiers = [
   "Framework :: Jupyter",
   "Framework :: Jupyter :: JupyterLab",
@@ -20,18 +20,16 @@ classifiers = [
   "License :: OSI Approved :: BSD License",
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
 ]
 
 dependencies = [
-  "jupyterlab>=4.1",
+  "jupyterlab>=4.3",
   "ipywidgets>=8.1.5",
-  "ipython>=8.2",
+  "ipython>=8.32",
   "jupyterlab_widgets>=3.0.11",
-  "pluggy~=1.1",
-  "typing_extensions; python_version < '3.12'",
+  "pluggy~=1.5",
 ]
 dynamic = ["version", "description", "authors", "urls", "keywords"]
 

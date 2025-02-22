@@ -6,14 +6,13 @@ from __future__ import annotations
 import contextlib
 import functools
 import inspect
-from typing import TYPE_CHECKING, Any, Unpack
+from typing import TYPE_CHECKING, Any, Unpack, override
 
 from ipywidgets import Widget, register
 from traitlets import Bool, Container, Dict, Instance, Unicode, UseEnum, default, observe
 
 import ipylab
 from ipylab import Ipylab
-from ipylab._compat.typing import override
 from ipylab.commands import APP_COMMANDS_NAME, CommandPalette, CommandRegistry
 from ipylab.common import Fixed, IpylabKwgs, LastUpdatedDict, Obj, to_selector
 from ipylab.dialog import Dialog
@@ -62,7 +61,7 @@ class App(Ipylab):
 
     @classmethod
     @override
-    def _single_key(cls, kwgs: dict):  # noqa: ARG003
+    def _single_key(cls, kwgs: dict):
         return "app"
 
     def close(self):

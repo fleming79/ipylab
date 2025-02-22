@@ -6,14 +6,13 @@ from __future__ import annotations
 import functools
 import inspect
 import uuid
-from typing import TYPE_CHECKING, Any, ClassVar, NotRequired, TypedDict, Unpack
+from typing import TYPE_CHECKING, Any, ClassVar, NotRequired, TypedDict, Unpack, override
 
 from ipywidgets import TypedTuple
 from traitlets import Callable as CallableTrait
 from traitlets import Container, Dict, Instance, Tuple, Unicode
 
 import ipylab
-from ipylab._compat.typing import override
 from ipylab.common import IpylabKwgs, Obj, TaskHooks, TaskHookType, TransformType, pack
 from ipylab.connection import InfoConnection, ShellConnection
 from ipylab.ipylab import Ipylab, IpylabBase, Transform, register
