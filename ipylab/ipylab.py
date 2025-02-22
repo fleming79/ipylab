@@ -51,23 +51,6 @@ class IpylabBase(TraitType[tuple[str, str], None]):
         super().__init__((base, subpath))
 
 
-class Response(asyncio.Event):
-    def set(self, payload, error: Exception | None = None) -> None:
-        if getattr(self, "_value", False):
-            msg = "Already set!"
-            raise RuntimeError(msg)
-        self.payload = payload
-        self.error = error
-        super().set()
-
-    async def wait(self) -> Any:
-        """Wait for a message and return the response."""
-        await super().wait()
-        if self.error:
-            raise self.error
-        return self.payload
-
-
 class IpylabFrontendError(IOError):
     pass
 
@@ -101,7 +84,7 @@ class Ipylab(WidgetBase):
     _ready_event: asyncio.Event | None = None
     _comm = None
 
-    _pending_operations: Dict[str, Response] = Dict()
+    _pending_operations: Dict[str, asyncio.Future] = Dict()
     _has_attrs_mappings: Container[set[tuple[HasTraits, str]]] = Set()
     ipylab_tasks: Container[set[asyncio.Task]] = Set()
     close_extras: Fixed[weakref.WeakSet[Widget]] = Fixed(weakref.WeakSet)
@@ -200,16 +183,11 @@ class Ipylab(WidgetBase):
     async def _wrap_awaitable(self, aw: Awaitable[T], hooks: TaskHookType) -> T:
         await self.ready()
         try:
-            if not hooks:
-                return await aw
             result = await aw
-            try:
+            if hooks:
                 self._task_result(result, hooks)
-            except Exception:
-                self.log.exception("TaskHook error", obj={"result": result, "hooks": hooks, "aw": aw})
-                raise
         except Exception:
-            self.log.exception("Task error", obj=aw)
+            self.log.exception("Task error", obj={"result": result, "hooks": hooks, "aw": aw})
             raise
         else:
             return result
@@ -272,8 +250,11 @@ class Ipylab(WidgetBase):
         try:
             c = json.loads(content)
             if "ipylab_PY" in c:
-                error = self._to_frontend_error(c) if "error" in c else None
-                self._pending_operations.pop(c["ipylab_PY"]).set(c.get("payload"), error)
+                op = self._pending_operations.pop(c["ipylab_PY"])
+                if "error" in c:
+                    op.set_exception(self._to_frontend_error(c))
+                else:
+                    op.set_result(c.get("payload"))
             elif "ipylab_FE" in c:
                 return self.to_task(self._do_operation_for_fe(c["ipylab_FE"], c["operation"], c["payload"], buffers))
             elif "closed" in c:
@@ -450,11 +431,11 @@ class Ipylab(WidgetBase):
         if toObject:
             content["toObject"] = toObject
 
-        self._pending_operations[ipylab_PY] = response = Response()
+        self._pending_operations[ipylab_PY] = op = asyncio.get_running_loop().create_future()
 
         async def _operation(content: dict):
             self._ipylab_send(content)
-            payload = await response.wait()
+            payload = await op
             return Transform.transform_payload(content["transform"], payload)
 
         return self.to_task(_operation(content), name=ipylab_PY, hooks=hooks)
