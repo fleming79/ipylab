@@ -133,12 +133,12 @@ class Shell(Ipylab):
             if isinstance(obj, ipylab.Panel):
                 hooks_["add_to_tuple_fwd"].append((obj, "connections"))
             args["ipy_model"] = obj.model_id
-            if isinstance(obj, DOMWidget):
-                obj.add_class(ipylab.app.selector.removeprefix("."))
         else:
             args["evaluate"] = pack(obj)
 
         async def add_to_shell() -> ShellConnection:
+            if isinstance(obj, DOMWidget):
+                obj.add_class((await ipylab.app.selector()).removeprefix("."))
             if "evaluate" in args:
                 if isinstance(vpath, dict):
                     result = ipylab.plugin_manager.hook.vpath_getter(app=ipylab.app, kwgs=vpath)

@@ -101,9 +101,9 @@ class App(Ipylab):
         "A representation to use when logging"
         return self.__class__.__name__
 
-    @property
-    def selector(self):
-        # Calling this before `_ready` is set will raise an attribute error.
+    async def selector(self):
+        "Returns the selector once the app is ready."
+        await self.ready()
         return self._selector
 
     @override

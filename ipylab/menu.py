@@ -200,7 +200,11 @@ class ContextMenu(Menu):
 
         ref: https://jupyterlab.readthedocs.io/en/stable/extension/extension_points.html#context-menu
         """
-        return self._add_item(command, submenu, rank, type, args, selector or ipylab.app.selector)
+
+        async def add_item_():
+            return await self._add_item(command, submenu, rank, type, args, selector or await ipylab.app.selector())
+
+        return self.to_task(add_item_())
 
     @override
     def activate(self):

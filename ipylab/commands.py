@@ -92,20 +92,25 @@ class CommandConnection(InfoConnection):
         self, keys: list, selector="", args: dict | None = None, *, prevent_default=True
     ) -> Task[KeybindingConnection]:
         "Add a key binding for this command and selector."
-        if not self.comm:
-            msg = f"Closed: {self}"
-            raise RuntimeError(msg)
         args = args or {}
-        selector = selector or ipylab.app.selector
-        args |= {"keys": keys, "preventDefault": prevent_default, "selector": selector, "command": str(self)}
-        cid = KeybindingConnection.to_cid(self)
-        transform: TransformType = {"transform": Transform.connection, "cid": cid}
-        hooks: TaskHooks = {
-            "add_to_tuple_fwd": [(self, "key_bindings")],
-            "trait_add_fwd": [("info", args), ("command", self)],
-            "close_with_fwd": [self],
-        }
-        return self.commands.execute_method("addKeyBinding", args, transform=transform, hooks=hooks)
+
+        async def add_key_binding():
+            args_ = args | {
+                "keys": keys,
+                "preventDefault": prevent_default,
+                "selector": selector or await ipylab.app.selector(),
+                "command": str(self),
+            }
+            cid = KeybindingConnection.to_cid(self)
+            transform: TransformType = {"transform": Transform.connection, "cid": cid}
+            hooks: TaskHooks = {
+                "add_to_tuple_fwd": [(self, "key_bindings")],
+                "trait_add_fwd": [("info", args_), ("command", self)],
+                "close_with_fwd": [self],
+            }
+            return await self.commands.execute_method("addKeyBinding", args_, transform=transform, hooks=hooks)
+
+        return self.to_task(add_key_binding())
 
 
 class CommandPalletItemConnection(InfoConnection):
