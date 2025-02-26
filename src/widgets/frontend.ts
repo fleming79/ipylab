@@ -26,7 +26,7 @@ export class JupyterFrontEndModel extends IpylabModel {
 
   async ipylabInit(base: any = null) {
     const vpath = await JFEM.getVpath(this.kernelId);
-    this.set('vpath', vpath);
+    this.set('_vpath', vpath);
     this.set('version', JFEM.app.version);
     this.set('per_kernel_widget_manager_detected', JFEM.PER_KERNEL_WM);
     await super.ipylabInit(base);

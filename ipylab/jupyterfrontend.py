@@ -41,7 +41,7 @@ class App(Ipylab):
     _model_name = Unicode("JupyterFrontEndModel").tag(sync=True)
     ipylab_base = IpylabBase(Obj.IpylabModel, "app").tag(sync=True)
     version = Unicode(read_only=True).tag(sync=True)
-    vpath = Unicode(read_only=True).tag(sync=True)
+    _vpath = Unicode(read_only=True).tag(sync=True)
     per_kernel_widget_manager_detected = Bool(read_only=True).tag(sync=True)
 
     shell = Fixed(Shell)
@@ -77,8 +77,8 @@ class App(Ipylab):
     @observe("_ready", "log_level")
     def _app_observe_ready(self, change):
         if change["name"] == "_ready" and self._ready:
-            assert self.vpath, "Vpath should always before '_ready'."  # noqa: S101
-            self._selector = to_selector(self.vpath)
+            assert self._vpath, "Vpath should always before '_ready'."  # noqa: S101
+            self._selector = to_selector(self._vpath)
             ipylab.plugin_manager.hook.autostart._call_history.clear()  # type: ignore  # noqa: SLF001
             try:
                 ipylab.plugin_manager.hook.autostart.call_historic(
@@ -94,12 +94,17 @@ class App(Ipylab):
 
     @property
     def repr_info(self):
-        return {"vpath": self.vpath}
+        return {"vpath": self._vpath}
 
     @property
     def repr_log(self):
         "A representation to use when logging"
         return self.__class__.__name__
+
+    async def vpath(self):
+        "Returns the vpath for this kernel once the app is ready."
+        await self.ready()
+        return self._vpath
 
     async def selector(self):
         "Returns the selector once the app is ready."

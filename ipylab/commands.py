@@ -295,7 +295,7 @@ class CommandRegistry(Ipylab):
         """
 
         async def add_command():
-            cid = CommandConnection.to_cid(self.name, ipylab.app.vpath, name)
+            cid = CommandConnection.to_cid(self.name, await ipylab.app.vpath(), name)
             if cmd := CommandConnection.get_existing_connection(cid, quiet=True):
                 await cmd.ready()
                 cmd.close()
@@ -348,7 +348,7 @@ class CommandRegistry(Ipylab):
         async def execute_command():
             id_ = str(command_id)
             if id_ not in self.all_commands:
-                id_ = CommandConnection.to_cid(self.name, ipylab.app.vpath, id_)
+                id_ = CommandConnection.to_cid(self.name, await ipylab.app.vpath(), id_)
                 if id_ not in self.all_commands:
                     msg = f"Command '{command_id}' not registered!"
                     raise ValueError(msg)
