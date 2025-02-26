@@ -11,8 +11,22 @@ import uuid
 import weakref
 from typing import TYPE_CHECKING, Any, TypeVar
 
+import traitlets
 from ipywidgets import Widget, register
-from traitlets import Bool, Container, Dict, HasTraits, Instance, Set, TraitError, TraitType, Unicode, default, observe
+from traitlets import (
+    Bool,
+    Container,
+    Dict,
+    HasTraits,
+    Instance,
+    List,
+    Set,
+    TraitError,
+    TraitType,
+    Unicode,
+    default,
+    observe,
+)
 
 import ipylab
 import ipylab._frontend as _fe
@@ -76,7 +90,9 @@ class Ipylab(WidgetBase):
     ipylab_base = IpylabBase(Obj.this, "").tag(sync=True)
     _ready = Bool(read_only=True, help="Set to by frontend when ready").tag(sync=True)
 
-    _on_ready_callbacks: Container[set[Callable]] = Set()
+    _on_ready_callbacks: Container[list[Callable[[], None | Awaitable] | Callable[[Self], None | Awaitable]]] = List(
+        trait=traitlets.Callable()
+    )
 
     _async_widget_base_init_complete = False
     _single_map: ClassVar[dict[Hashable, str]] = {}  # single_key : model_id
@@ -320,6 +336,11 @@ class Ipylab(WidgetBase):
             raise
 
     async def ready(self):
+        """Wait for the application to be ready.
+
+        If this is not the main application instance, it waits for the
+        main application instance to be ready first.
+        """
         if self is not ipylab.app and not ipylab.app._ready:  # noqa: SLF001
             await ipylab.app.ready()
         if not self._ready:  # type: ignore
@@ -336,10 +357,22 @@ class Ipylab(WidgetBase):
             await self._ready_event.wait()
 
     def on_ready(self, callback, remove=False):  # noqa: FBT002
+        """Register a callback to execute when the application is ready.
+
+        The callback will be executed only once.
+
+        Parameters
+        ----------
+        callback : callable
+            The callback to execute when the application is ready.
+        remove : bool, optional
+            If True, remove the callback from the list of callbacks.
+            By default, False.
+        """
         if remove:
-            self._on_ready_callbacks.discard(callback)
-        else:
-            self._on_ready_callbacks.add(callback)
+            self._on_ready_callbacks.append(callback)
+        elif callback in self._on_ready_callbacks:
+            self._on_ready_callbacks.remove(callback)
 
     def add_to_tuple(self, owner: HasTraits, name: str):
         """Add self to the tuple of obj."""
