@@ -7,6 +7,7 @@ import { Kernel } from '@jupyterlab/services';
 import { PromiseDelegate } from '@lumino/coreutils';
 import { IpylabModel } from './ipylab';
 
+const VPATH = '_vpath';
 /**
  * JupyterFrontEndModel (JFEM) is a SINGLETON per kernel.
  */
@@ -26,7 +27,7 @@ export class JupyterFrontEndModel extends IpylabModel {
 
   async ipylabInit(base: any = null) {
     const vpath = await JFEM.getVpath(this.kernelId);
-    this.set('_vpath', vpath);
+    this.set(VPATH, vpath);
     this.set('version', JFEM.app.version);
     this.set('per_kernel_widget_manager_detected', JFEM.PER_KERNEL_WM);
     await super.ipylabInit(base);
@@ -38,7 +39,7 @@ export class JupyterFrontEndModel extends IpylabModel {
 
   close(comm_closed?: boolean): Promise<void> {
     Private.jfems.delete(this.kernelId);
-    Private.vpathTojfem.delete(this.get('vpath'));
+    Private.vpathTojfem.delete(this.get(VPATH));
     return super.close(comm_closed);
   }
 
@@ -133,8 +134,16 @@ export class JupyterFrontEndModel extends IpylabModel {
         reject(msg);
       }, 10000);
       Private.vpathTojfem.get(vpath).promise.then(jfem => {
-        clearTimeout(timeoutID);
-        resolve(jfem);
+        if (!jfem.commAvailable) {
+          jfem.close();
+          JupyterFrontEndModel.getModelByVpath(vpath).then(jfem => {
+            clearTimeout(timeoutID);
+            resolve(jfem);
+          });
+        } else {
+          clearTimeout(timeoutID);
+          resolve(jfem);
+        }
       });
     });
   }
