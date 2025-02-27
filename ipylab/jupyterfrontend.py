@@ -101,14 +101,39 @@ class App(Ipylab):
         "A representation to use when logging"
         return self.__class__.__name__
 
-    async def vpath(self):
-        "Returns the vpath for this kernel once the app is ready."
-        await self.ready()
+    @property
+    def vpath(self):
+        """The virtual path for this kernel.
+
+        `vpath` is equivalent to the session `path` in the frontend.
+
+        Raises
+        ------
+        RuntimeError
+            If App is not ready.
+
+        Returns
+        -------
+        str
+            Virtual path to the application.
+        """
+        if not self._ready:
+            msg = "`vpath` cannot not be accessed until app is ready."
+            raise RuntimeError(msg)
         return self._vpath
 
-    async def selector(self):
-        "Returns the selector once the app is ready."
-        await self.ready()
+    @property
+    def selector(self):
+        """The default selector based on the `vpath` for this kernel.
+
+        Raises
+        ------
+        RuntimeError
+            If the application is not ready.
+        """
+        if not self._ready:
+            msg = "`vpath` cannot not be accessed until app is ready."
+            raise RuntimeError(msg)
         return self._selector
 
     @override

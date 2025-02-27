@@ -202,7 +202,7 @@ class ContextMenu(Menu):
         """
 
         async def add_item_():
-            return await self._add_item(command, submenu, rank, type, args, selector or await ipylab.app.selector())
+            return await self._add_item(command, submenu, rank, type, args, selector or ipylab.app.selector)
 
         return self.to_task(add_item_())
 

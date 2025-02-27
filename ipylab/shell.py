@@ -137,9 +137,9 @@ class Shell(Ipylab):
             args["evaluate"] = pack(obj)
 
         async def add_to_shell() -> ShellConnection:
-            vpath_ = await ipylab.app.vpath()
+            vpath_ = ipylab.app.vpath
             if isinstance(obj, DOMWidget):
-                obj.add_class((await ipylab.app.selector()).removeprefix("."))
+                obj.add_class(ipylab.app.selector.removeprefix("."))
             if "evaluate" in args:
                 if isinstance(vpath, dict):
                     result = ipylab.plugin_manager.hook.vpath_getter(app=ipylab.app, kwgs=vpath)
@@ -192,15 +192,15 @@ class Shell(Ipylab):
             if not isinstance(ref_, ShellConnection):
                 ref_ = await self.connect_to_widget(ref_)
             objects_ = {"ref": ref_} | (objects or {})
-            vpath_ = await ipylab.app.vpath()
+            vpath = ipylab.app.vpath
             args = {
-                "path": vpath_,
+                "path": vpath,
                 "insertMode": InsertMode(mode),
                 "activate": activate,
                 "ref": f"{pack(ref_)}.id",
             }
             kwgs = IpylabKwgs(
-                transform={"transform": Transform.connection, "cid": ConsoleConnection.to_cid(vpath_)},
+                transform={"transform": Transform.connection, "cid": ConsoleConnection.to_cid(vpath)},
                 toObject=["args[ref]"],
                 hooks={
                     "trait_add_rev": [(self, "console")],
