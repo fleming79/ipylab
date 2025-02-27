@@ -101,7 +101,7 @@ async def test_app_evaluate(kw: dict[str, Any], result, mocker):
     fe_msg = {"ipylab": json.dumps(data)}
 
     # Simulate the message arriving in kernel and being processed
-    task2 = app._on_custom_msg(None, fe_msg, [])  # noqa: SLF001
+    task2 = app._on_custom_msg(None, fe_msg, [])
     assert isinstance(task2, asyncio.Task)
     async with asyncio.timeout(1):
         await task2

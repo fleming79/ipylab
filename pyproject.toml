@@ -111,3 +111,6 @@ write = true
 ignore = ["BLE001", "N803"]
 [tool.ruff.format]
 docstring-code-format = true
+
+[tool.ruff.lint.per-file-ignores]
+"tests*" = ['ARG002', 'SLF001', 'S101', 'PLR2004']
