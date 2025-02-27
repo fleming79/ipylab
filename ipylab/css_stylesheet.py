@@ -27,6 +27,8 @@ class CSSStyleSheet(Ipylab):
     )
 
     def __init__(self, **kwgs):
+        if self._async_widget_base_init_complete:
+            return
         super().__init__(**kwgs)
         self.on_ready(self._restore)
 

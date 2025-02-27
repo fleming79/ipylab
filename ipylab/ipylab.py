@@ -369,7 +369,7 @@ class Ipylab(WidgetBase):
             If True, remove the callback from the list of callbacks.
             By default, False.
         """
-        if remove:
+        if not remove:
             self._on_ready_callbacks.append(callback)
         elif callback in self._on_ready_callbacks:
             self._on_ready_callbacks.remove(callback)
