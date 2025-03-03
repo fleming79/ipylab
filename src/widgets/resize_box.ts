@@ -22,6 +22,7 @@ export class ResizeBoxModel extends BoxModel {
       _view_module_version: MODULE_VERSION
     };
   }
+  primaryView: ResizeBoxView | null;
 }
 
 /**
@@ -30,8 +31,11 @@ export class ResizeBoxModel extends BoxModel {
 export class ResizeBoxView extends BoxView {
   initialize(parameters: any): void {
     super.initialize(parameters);
-    if (Object.keys(this.model.views).length === 1) {
+    if (!this.model.primaryView) {
       this.makeObserver();
+    } else {
+      this.listenTo(this.model, 'change:size', this.updateSize);
+      requestAnimationFrame(() => this.updateSize());
     }
   }
 
@@ -39,24 +43,39 @@ export class ResizeBoxView extends BoxView {
     if (this.sizeObserver) {
       return;
     }
+    this.model.primaryView = this;
     this.sizeObserver = new ResizeObserver(() => {
-      this.model.set('width', this.el.clientWidth);
-      this.model.set('height', this.el.clientHeight);
+      const size = [this.el.clientWidth, this.el.clientHeight];
+      this.model.set('size', size);
       this.model.save_changes();
     });
     this.sizeObserver.observe(this.el);
     this.luminoWidget.removeClass('widget-box');
     this.luminoWidget.removeClass('jupyter-widgets');
     this.luminoWidget.addClass('ipylab-ResizeBox');
+    this.stopListening(this.model, 'change:size', this.updateSize);
   }
 
+  updateSize() {
+    const view = this.model.primaryView;
+    if (view && view !== this) {
+      this.el.style.width = view.el.style.width;
+      this.el.style.height = view.el.style.height;
+    }
+  }
 
   remove(): any {
-    this.sizeObserver.disconnect();
+    this?.sizeObserver?.disconnect();
+    this.stopListening(this.model, 'change:size', this.updateSize);
     super.remove();
-    for (const k in this.model.views) {
-      this.model.views[k].then(view => (view as ResizeBoxView).makeObserver());
-      break;
+    if (this.model.primaryView === this) {
+      for (const k in this.model.views) {
+        this.model.views[k].then(view => {
+          const view_ = view as ResizeBoxView;
+          view_.makeObserver();
+        });
+        break;
+      }
     }
   }
 

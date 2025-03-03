@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from ipywidgets import Box, DOMWidget, Layout, TypedTuple, register, widget_serialization
 from ipywidgets.widgets.trait_types import InstanceDict
-from traitlets import Container, Dict, Instance, Int, Unicode, observe
+from traitlets import Container, Dict, Instance, Tuple, Unicode, observe
 
 import ipylab
 import ipylab._frontend as _fe
@@ -124,5 +124,4 @@ class ResizeBox(Box):
     _view_module = Unicode(_fe.module_name, read_only=True).tag(sync=True)
     _view_module_version = Unicode(_fe.module_version, read_only=True).tag(sync=True)
 
-    width = Int(readonly=True, help="clientWidth in pixels").tag(sync=True)
-    height = Int(readonly=True, help="clientHeight in pixels").tag(sync=True)
+    size: Container[tuple[int, int]] = Tuple(readonly=True, help="(clientWidth,clientHeight) in pixels").tag(sync=True)
