@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from ipywidgets import Box, DOMWidget, Layout, TypedTuple, register, widget_serialization
 from ipywidgets.widgets.trait_types import InstanceDict
-from traitlets import Container, Dict, Instance, Unicode, observe
+from traitlets import Container, Dict, Instance, Int, Unicode, observe
 
 import ipylab
 import ipylab._frontend as _fe
@@ -111,3 +111,18 @@ class SplitPanel(Panel):
         return ipylab.app.to_task(force_refresh(self.children))
 
     # ============== End temp fix =============
+
+
+@register
+class ResizeBox(Box):
+    "A box that is aware of its size. Only the first view is resizeable."
+
+    _model_name = Unicode("ResizeBoxModel").tag(sync=True)
+    _view_name = Unicode("ResizeBoxView").tag(sync=True)
+    _model_module = Unicode(_fe.module_name, read_only=True).tag(sync=True)
+    _model_module_version = Unicode(_fe.module_version, read_only=True).tag(sync=True)
+    _view_module = Unicode(_fe.module_name, read_only=True).tag(sync=True)
+    _view_module_version = Unicode(_fe.module_version, read_only=True).tag(sync=True)
+
+    width = Int(readonly=True, help="clientWidth in pixels").tag(sync=True)
+    height = Int(readonly=True, help="clientHeight in pixels").tag(sync=True)

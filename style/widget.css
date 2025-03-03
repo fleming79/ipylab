@@ -36,3 +36,10 @@
   /* overflow-x: auto;
   overflow-y: auto; */
 }
+
+.ipylab-ResizeBox {
+  box-sizing: border-box;
+  display: flex block;
+  resize: both;
+  overflow: hidden;
+}
