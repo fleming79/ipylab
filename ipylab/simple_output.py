@@ -57,11 +57,11 @@ class SimpleOutput(Ipylab, DOMWidget):
                 yield output
             elif isinstance(output, str):
                 yield {"output_type": "stream", "name": "stdout", "text": output}
-            elif hasattr(output, "_repr_mimebundle_") and callable(output._repr_mimebundle_):  # type: ignore
-                yield output._repr_mimebundle_()  # type: ignore
             elif fmt:
                 data, metadata = fmt(output)
                 yield {"output_type": "display_data", "data": data, "metadata": metadata}
+            elif hasattr(output, "_repr_mimebundle_") and callable(output._repr_mimebundle_):  # type: ignore
+                yield {"output_type": "display_data", "data": output._repr_mimebundle_()}  # type: ignore
             else:
                 yield {"output_type": "display_data", "data": repr(output)}
 

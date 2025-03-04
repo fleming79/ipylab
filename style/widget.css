@@ -34,6 +34,11 @@
   overflow: auto;
 }
 
+.ipylab-SimpleOutput {
+  box-sizing: border-box;
+  display: inline block;
+  overflow: auto;
+}
 .ipylab-ResizeBox {
   box-sizing: border-box;
   display: inline block;
