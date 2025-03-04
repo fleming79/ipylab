@@ -22,7 +22,7 @@ export class ResizeBoxModel extends BoxModel {
       _view_module_version: MODULE_VERSION
     };
   }
-  primaryView: ResizeBoxView | null;
+  _resizing = false;
 }
 
 /**
@@ -31,54 +31,61 @@ export class ResizeBoxModel extends BoxModel {
 export class ResizeBoxView extends BoxView {
   initialize(parameters: any): void {
     super.initialize(parameters);
-    if (!this.model.primaryView) {
-      this.makeObserver();
-    } else {
-      this.listenTo(this.model, 'change:size', this.updateSize);
-      requestAnimationFrame(() => this.updateSize());
-    }
-  }
-
-  makeObserver() {
-    if (this.sizeObserver) {
-      return;
-    }
-    this.model.primaryView = this;
-    this.sizeObserver = new ResizeObserver(() => {
-      const size = [this.el.clientWidth, this.el.clientHeight];
-      this.model.set('size', size);
-      this.model.save_changes();
-    });
-    this.sizeObserver.observe(this.el);
     this.luminoWidget.removeClass('widget-box');
     this.luminoWidget.removeClass('jupyter-widgets');
     this.luminoWidget.addClass('ipylab-ResizeBox');
-    this.stopListening(this.model, 'change:size', this.updateSize);
+    this.resize();
+    this.sizeObserver = new ResizeObserver(() => {
+      if (!this.model._resizing && !this._resizing) {
+        const clientWidth = this.el.clientWidth;
+        const clientHeight = this.el.clientHeight;
+        const width = this.el.style.width;
+        const height = this.el.style.height;
+        try {
+          this.model._resizing = true;
+          this._resizing = true;
+          if (clientWidth && clientHeight) {
+            this.model.set('size', [clientWidth, clientHeight]);
+          }
+          if (width && height) {
+            this.model.set('width_height', [width, height]);
+          }
+          if ((width && height) || (clientWidth && clientHeight)) {
+            this.model.save_changes();
+          }
+        } finally {
+          this._resizing = false;
+          this.model._resizing = false;
+        }
+        if (!width && !height) {
+          this.resize();
+        }
+      }
+    });
+    this.sizeObserver.observe(this.el);
+    this.listenTo(this.model, 'change:width_height', this.resize);
   }
 
-  updateSize() {
-    const view = this.model.primaryView;
-    if (view && view !== this) {
-      this.el.style.width = view.el.style.width;
-      this.el.style.height = view.el.style.height;
+  resize() {
+    if (this._resizing) {
+      return;
+    }
+    const [width, height] = this.model.get('width_height') ?? [null, null];
+    if (width && height) {
+      this._resizing = true;
+      this.el.style.width = width;
+      this.el.style.height = height;
+      this._resizing = false;
     }
   }
 
   remove(): any {
     this?.sizeObserver?.disconnect();
-    this.stopListening(this.model, 'change:size', this.updateSize);
+    this.stopListening(this.model, 'change:size', this.resize);
     super.remove();
-    if (this.model.primaryView === this) {
-      for (const k in this.model.views) {
-        this.model.views[k].then(view => {
-          const view_ = view as ResizeBoxView;
-          view_.makeObserver();
-        });
-        break;
-      }
-    }
   }
 
   sizeObserver: ResizeObserver;
   model: ResizeBoxModel;
+  _resizing = false;
 }

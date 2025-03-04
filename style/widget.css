@@ -35,9 +35,8 @@
 }
 
 .ipylab-ResizeBox {
-  flex: 0 0 auto;
   box-sizing: border-box;
-  display: flex block;
+  display: inline block;
   resize: both;
   overflow: hidden;
 }
