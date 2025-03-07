@@ -198,7 +198,6 @@ class Ipylab(WidgetBase):
 
     async def _wrap_awaitable(self, aw: Awaitable[T], hooks: TaskHookType) -> T:
         await self.ready()
-        result = None
         try:
             result = await aw
             if hooks:
