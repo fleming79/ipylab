@@ -217,6 +217,11 @@ export class IpylabModel extends DOMWidgetModel {
     }
   }
 
+  /**
+   * Handles custom messages received from the Python backend.
+   *
+   * @param msg The message received from the backend.
+   */
   protected onCustomMessage(msg: any) {
     if (msg.ipylab) {
       this._onBackendMessage(JSON.parse(msg.ipylab));
@@ -224,13 +229,26 @@ export class IpylabModel extends DOMWidgetModel {
   }
 
   /**
-   * Handle messages
-   * 1. Response to requested operation sent to Python (ipylab_FE).
-   * 2. Operation requests received from the Python (ipylab_PY).
-   * 3. close - close always starts from the frontend unless the kernel is lost.
-   * 4. Log messages for the Jupyterlab logger.
+   * Handles messages received from the backend.
    *
-   * @param msg
+   * This method processes messages from the Python backend, which can include:
+   * - Results of operations requested by the frontend.
+   * - Requests for operations to be performed by the frontend on behalf of the backend.
+   * - Instructions to close the widget.
+   *
+   * @param content - The content of the message received from the backend.  The content
+   *                  is expected to have one of the following properties: `ipylab_FE`, `ipylab_PY`, or `close`.
+   *
+   * If `content.ipylab_FE` is present:
+   *   - Retrieves the corresponding pending operation.
+   *   - Replaces parts of the widget based on the received keyword arguments and conversion flags.
+   *   - Resolves or rejects the pending operation based on the success of the `replaceParts` method and the presence of an error in the content.
+   *
+   * If `content.ipylab_PY` is present:
+   *   - Executes an operation requested by the Python backend using the `doOperationForPython` method.
+   *
+   * If `content.close` is present:
+   *   - Closes the widget.
    */
   private async _onBackendMessage(content: any) {
     if (content.ipylab_FE) {
@@ -258,8 +276,35 @@ export class IpylabModel extends DOMWidgetModel {
   }
 
   /**
-   * Perform an operation request issued from a Python kernel.
-   * @param content
+   * Executes a specified operation in Python, handles data transformation,
+   * and sends the result back to the Python environment.
+   *
+   * @param content - An object containing the operation details,
+   * including the operation name, Python object identifier,
+   * transformation instructions, keyword arguments, and flags for
+   * Lumino widget and object conversion.
+   *
+   * @remarks
+   * This method orchestrates the execution of a Python operation,
+   * potentially transforming the result before sending it back.
+   * It also handles error reporting to the Python environment.
+   *
+   * The `content` object is expected to have the following properties:
+   * - `operation`: The name of the operation to execute in Python.
+   * - `ipylab_PY`: An identifier for the Python object associated with the operation.
+   * - `transform`: Instructions for transforming the result object.
+   * - `kwgs`: Keyword arguments to pass to the Python operation.
+   * - `toLuminoWidget`: A flag indicating whether to convert objects to Lumino widgets.
+   * - `toObject`: A flag indicating whether to convert objects to plain JavaScript objects.
+   *
+   * The method performs the following steps:
+   * 1. Replaces parts of the keyword arguments based on `toLuminoWidget` and `toObject` flags.
+   * 2. Executes the specified operation with the provided keyword arguments.
+   * 3. Extracts the payload and buffers from the result object, if present.
+   * 4. Transforms the result object using the provided transformation instructions.
+   * 5. Sends the transformed payload back to the Python environment.
+   * 6. If an error occurs during any of these steps, it sends an error message
+   *    back to the Python environment and logs the error to the console.
    */
   private async doOperationForPython(content: any) {
     const { operation, ipylab_PY, transform } = content;
@@ -285,13 +330,21 @@ export class IpylabModel extends DOMWidgetModel {
   }
 
   /**
-   * Replace parts in obj that are indicated by the arrays
-   * - toLuminoWidget
-   * - toObject
+   * Replaces parts of a nested object with Lumino widgets or plain JavaScript objects.
    *
-   * @param obj The object (map) with elements to be replaced.
-   * @param toLuminoWidget A list of elements to replace with widgets.
-   * @param toObject A list of elements to replace with objects.
+   * @param obj The object whose parts need to be replaced.
+   * @param toLuminoWidget An array of subpaths within the object that should be replaced with Lumino widgets. Each subpath is a string representing the path to the property (e.g., 'a.b.c').
+   * @param toObject An array of subpaths within the object that should be replaced with plain JavaScript objects.  Each subpath is a string representing the path to the property (e.g., 'a.b.c').
+   *
+   * @remarks
+   * The `toLuminoWidget` replacements are performed first.
+   * The `getNestedProperty` function is used to retrieve the value at the given subpath.
+   * The `IpylabModel.toLuminoWidget` method is used to convert the value to a Lumino widget.
+   * The `setNestedProperty` function is used to set the new widget value at the given subpath.
+   *
+   * For `toObject` replacements, the `toBaseAndSubpath` method is used to split the value into a base and subpath.
+   * The `IpylabModel.toObject` method is then used to convert the value to a plain JavaScript object.
+   * Finally, the `setNestedProperty` function is used to set the new object value at the given subpath.
    */
   private async replaceParts(
     obj: Map<string, any>,
@@ -322,13 +375,14 @@ export class IpylabModel extends DOMWidgetModel {
   }
 
   /**
-   * Get the base and subpath from value.
+   * Converts a value, which can be a string or an array, into a base and subpath.
    *
-   * When `default_basename` will be used when `value` is a string.
+   * If the value is an array, the first element is treated as the basename and the second as the subpath.
+   * If the value is a string, it's treated as the subpath, and a default basename is used.
    *
-   * @param value can be either [basename, subpath] or subpath.
-   * @param defaultBasename A basename to use when value is just a subpath.
-   * @returns [base, subpath]
+   * @param value The input value, which can be a string or an array of strings.
+   * @param defaultBasename The default basename to use if the value is a string. Defaults to 'base'.
+   * @returns A tuple containing the base (obtained from `this.getBase` using the basename) and the subpath.
    */
   private toBaseAndSubpath(
     value: string | Array<string>,
@@ -360,10 +414,14 @@ export class IpylabModel extends DOMWidgetModel {
   }
 
   /**
-   * Transform the object for sending.
-   * @param base
-   * @param args The mode as a string or an object with mode and any other parameters.
-   * @returns
+   * Transforms an object based on the specified transformation type.
+   *
+   * @param obj The object to transform.
+   * @param args The transformation arguments. If a string, it's treated as the transformation type.
+   *             If an object, it should contain a `transform` property specifying the transformation type,
+   *             and other properties relevant to the specific transformation.
+   * @returns A promise resolving to the transformed object.
+   * @throws Error if an invalid transformation type is provided.
    */
   private async transformObject(obj: any, args: string | any): Promise<any> {
     const transform = typeof args === 'string' ? args : args.transform;
@@ -471,17 +529,19 @@ export class IpylabModel extends DOMWidgetModel {
     return widget;
   }
 
+
   /**
-   * Returns the object for the subpath 'value'.
-   * 1. If value starts with IPY_MODEL_ it will ignore the base, instead
-   *    unpacking the model and return the object relative to subpath after
-   *    the model name. If there is no path after the model id it will be the model.
-   * 2. The object as specified by the subpath relate to the base will be returned.
-   * 3. An error will be thrown if the value doesn't point an existing attribute.
+   * Converts a value to an object, handling special cases for strings starting with 'IPY_MODEL_'.
    *
-   * @param obj The object to locate the dotted value.
-   * @param value The subpath on the base (except for IPY_MODEL_).
-   * @param nullIfMissing Return a null instead of throwing an error if missing.
+   * If the value is a string, it checks if it starts with 'IPY_MODEL_'. If so, it extracts the model ID and subpath,
+   * retrieves the widget model using `IpylabModel.JFEM.getWidgetModel`, and resolves nested properties using `getNestedProperty`.
+   * If the value is not a string, it throws an error.
+   *
+   * @param obj The initial object to traverse, can be a widget model.
+   * @param value The value to convert to an object. If it's a string starting with 'IPY_MODEL_', it's treated as a reference to a widget model and a subpath.
+   * @param nullIfMissing Optional. If true, returns null if the nested property is missing. Defaults to false.
+   * @returns A promise that resolves to the object or nested property.
+   * @throws Error if the value is not a string.
    */
   static async toObject(
     obj: any,
