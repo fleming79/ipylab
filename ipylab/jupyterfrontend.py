@@ -6,14 +6,13 @@ from __future__ import annotations
 import contextlib
 import functools
 import inspect
-from typing import TYPE_CHECKING, Any, Unpack
+from typing import TYPE_CHECKING, Any, Unpack, override
 
 from ipywidgets import Widget, register
 from traitlets import Bool, Container, Dict, Instance, Unicode, UseEnum, default, observe
 
 import ipylab
 from ipylab import Ipylab
-from ipylab._compat.typing import override
 from ipylab.commands import APP_COMMANDS_NAME, CommandPalette, CommandRegistry
 from ipylab.common import Fixed, IpylabKwgs, LastUpdatedDict, Obj, to_selector
 from ipylab.dialog import Dialog
@@ -42,7 +41,7 @@ class App(Ipylab):
     _model_name = Unicode("JupyterFrontEndModel").tag(sync=True)
     ipylab_base = IpylabBase(Obj.IpylabModel, "app").tag(sync=True)
     version = Unicode(read_only=True).tag(sync=True)
-    vpath = Unicode(read_only=True).tag(sync=True)
+    _vpath = Unicode(read_only=True).tag(sync=True)
     per_kernel_widget_manager_detected = Bool(read_only=True).tag(sync=True)
 
     shell = Fixed(Shell)
@@ -62,7 +61,7 @@ class App(Ipylab):
 
     @classmethod
     @override
-    def _single_key(cls, kwgs: dict):  # noqa: ARG003
+    def _single_key(cls, kwgs: dict):
         return "app"
 
     def close(self):
@@ -78,8 +77,8 @@ class App(Ipylab):
     @observe("_ready", "log_level")
     def _app_observe_ready(self, change):
         if change["name"] == "_ready" and self._ready:
-            assert self.vpath, "Vpath should always before '_ready'."  # noqa: S101
-            self._selector = to_selector(self.vpath)
+            assert self._vpath, "Vpath should always before '_ready'."  # noqa: S101
+            self._selector = to_selector(self._vpath)
             ipylab.plugin_manager.hook.autostart._call_history.clear()  # type: ignore  # noqa: SLF001
             try:
                 ipylab.plugin_manager.hook.autostart.call_historic(
@@ -95,7 +94,7 @@ class App(Ipylab):
 
     @property
     def repr_info(self):
-        return {"vpath": self.vpath}
+        return {"vpath": self._vpath}
 
     @property
     def repr_log(self):
@@ -103,8 +102,38 @@ class App(Ipylab):
         return self.__class__.__name__
 
     @property
+    def vpath(self):
+        """The virtual path for this kernel.
+
+        `vpath` is equivalent to the session `path` in the frontend.
+
+        Raises
+        ------
+        RuntimeError
+            If App is not ready.
+
+        Returns
+        -------
+        str
+            Virtual path to the application.
+        """
+        if not self._ready:
+            msg = "`vpath` cannot not be accessed until app is ready."
+            raise RuntimeError(msg)
+        return self._vpath
+
+    @property
     def selector(self):
-        # Calling this before `_ready` is set will raise an attribute error.
+        """The default selector based on the `vpath` for this kernel.
+
+        Raises
+        ------
+        RuntimeError
+            If the application is not ready.
+        """
+        if not self._ready:
+            msg = "`vpath` cannot not be accessed until app is ready."
+            raise RuntimeError(msg)
         return self._selector
 
     @override

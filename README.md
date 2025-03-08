@@ -80,10 +80,11 @@ combining [Per-kernel-widget-manager](https://github.com/jupyter-widgets/ipywidg
 and [weakref](https://github.com/fleming79/ipywidgets/tree/weakref).
 
 These versions enable:
-* Widget restoration when the page is reloaded.
-* Starting new kernels and opening widgets from those kernels.
-* autostart plugins - Run code when Jupyterlab is started.
-* Viewing widgets from kernels inside from other kernels.
+
+- Widget restoration when the page is reloaded.
+- Starting new kernels and opening widgets from those kernels.
+- autostart plugins - Run code when Jupyterlab is started.
+- Viewing widgets from kernels inside from other kernels.
 
 ```bash
 # For per-kernel-widget-manager support (Install modified version of ipywidgets, jupyterlab_widgets & widgetsnbextension)

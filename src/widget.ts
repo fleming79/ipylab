@@ -12,6 +12,7 @@ import { IconModel, IconView } from './widgets/icon';
 import { IpylabModel } from './widgets/ipylab';
 import { NotificationManagerModel } from './widgets/notification';
 import { PanelModel, PanelView } from './widgets/panel';
+import { ResizeBoxModel, ResizeBoxView } from './widgets/resize_box';
 import { SessionManagerModel } from './widgets/sessions';
 import { ShellModel } from './widgets/shell';
 import { SimpleOutputModel, SimpleOutputView } from './widgets/simple_output';
@@ -33,6 +34,8 @@ export {
   NotificationManagerModel,
   PanelModel,
   PanelView,
+  ResizeBoxModel,
+  ResizeBoxView,
   SessionManagerModel,
   ShellConnectionModel,
   ShellModel,

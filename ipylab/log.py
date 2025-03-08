@@ -6,13 +6,12 @@ from __future__ import annotations
 import logging
 import weakref
 from enum import IntEnum, StrEnum
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, override
 
 from IPython.core.ultratb import FormattedTB
 from ipywidgets import CallbackDispatcher
 
 import ipylab
-from ipylab._compat.typing import override
 
 if TYPE_CHECKING:
     from asyncio import Task
@@ -101,7 +100,7 @@ class IpylabLogHandler(logging.Handler):
             logger.addHandler(self)
 
     @override
-    def setLevel(self, level: LogLevel) -> None:  # noqa: N802
+    def setLevel(self, level: LogLevel) -> None:
         level = LogLevel(level)
         super().setLevel(level)
         for logger in self._loggers:

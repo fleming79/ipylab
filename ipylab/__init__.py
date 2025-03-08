@@ -8,7 +8,6 @@ from ipylab._frontend import module_version as __version__
 from ipylab.code_editor import CodeEditor
 from ipylab.common import Area, Fixed, InsertMode, Obj, Transform, hookimpl, pack, to_selector
 from ipylab.connection import Connection, ShellConnection
-from ipylab.css_stylesheet import CSSStyleSheet
 from ipylab.ipylab import Ipylab
 from ipylab.jupyterfrontend import App, JupyterFrontEnd
 from ipylab.notification import NotificationType, NotifyAction
@@ -19,7 +18,6 @@ __all__ = [
     "__version__",
     "CodeEditor",
     "Connection",
-    "CSSStyleSheet",
     "ShellConnection",
     "SimpleOutput",
     "Panel",

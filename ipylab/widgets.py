@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from ipywidgets import Box, DOMWidget, Layout, TypedTuple, register, widget_serialization
 from ipywidgets.widgets.trait_types import InstanceDict
-from traitlets import Container, Dict, Instance, Unicode, observe
+from traitlets import Container, Dict, Instance, Tuple, Unicode, observe
 
 import ipylab
 import ipylab._frontend as _fe
@@ -111,3 +111,29 @@ class SplitPanel(Panel):
         return ipylab.app.to_task(force_refresh(self.children))
 
     # ============== End temp fix =============
+
+
+@register
+class ResizeBox(Box):
+    """A box that can be resized.
+
+    All views of the box are resizeable via the handle on the bottom right corner.
+    When a view is resized the other views are also resized to the same width and height.
+    The `size` trait of this object provides the size in pixels as (client width, client height).
+
+    Reference
+    ---------
+    * [width](https://developer.mozilla.org/en-US/docs/Web/CSS/width)
+    * [height](https://developer.mozilla.org/en-US/docs/Web/CSS/height)
+    * [client width](https://developer.mozilla.org/en-US/docs/Web/API/Element/clientWidth)
+    * [client height](https://developer.mozilla.org/en-US/docs/Web/API/Element/clientHeight)
+    """
+
+    _model_name = Unicode("ResizeBoxModel").tag(sync=True)
+    _view_name = Unicode("ResizeBoxView").tag(sync=True)
+    _model_module = Unicode(_fe.module_name, read_only=True).tag(sync=True)
+    _model_module_version = Unicode(_fe.module_version, read_only=True).tag(sync=True)
+    _view_module = Unicode(_fe.module_name, read_only=True).tag(sync=True)
+    _view_module_version = Unicode(_fe.module_version, read_only=True).tag(sync=True)
+
+    size: Container[tuple[int, int]] = Tuple(readonly=True, help="(clientWidth, clientHeight) in pixels").tag(sync=True)

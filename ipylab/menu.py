@@ -3,13 +3,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 from ipywidgets import TypedTuple
 from traitlets import Container, Instance, Union
 
 import ipylab
-from ipylab._compat.typing import override
 from ipylab.commands import APP_COMMANDS_NAME, CommandRegistry
 from ipylab.common import Fixed, Obj
 from ipylab.connection import InfoConnection
@@ -157,7 +156,7 @@ class MainMenu(Menu):
 
     @classmethod
     @override
-    def _single_key(cls, kwgs: dict):  # noqa: ARG003
+    def _single_key(cls, kwgs: dict):
         return cls
 
     def __init__(self):
@@ -193,7 +192,7 @@ class ContextMenu(Menu):
         selector="",
         submenu: MenuConnection | None = None,
         rank: float | None = None,
-        type: Literal["command", "submenu", "separator"] = "command",  # noqa: A002
+        type: Literal["command", "submenu", "separator"] = "command",
         args: dict | None = None,
     ) -> Task[MenuItemConnection]:
         """Add command, subitem or separator.
@@ -201,7 +200,11 @@ class ContextMenu(Menu):
 
         ref: https://jupyterlab.readthedocs.io/en/stable/extension/extension_points.html#context-menu
         """
-        return self._add_item(command, submenu, rank, type, args, selector or ipylab.app.selector)
+
+        async def add_item_():
+            return await self._add_item(command, submenu, rank, type, args, selector or ipylab.app.selector)
+
+        return self.to_task(add_item_())
 
     @override
     def activate(self):

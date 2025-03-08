@@ -7,7 +7,7 @@ import asyncio
 import inspect
 import typing
 from asyncio import Task
-from typing import TYPE_CHECKING, Any, NotRequired, TypedDict
+from typing import TYPE_CHECKING, Any, NotRequired, TypedDict, override
 
 from IPython.core import completer as IPC  # noqa: N812
 from IPython.utils.tokenutil import token_at_cursor
@@ -18,7 +18,6 @@ from ipywidgets.widgets.widget_string import _String
 from traitlets import Callable, Container, Dict, Instance, Int, Unicode, default, observe
 
 import ipylab
-from ipylab._compat.typing import override
 from ipylab.common import Fixed, LastUpdatedDict
 from ipylab.ipylab import Ipylab
 

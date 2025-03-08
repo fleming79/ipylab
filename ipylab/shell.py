@@ -133,12 +133,13 @@ class Shell(Ipylab):
             if isinstance(obj, ipylab.Panel):
                 hooks_["add_to_tuple_fwd"].append((obj, "connections"))
             args["ipy_model"] = obj.model_id
-            if isinstance(obj, DOMWidget):
-                obj.add_class(ipylab.app.selector.removeprefix("."))
         else:
             args["evaluate"] = pack(obj)
 
         async def add_to_shell() -> ShellConnection:
+            vpath_ = ipylab.app.vpath
+            if isinstance(obj, DOMWidget):
+                obj.add_class(ipylab.app.selector.removeprefix("."))
             if "evaluate" in args:
                 if isinstance(vpath, dict):
                     result = ipylab.plugin_manager.hook.vpath_getter(app=ipylab.app, kwgs=vpath)
@@ -146,11 +147,11 @@ class Shell(Ipylab):
                         result = await result
                     args["vpath"] = result
                 else:
-                    args["vpath"] = vpath or ipylab.app.vpath
-                if args["vpath"] != ipylab.app.vpath:
+                    args["vpath"] = vpath or vpath_
+                if args["vpath"] != vpath_:
                     hooks_["trait_add_fwd"] = [("auto_dispose", False)]
             else:
-                args["vpath"] = ipylab.app.vpath
+                args["vpath"] = vpath_
 
             return await self.operation("addToShell", {"args": args}, transform=Transform.connection, hooks=hooks_)
 
@@ -191,14 +192,15 @@ class Shell(Ipylab):
             if not isinstance(ref_, ShellConnection):
                 ref_ = await self.connect_to_widget(ref_)
             objects_ = {"ref": ref_} | (objects or {})
+            vpath = ipylab.app.vpath
             args = {
-                "path": ipylab.app.vpath,
+                "path": vpath,
                 "insertMode": InsertMode(mode),
                 "activate": activate,
                 "ref": f"{pack(ref_)}.id",
             }
             kwgs = IpylabKwgs(
-                transform={"transform": Transform.connection, "cid": ConsoleConnection.to_cid(ipylab.app.vpath)},
+                transform={"transform": Transform.connection, "cid": ConsoleConnection.to_cid(vpath)},
                 toObject=["args[ref]"],
                 hooks={
                     "trait_add_rev": [(self, "console")],

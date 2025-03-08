@@ -106,8 +106,8 @@ class LogViewer(Panel):
     def _observe_connections(self, _):
         if self.connections and len(self.connections) == 1:
             self.output.push(*(rec.output for rec in self._records), clear=True)
-        self.info.value = f"<b>Vpath: {ipylab.app.vpath}</b>"
-        self.title.label = f"Log: {ipylab.app.vpath}"
+        self.info.value = f"<b>Vpath: {ipylab.app._vpath}</b>"  # noqa: SLF001
+        self.title.label = f"Log: {ipylab.app._vpath}"  # noqa: SLF001
 
     def _add_record(self, record: logging.LogRecord):
         self._records.append(record)

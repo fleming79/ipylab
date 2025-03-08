@@ -130,6 +130,11 @@ export class SimpleOutputModel extends IpylabModel {
 }
 
 export class SimpleOutputView extends DOMWidgetView {
+  initialize(parameters: any): void {
+    super.initialize(parameters);
+    this.luminoWidget.removeClass('jupyter-widgets');
+    this.luminoWidget.addClass('ipylab-SimpleOutput');
+  }
   _createElement(tagName: string): HTMLElement {
     this.luminoWidget = new IpylabSimplifiedOutputArea({
       view: this,
