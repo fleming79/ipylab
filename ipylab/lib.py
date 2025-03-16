@@ -41,6 +41,11 @@ async def autostart(app: ipylab.App) -> None | Awaitable[None]:
 
 
 @hookimpl
+async def autostart_once(app: ipylab.App) -> None | Awaitable[None]:
+    pass
+
+
+@hookimpl
 def vpath_getter(app: App, kwgs: dict) -> Awaitable[str] | str:
     return app.dialog.get_text(**kwgs)
 

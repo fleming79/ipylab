@@ -29,6 +29,18 @@ async def ready(obj: ipylab.Ipylab) -> None | Awaitable[None]:
 
 
 @hookspec(historic=True)
+async def autostart_once(app: ipylab.App) -> None | Awaitable[None]:
+    """A hook that is called when the `app` is ready for the first time.
+
+    Historic
+    --------
+
+    This plugin is historic so will be called when a plugin is registered if the
+    app is already ready.
+    """
+
+
+@hookspec(historic=True)
 async def autostart(app: ipylab.App) -> None | Awaitable[None]:
     """A hook that is called when the `app` is ready.
 

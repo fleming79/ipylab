@@ -77,6 +77,10 @@ class App(Singular, Ipylab):
             self._selector = to_selector(self._vpath)
             ipylab.plugin_manager.hook.autostart._call_history.clear()  # type: ignore  # noqa: SLF001
             try:
+                if not ipylab.plugin_manager.hook.autostart_once._call_history:  # noqa: SLF001
+                    ipylab.plugin_manager.hook.autostart_once.call_historic(
+                        kwargs={"app": self}, result_callback=self._autostart_callback
+                    )
                 ipylab.plugin_manager.hook.autostart.call_historic(
                     kwargs={"app": self}, result_callback=self._autostart_callback
                 )
