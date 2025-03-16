@@ -173,9 +173,6 @@ class MainMenu(Menu):
 class ContextMenu(Menu):
     """Menu available on mouse right click."""
 
-    # TODO: Support custom context menus.
-    # This would require a model similar to CommandRegistryModel.
-
     ipylab_base = IpylabBase(Obj.IpylabModel, "app.contextMenu").tag(sync=True)
 
     @override

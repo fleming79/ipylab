@@ -151,7 +151,6 @@ class LogViewer(Panel):
             self.output.push(clear=True)
 
     async def _show_send_dialog(self):
-        # TODO: make a formatter to simplify the message with obj and owner)
         options = {r.msg: r for r in reversed(self._records)}  # type: ignore
         select = Select(
             tooltip="Most recent exception is first",

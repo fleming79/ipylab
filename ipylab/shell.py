@@ -29,8 +29,6 @@ __all__ = ["Shell", "ConsoleConnection"]
 class ConsoleConnection(ShellConnection):
     "A connection intended for a JupyterConsole"
 
-    # TODO: add methods
-
 
 class Shell(Singular, Ipylab):
     """Provides access to the shell."""
