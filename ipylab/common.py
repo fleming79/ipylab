@@ -44,6 +44,7 @@ __all__ = [
     "Fixed",
     "FixedCreate",
     "FixedCreated",
+    "Singular",
 ]
 
 hookimpl = pluggy.HookimplMarker("ipylab")  # Used for plugins

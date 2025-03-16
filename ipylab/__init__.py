@@ -3,10 +3,10 @@
 
 from __future__ import annotations
 
-from ipylab import menu
+from ipylab import common, menu
 from ipylab._frontend import module_version as __version__
 from ipylab.code_editor import CodeEditor
-from ipylab.common import Area, Fixed, InsertMode, Obj, Transform, hookimpl, pack, to_selector
+from ipylab.common import Area, InsertMode, Obj, Transform, hookimpl, pack, to_selector
 from ipylab.connection import Connection, ShellConnection
 from ipylab.ipylab import Ipylab
 from ipylab.jupyterfrontend import App, JupyterFrontEnd
@@ -16,6 +16,7 @@ from ipylab.widgets import Icon, Panel, SplitPanel
 
 __all__ = [
     "__version__",
+    "common",
     "CodeEditor",
     "Connection",
     "ShellConnection",
@@ -24,7 +25,6 @@ __all__ = [
     "SplitPanel",
     "Icon",
     "Area",
-    "Fixed",
     "NotificationType",
     "NotifyAction",
     "InsertMode",

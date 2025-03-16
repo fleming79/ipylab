@@ -189,7 +189,6 @@ class Ipylab(WidgetBase):
                 elif isinstance(val, tuple):
                     obj.set_trait(name, tuple(v for v in val if v.comm))
         self._on_ready_callbacks.clear()
-        self.set_trait("closed", True)
 
     def _check_closed(self):
         if not self._repr_mimebundle_:
