@@ -81,7 +81,28 @@ class WidgetBase(Widget):
 
 @register
 class Ipylab(WidgetBase):
-    """The base class for Ipylab which has a corresponding frontend."""
+    """A base class for creating ipylab widgets.
+
+    Ipylab widgets are Jupyter widgets that are designed to interact with the
+    JupyterLab application. They provide a way to extend the functionality
+    of JupyterLab with custom Python code.
+
+    Attributes:
+        _model_name (Unicode): The name of the model.
+        _python_class (Unicode): The name of the Python class.
+        ipylab_base (IpylabBase): The base ipylab object.
+        _ready (Bool): Whether the widget is ready.
+        _on_ready_callbacks (List): A list of callbacks to execute when the widget is ready.
+        _ready_event (asyncio.Event): An event that is set when the widget is ready.
+        _comm: The comm object.
+        _ipylab_init_complete (bool): Whether the ipylab initialization is complete.
+        _pending_operations (Dict): A dictionary of pending operations.
+        _has_attrs_mappings (Set): A set of attribute mappings.
+        ipylab_tasks (Set): A set of ipylab tasks.
+        close_extras (Fixed): A set of extra widgets to close.
+        log (Instance): A logger instance.
+        app (Fixed): A reference to the ipylab App instance.
+    """
 
     _model_name = Unicode("IpylabModel", help="Name of the model.", read_only=True).tag(sync=True)
     _python_class = Unicode().tag(sync=True)
