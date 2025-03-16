@@ -192,9 +192,9 @@ class TestLimited:
     async def test_limited_newget_single_keyed(self):
         # Test that the get_single_key method and arguments are passed
         class KeyedSingle(Singular):
-            key = Unicode()
+            key = Unicode(allow_none=True)
 
-            def __init__(self, /, key: str, **kwgs):
+            def __init__(self, /, key: str | None, **kwgs):
                 super().__init__(key=key, **kwgs)
 
             @override
@@ -206,9 +206,15 @@ class TestLimited:
         obj2 = KeyedSingle(key="key1")
         obj3 = KeyedSingle(key="key2")
         obj4 = KeyedSingle("key2")
+        obj5 = KeyedSingle(None)
+        obj6 = KeyedSingle(None)
+
+        assert obj1 in KeyedSingle._single_instances.values()
         assert obj1 is obj2
         assert obj1 is not obj3
         assert obj4 is obj3
+        assert obj5 is not obj6
+        assert obj5 not in KeyedSingle._single_instances.values()
 
 
 class TestFixed:

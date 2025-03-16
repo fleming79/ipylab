@@ -323,7 +323,8 @@ class Singular(HasTraits):
 
     This class uses a class-level dictionary `_single_instances` to store instances,
     keyed by a value obtained from the `get_single_key` method.  Subsequent calls to
-    the constructor with the same key will return the existing instance.
+    the constructor with the same key will return the existing instance. If key is
+    None, a new instance is always created and a reference is not kept to the object.
 
     Attributes:
         _limited_init_complete (bool): A flag to prevent multiple initializations.
@@ -366,11 +367,13 @@ class Singular(HasTraits):
 
     def __new__(cls, /, *args, **kwgs) -> Self:
         key = cls.get_single_key(*args, **kwgs)
-        if key not in cls._single_instances:
+        if key is None or not (inst := cls._single_instances.get(key)):
             new = super().__new__
-            cls._single_instances[key] = inst = new(cls) if new is object.__new__ else new(cls, *args, **kwgs)
-            inst.set_trait("_single_key", key)
-        return cls._single_instances[key]
+            inst = new(cls) if new is object.__new__ else new(cls, *args, **kwgs)
+            if key:
+                cls._single_instances[key] = inst
+                inst.set_trait("_single_key", key)
+        return inst
 
     def __init__(self, /, *args, **kwgs):
         if self._limited_init_complete:
