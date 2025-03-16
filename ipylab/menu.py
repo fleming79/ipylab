@@ -128,6 +128,8 @@ class Menu(Singular, RankedMenu):
         return commands
 
     def __init__(self, *, commands: CommandRegistry, **kwgs):
+        if self._ipylab_init_complete:
+            return
         commands.close_extras.add(self)
         super().__init__(commands=commands, **kwgs)
 

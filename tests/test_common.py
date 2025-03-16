@@ -192,9 +192,10 @@ class TestLimited:
     async def test_limited_newget_single_keyed(self):
         # Test that the get_single_key method and arguments are passed
         class KeyedSingle(Singular):
-            def __init__(self, /, key: str, *args, **kwgs):
-                self.key = key
-                super().__init__(*args, **kwgs)
+            key = Unicode()
+
+            def __init__(self, /, key: str, **kwgs):
+                super().__init__(key=key, **kwgs)
 
             @override
             @classmethod
