@@ -9,7 +9,7 @@ import inspect
 import json
 import uuid
 import weakref
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import traitlets
 from ipywidgets import Widget, register
@@ -45,8 +45,8 @@ from ipylab.log import IpylabLoggerAdapter
 
 if TYPE_CHECKING:
     from asyncio import Task
-    from collections.abc import Awaitable, Callable, Hashable
-    from typing import ClassVar, Self, Unpack
+    from collections.abc import Awaitable, Callable
+    from typing import Self, Unpack
 
 
 __all__ = ["Ipylab", "WidgetBase"]
@@ -83,33 +83,22 @@ class WidgetBase(Widget):
 class Ipylab(WidgetBase):
     """The base class for Ipylab which has a corresponding frontend."""
 
-    SINGLE = False
-
     _model_name = Unicode("IpylabModel", help="Name of the model.", read_only=True).tag(sync=True)
     _python_class = Unicode().tag(sync=True)
     ipylab_base = IpylabBase(Obj.this, "").tag(sync=True)
     _ready = Bool(read_only=True, help="Set to by frontend when ready").tag(sync=True)
-
     _on_ready_callbacks: Container[list[Callable[[], None | Awaitable] | Callable[[Self], None | Awaitable]]] = List(
         trait=traitlets.Callable()
     )
-
-    _async_widget_base_init_complete = False
-    _single_map: ClassVar[dict[Hashable, str]] = {}  # single_key : model_id
-    _single_models: ClassVar[dict[str, Self]] = {}  #  model_id   : Widget
     _ready_event: asyncio.Event | None = None
     _comm = None
-
+    _ipylab_init_complete = False
     _pending_operations: Dict[str, asyncio.Future] = Dict()
     _has_attrs_mappings: Container[set[tuple[HasTraits, str]]] = Set()
     ipylab_tasks: Container[set[asyncio.Task]] = Set()
     close_extras: Fixed[weakref.WeakSet[Widget]] = Fixed(weakref.WeakSet)
     log = Instance(IpylabLoggerAdapter, read_only=True)
-
-    @classmethod
-    def _single_key(cls, kwgs: dict) -> Hashable:  # noqa: ARG003
-        """The key used for finding instances when SINGLE is enabled."""
-        return cls
+    app = Fixed(cast(type["ipylab.App"], "ipylab.App"))
 
     @property
     def repr_info(self) -> dict[str, Any] | str:
@@ -120,31 +109,16 @@ class Ipylab(WidgetBase):
     def _default_log(self):
         return IpylabLoggerAdapter(self.__module__, owner=self)
 
-    def __new__(cls, **kwgs) -> Self:
-        model_id = kwgs.get("model_id") or cls._single_map.get(cls._single_key(kwgs)) if cls.SINGLE else None
-        if model_id and model_id in cls._single_models:
-            return cls._single_models[model_id]
-        return super().__new__(cls)
-
     def __init__(self, **kwgs):
-        if self._async_widget_base_init_complete:
+        if self._ipylab_init_complete:
             return
-        # set traits, including read only traits.
-        model_id = kwgs.pop("model_id", None)
         for k in kwgs:
             if self.has_trait(k):
                 self.set_trait(k, kwgs[k])
         self.set_trait("_python_class", self.__class__.__name__)
-        super().__init__(model_id=model_id) if model_id else super().__init__()
-        model_id = self.model_id
-        if not model_id:
-            msg = "Failed to init comms"
-            raise RuntimeError(msg)
-        if key := self._single_key(kwgs) if self.SINGLE else None:
-            self._single_map[key] = model_id
-            self._single_models[model_id] = self
+        super().__init__()
+        self._ipylab_init_complete = True
         self.on_msg(self._on_custom_msg)
-        self._async_widget_base_init_complete = True
 
     def __repr__(self):
         if not self._repr_mimebundle_:
@@ -165,21 +139,7 @@ class Ipylab(WidgetBase):
     @observe("comm", "_ready")
     def _observe_comm(self, change: dict):
         if not self.comm:
-            for task in self.ipylab_tasks:
-                task.cancel()
-            self.ipylab_tasks.clear()
-            for item in list(self.close_extras):
-                item.close()
-            for obj, name in list(self._has_attrs_mappings):
-                if val := getattr(obj, name, None):
-                    if val is self:
-                        with contextlib.suppress(TraitError):
-                            obj.set_trait(name, None)
-                    elif isinstance(val, tuple):
-                        obj.set_trait(name, tuple(v for v in val if v.comm))
-            self._on_ready_callbacks.clear()
-            if self.SINGLE:
-                self._single_models.pop(change["old"].comm_id, None)  # type: ignore
+            self.close()
         if change["name"] == "_ready":
             if self._ready:
                 if self._ready_event:
@@ -191,6 +151,25 @@ class Ipylab(WidgetBase):
             elif self._ready_event:
                 self._ready_event.clear()
 
+    def close(self):
+        if self.comm:
+            self._ipylab_send({"close": True})
+        super().close()
+        for task in self.ipylab_tasks:
+            task.cancel()
+        self.ipylab_tasks.clear()
+        for item in list(self.close_extras):
+            item.close()
+        for obj, name in list(self._has_attrs_mappings):
+            if val := getattr(obj, name, None):
+                if val is self:
+                    with contextlib.suppress(TraitError):
+                        obj.set_trait(name, None)
+                elif isinstance(val, tuple):
+                    obj.set_trait(name, tuple(v for v in val if v.comm))
+        self._on_ready_callbacks.clear()
+        self.set_trait("closed", True)
+
     def _check_closed(self):
         if not self._repr_mimebundle_:
             msg = f"This widget is closed {self!r}"
@@ -200,12 +179,16 @@ class Ipylab(WidgetBase):
         await self.ready()
         try:
             result = await aw
-            if hooks:
-                self._task_result(result, hooks)
         except Exception:
-            self.log.exception("Task error", obj={"result": result, "hooks": hooks, "aw": aw})
+            self.log.exception("Awaiting %s", aw, obj={"hooks": hooks, "aw": aw})
             raise
         else:
+            if hooks:
+                try:
+                    self._task_result(result, hooks)
+                except Exception:
+                    self.log.exception("Running hooks", obj={"result": result, "hooks": hooks, "aw": aw})
+                    raise
             return result
 
     def _task_result(self: Ipylab, result: Any, hooks: TaskHooks):
@@ -313,10 +296,6 @@ class Ipylab(WidgetBase):
         kwgs |= {"genericOperation": operation, "basename": base, "subpath": subpath}
         return self.operation("genericOperation", kwgs, **kwargs)
 
-    def close(self):
-        self._ipylab_send({"close": True})
-        super().close()
-
     def ensure_run(self, aw: Callable | Awaitable | None) -> None:
         """Ensure aw is run.
 
@@ -334,14 +313,15 @@ class Ipylab(WidgetBase):
             self.log.exception("Ensure run", obj=aw)
             raise
 
-    async def ready(self):
+    async def ready(self) -> Self:
         """Wait for the application to be ready.
 
         If this is not the main application instance, it waits for the
         main application instance to be ready first.
         """
-        if self is not ipylab.app and not ipylab.app._ready:  # noqa: SLF001
-            await ipylab.app.ready()
+        app = self.app
+        if app is not self and not app._ready:  # noqa: SLF001
+            await app.ready()
         if not self._ready:  # type: ignore
             if self._ready_event:
                 try:
@@ -351,9 +331,10 @@ class Ipylab(WidgetBase):
                 except RuntimeError:
                     pass
                 else:
-                    return
+                    return self
             self._ready_event = asyncio.Event()
             await self._ready_event.wait()
+        return self
 
     def on_ready(self, callback, remove=False):  # noqa: FBT002
         """Register a callback to execute when the application is ready.

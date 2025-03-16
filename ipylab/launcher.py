@@ -9,7 +9,7 @@ from ipywidgets import TypedTuple
 from traitlets import Container, Instance
 
 from ipylab.commands import CommandConnection, CommandPalletItemConnection, CommandRegistry
-from ipylab.common import Obj, TaskHooks
+from ipylab.common import Obj, Singular, TaskHooks
 from ipylab.ipylab import Ipylab, IpylabBase, Transform
 
 if TYPE_CHECKING:
@@ -26,11 +26,9 @@ class LauncherConnection(CommandPalletItemConnection):
 cid: str
 
 
-class Launcher(Ipylab):
+class Launcher(Singular, Ipylab):
     """
     ref: https://jupyterlab.readthedocs.io/en/latest/api/interfaces/launcher.ILauncher-1.html"""
-
-    SINGLE = True
 
     ipylab_base = IpylabBase(Obj.IpylabModel, "launcher").tag(sync=True)
 

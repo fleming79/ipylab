@@ -61,4 +61,3 @@ def _get_plugin_manager():
 
 plugin_manager = _get_plugin_manager()
 del _get_plugin_manager
-app = App()

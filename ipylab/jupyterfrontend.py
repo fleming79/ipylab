@@ -14,7 +14,7 @@ from traitlets import Bool, Container, Dict, Instance, Unicode, UseEnum, default
 import ipylab
 from ipylab import Ipylab
 from ipylab.commands import APP_COMMANDS_NAME, CommandPalette, CommandRegistry
-from ipylab.common import Fixed, IpylabKwgs, LastUpdatedDict, Obj, to_selector
+from ipylab.common import Fixed, IpylabKwgs, LastUpdatedDict, Obj, Singular, to_selector
 from ipylab.dialog import Dialog
 from ipylab.ipylab import IpylabBase
 from ipylab.launcher import Launcher
@@ -30,13 +30,12 @@ if TYPE_CHECKING:
 
 
 @register
-class App(Ipylab):
+class App(Singular, Ipylab):
     """A connection to the 'app' in the frontend.
 
     A singleton (per kernel) not to be subclassed or closed.
     """
 
-    SINGLE = True
     DEFAULT_COMMANDS: ClassVar = {"Open console", "Show log viewer"}
     _model_name = Unicode("JupyterFrontEndModel").tag(sync=True)
     ipylab_base = IpylabBase(Obj.IpylabModel, "app").tag(sync=True)
@@ -59,13 +58,10 @@ class App(Ipylab):
 
     namespaces: Container[dict[str, LastUpdatedDict]] = Dict(read_only=True)  # type: ignore
 
-    @classmethod
     @override
-    def _single_key(cls, kwgs: dict):
-        return "app"
-
-    def close(self):
-        "Cannot close"
+    def close(self, *, force=False):
+        if force:
+            super().close()
 
     @default("logging_handler")
     def _default_logging_handler(self):
@@ -169,7 +165,7 @@ class App(Ipylab):
         `default_namespace_objects`.
 
         Note:
-            To remove a namespace call `ipylab.app.namespaces.pop(<namespace_id>)`.
+            To remove a namespace call `app.namespaces.pop(<namespace_id>)`.
 
         The default namespace `""` will also load objects from `shell.user_ns` if
         the kernel is an ipykernel (the default kernel provided in Jupyterlab).
@@ -298,7 +294,7 @@ class App(Ipylab):
         simple:
         ``` python
         task = app.evaluate(
-            "ipylab.app.shell.open_console",
+            "app.shell.open_console",
             vpath="test",
             kwgs={"mode": ipylab.InsertMode.split_right, "activate": False},
         )

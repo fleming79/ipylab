@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from typing import override
+
 import pytest
 from ipywidgets import TypedTuple
 from traitlets import HasTraits, Unicode
@@ -12,6 +14,7 @@ from ipylab.common import (
     FixedCreate,
     FixedCreated,
     LastUpdatedDict,
+    Singular,
     Transform,
     TransformDictAdvanced,
     TransformDictConnection,
@@ -175,6 +178,36 @@ class TestTransformPayload:
         payload = {"key": "value"}
         result = Transform.transform_payload(transform, payload)
         assert result == payload
+
+
+class TestLimited:
+    async def test_limited_new_single(self):
+        obj1 = Singular()
+        obj2 = Singular()
+        assert obj1 is obj2
+        obj1.close()
+        assert obj1 not in obj1._single_instances
+        assert obj1.closed
+
+    async def test_limited_newget_single_keyed(self):
+        # Test that the get_single_key method and arguments are passed
+        class KeyedSingle(Singular):
+            def __init__(self, /, key: str, *args, **kwgs):
+                self.key = key
+                super().__init__(*args, **kwgs)
+
+            @override
+            @classmethod
+            def get_single_key(cls, key: str, **kwgs):
+                return key
+
+        obj1 = KeyedSingle(key="key1")
+        obj2 = KeyedSingle(key="key1")
+        obj3 = KeyedSingle(key="key2")
+        obj4 = KeyedSingle("key2")
+        assert obj1 is obj2
+        assert obj1 is not obj3
+        assert obj4 is obj3
 
 
 class TestFixed:

@@ -7,11 +7,12 @@ import asyncio
 import contextlib
 import json
 import uuid
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
-import ipylab
+if TYPE_CHECKING:
+    import ipylab
 
 
 def example_callable(a=None):
@@ -78,11 +79,10 @@ async def example_async_callable(c, *, return_task=False):
         ),
     ],
 )
-async def test_app_evaluate(kw: dict[str, Any], result, mocker):
+async def test_app_evaluate(app: ipylab.App, kw: dict[str, Any], result, mocker):
     "Tests for app.evaluate"
     import asyncio
 
-    app = ipylab.app
     ready = mocker.patch.object(app, "ready")
     send = mocker.patch.object(app, "send")
 
@@ -120,14 +120,13 @@ loops = set()
 
 
 @pytest.mark.parametrize("n", [1, 2])
-async def test_ready(n):
+async def test_ready(n, app: ipylab.App):
     "Paramatised tests must be run consecutively."
     # Normally not an issue, but when testing, it is possible for asyncio to
     # use different loops. Running this test consecutively should use separate
     # event loops.
-
     loops.add(asyncio.get_running_loop())
     assert len(loops) == n, "A new event loop should be provided per test."
     with contextlib.suppress(asyncio.TimeoutError):
         async with asyncio.timeout(1):
-            await ipylab.app.ready()
+            await app.ready()

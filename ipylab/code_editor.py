@@ -7,7 +7,7 @@ import asyncio
 import inspect
 import typing
 from asyncio import Task
-from typing import TYPE_CHECKING, Any, NotRequired, TypedDict, override
+from typing import TYPE_CHECKING, Any, NotRequired, TypedDict, cast, override
 
 from IPython.core import completer as IPC  # noqa: N812
 from IPython.utils.tokenutil import token_at_cursor
@@ -42,6 +42,7 @@ mime_types = (
 
 class IpylabCompleter(IPC.IPCompleter):
     code_editor: Instance[CodeEditor] = Instance("ipylab.CodeEditor")
+    app = Fixed(cast(type["ipylab.App"], "ipylab.App"))
     if TYPE_CHECKING:
         shell: InteractiveShell  # Set in IPV.IPCompleter.__init__
         namespace: LastUpdatedDict
@@ -61,7 +62,7 @@ class IpylabCompleter(IPC.IPCompleter):
         ]
 
     def update_namespace(self):
-        self.namespace = ipylab.app.get_namespace(self.code_editor.namespace_id)
+        self.namespace = self.app.get_namespace(self.code_editor.namespace_id)
 
     def do_complete(self, code: str, cursor_pos: int):
         """Completions provided by IPython completer, using Jedi for different namespaces."""
@@ -152,7 +153,7 @@ class IpylabCompleter(IPC.IPCompleter):
             if wait or inspect.iscoroutine(result):
                 result = await result
             if not self.code_editor.namespace_id:
-                ipylab.app.shell.add_objects_to_ipython_namespace(ns)
+                self.app.shell.add_objects_to_ipython_namespace(ns)
         except SyntaxError:
             exec(code, ns, ns)  # noqa: S102
             return next(reversed(ns.values()))
@@ -230,7 +231,7 @@ class CodeEditor(Ipylab, _String):
             "evaluate": ["Shift Enter"],
             "undo": ["Ctrl Z"],
             "redo": ["Ctrl Shift Z"],
-        } | ipylab.plugin_manager.hook.default_editor_key_bindings(app=ipylab.app, obj=self)
+        } | ipylab.plugin_manager.hook.default_editor_key_bindings(app=self.app, obj=self)
 
     @default("evaluate")
     def _default_evaluate(self):

@@ -6,15 +6,17 @@ from __future__ import annotations
 import logging
 import weakref
 from enum import IntEnum, StrEnum
-from typing import TYPE_CHECKING, Any, ClassVar, override
+from typing import TYPE_CHECKING, Any, ClassVar, cast, override
 
 from IPython.core.ultratb import FormattedTB
 from ipywidgets import CallbackDispatcher
 
-import ipylab
+from ipylab.common import Fixed
 
 if TYPE_CHECKING:
     from asyncio import Task
+
+    import ipylab
 
 __all__ = ["LogLevel", "IpylabLogHandler"]
 
@@ -71,9 +73,11 @@ def truncated_repr(obj: Any, maxlen=120, tail="…") -> str:
 
 
 class IpylabLoggerAdapter(logging.LoggerAdapter):
+    app = Fixed(cast(type["ipylab.App"], "ipylab.App"))
+
     def __init__(self, name: str, owner: Any) -> None:
         logger = logging.getLogger(name)
-        if handler := ipylab.app.logging_handler:
+        if handler := self.app.logging_handler:
             handler._add_logger(logger)  # noqa: SLF001
         super().__init__(logger)
         self.owner_ref = weakref.ref(owner)
@@ -125,6 +129,8 @@ class IpylabLogHandler(logging.Handler):
 
 
 class IpylabLogFormatter(logging.Formatter):
+    app = Fixed(cast(type["ipylab.App"], "ipylab.App"))
+
     def __init__(self, *, colors: dict[LogLevel, ANSIColors] = COLORS, reset=ANSIColors.reset, **kwargs) -> None:
         """Initialize the formatter with specified format strings."""
         self.colors = colors
@@ -148,8 +154,8 @@ class IpylabLogFormatter(logging.Formatter):
     def formatException(self, ei) -> str:  # noqa: N802
         if not ei[0]:
             return ""
-        tbf = self.tb_formatter
-        if ipylab.app.logging_handler:
-            tbf.verbose if ipylab.app.logging_handler.level == LogLevel.DEBUG else tbf.minimal  # noqa: B018
-            return tbf.stb2text(tbf.structured_traceback(*ei))
+        if self.app.logging_handler:
+            tbf = self.tb_formatter
+            tbf.verbose if self.app.logging_handler.level == LogLevel.DEBUG else tbf.minimal  # noqa: B018
+            return tbf.stb2text(tbf.structured_traceback(*ei))  # type: ignore
         return super().formatException(ei)

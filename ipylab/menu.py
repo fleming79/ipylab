@@ -8,9 +8,8 @@ from typing import TYPE_CHECKING, override
 from ipywidgets import TypedTuple
 from traitlets import Container, Instance, Union
 
-import ipylab
 from ipylab.commands import APP_COMMANDS_NAME, CommandRegistry
-from ipylab.common import Fixed, Obj
+from ipylab.common import Fixed, Obj, Singular
 from ipylab.connection import InfoConnection
 from ipylab.ipylab import Ipylab, IpylabBase, Transform
 
@@ -96,8 +95,8 @@ class RankedMenu(Ipylab):
 
     def activate(self):
         async def activate():
-            await ipylab.app.main_menu.set_property("activeMenu", self, toObject=["value"])
-            await ipylab.app.main_menu.execute_method("openActiveMenu")
+            await self.app.main_menu.set_property("activeMenu", self, toObject=["value"])
+            await self.app.main_menu.execute_method("openActiveMenu")
 
         return self.to_task(activate())
 
@@ -106,7 +105,7 @@ class BuiltinMenu(RankedMenu):
     @override
     def activate(self):
         name = self.ipylab_base[-1].removeprefix("mainMenu.").lower()
-        return ipylab.app.commands.execute(f"{name}:open")
+        return self.app.commands.execute(f"{name}:open")
 
 
 class MenuConnection(InfoConnection, RankedMenu):
@@ -115,9 +114,7 @@ class MenuConnection(InfoConnection, RankedMenu):
     commands = Instance(CommandRegistry)
 
 
-class Menu(RankedMenu):
-    SINGLE = True
-
+class Menu(Singular, RankedMenu):
     ipylab_base = IpylabBase(Obj.IpylabModel, "palette").tag(sync=True)
 
     commands = Instance(CommandRegistry)
@@ -127,8 +124,8 @@ class Menu(RankedMenu):
 
     @classmethod
     @override
-    def _single_key(cls, kwgs: dict):
-        return cls, kwgs["commands"]
+    def get_single_key(cls, commands: str, **kwgs):
+        return commands
 
     def __init__(self, *, commands: CommandRegistry, **kwgs):
         commands.close_extras.add(self)
@@ -140,8 +137,6 @@ class MainMenu(Menu):
 
     ref: https://jupyterlab.readthedocs.io/en/4.0.x/api/classes/mainmenu.MainMenu.html
     """
-
-    SINGLE = True
 
     ipylab_base = IpylabBase(Obj.IpylabModel, "mainMenu").tag(sync=True)
 
@@ -156,7 +151,7 @@ class MainMenu(Menu):
 
     @classmethod
     @override
-    def _single_key(cls, kwgs: dict):
+    def get_single_key(cls, **kwgs):
         return cls
 
     def __init__(self):
@@ -178,7 +173,6 @@ class MainMenu(Menu):
 class ContextMenu(Menu):
     """Menu available on mouse right click."""
 
-    SINGLE = True
     # TODO: Support custom context menus.
     # This would require a model similar to CommandRegistryModel.
 
@@ -202,7 +196,7 @@ class ContextMenu(Menu):
         """
 
         async def add_item_():
-            return await self._add_item(command, submenu, rank, type, args, selector or ipylab.app.selector)
+            return await self._add_item(command, submenu, rank, type, args, selector or self.app.selector)
 
         return self.to_task(add_item_())
 

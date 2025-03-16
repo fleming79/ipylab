@@ -12,7 +12,7 @@ from traitlets import Container, Instance, Unicode
 
 import ipylab
 from ipylab import Area, InsertMode, Ipylab, ShellConnection, Transform, pack
-from ipylab.common import Fixed, IpylabKwgs, Obj, TaskHookType
+from ipylab.common import Fixed, IpylabKwgs, Obj, Singular, TaskHookType
 from ipylab.ipylab import IpylabBase
 from ipylab.log_viewer import LogViewer
 
@@ -32,10 +32,8 @@ class ConsoleConnection(ShellConnection):
     # TODO: add methods
 
 
-class Shell(Ipylab):
+class Shell(Singular, Ipylab):
     """Provides access to the shell."""
-
-    SINGLE = True
 
     _model_name = Unicode("ShellModel", help="Name of the model.", read_only=True).tag(sync=True)
     ipylab_base = IpylabBase(Obj.IpylabModel, "app.shell").tag(sync=True)
@@ -137,22 +135,17 @@ class Shell(Ipylab):
             args["evaluate"] = pack(obj)
 
         async def add_to_shell() -> ShellConnection:
-            vpath_ = ipylab.app.vpath
+            vpath_ = vpath or self.app.vpath
             if isinstance(obj, DOMWidget):
-                obj.add_class(ipylab.app.selector.removeprefix("."))
-            if "evaluate" in args:
-                if isinstance(vpath, dict):
-                    result = ipylab.plugin_manager.hook.vpath_getter(app=ipylab.app, kwgs=vpath)
-                    while inspect.isawaitable(result):
-                        result = await result
-                    args["vpath"] = result
-                else:
-                    args["vpath"] = vpath or vpath_
-                if args["vpath"] != vpath_:
-                    hooks_["trait_add_fwd"] = [("auto_dispose", False)]
-            else:
-                args["vpath"] = vpath_
-
+                obj.add_class(self.app.selector.removeprefix("."))
+            if "evaluate" in args and isinstance(vpath, dict):
+                result = ipylab.plugin_manager.hook.vpath_getter(app=self.app, kwgs=vpath)
+                while inspect.isawaitable(result):
+                    result = await result
+                vpath_ = result
+            args["vpath"] = vpath_
+            if vpath_ != self.app.vpath:
+                hooks_["trait_add_fwd"] = [("auto_dispose", False)]
             return await self.operation("addToShell", {"args": args}, transform=Transform.connection, hooks=hooks_)
 
         return self.to_task(add_to_shell(), "Add to shell", hooks=hooks)
@@ -192,7 +185,7 @@ class Shell(Ipylab):
             if not isinstance(ref_, ShellConnection):
                 ref_ = await self.connect_to_widget(ref_)
             objects_ = {"ref": ref_} | (objects or {})
-            vpath = ipylab.app.vpath
+            vpath = self.app.vpath
             args = {
                 "path": vpath,
                 "insertMode": InsertMode(mode),
@@ -208,7 +201,7 @@ class Shell(Ipylab):
                     "callbacks": [lambda _: self.add_objects_to_ipython_namespace(objects_, reset=reset_shell)],
                 },
             )
-            return await ipylab.app.commands.execute("console:open", args, **kwgs)
+            return await self.app.commands.execute("console:open", args, **kwgs)
 
         return self.to_task(open_console(), "Open console", hooks=hooks)
 

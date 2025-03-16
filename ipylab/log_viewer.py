@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import collections
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast, override
 
 from ipywidgets import HTML, BoundedIntText, Button, Checkbox, Combobox, Dropdown, HBox, Select, VBox
 from traitlets import directional_link, link, observe
@@ -30,6 +30,7 @@ class LogViewer(Panel):
     _log_notify_task: None | Task = None
     _updating = False
     info = Fixed(HTML, layout={"flex": "1 0 auto", "margin": "0px 20px 0px 20px"})
+    app = Fixed(cast(type["ipylab.App"], "ipylab.App"))
     log_level = Fixed(
         Dropdown,
         description="Level",
@@ -87,7 +88,7 @@ class LogViewer(Panel):
         self.title.icon = Icon(name="ipylab-test_tube", svgstr=SVGSTR_TEST_TUBE)
         super().__init__(children=[self.header, self.autoscroll_widget])
         self.buffer_size.value = buffersize
-        app = ipylab.app
+        app = self.app
         link((self.autoscroll_widget, "enabled"), (self.autoscroll_enabled, "value"))
         link((app, "log_level"), (self.log_level, "value"))
         link((self.buffer_size, "value"), (self.output, "max_outputs"))
@@ -99,21 +100,24 @@ class LogViewer(Panel):
         self.button_show_send_dialog.on_click(self._button_on_click)
         self.button_clear.on_click(self._button_on_click)
 
-    def close(self):
-        "Cannot close"
+    @override
+    def close(self, *, force=False):
+        if force:
+            super().close()
 
     @observe("connections")
     def _observe_connections(self, _):
+        app = self.app
         if self.connections and len(self.connections) == 1:
             self.output.push(*(rec.output for rec in self._records), clear=True)
-        self.info.value = f"<b>Vpath: {ipylab.app._vpath}</b>"  # noqa: SLF001
-        self.title.label = f"Log: {ipylab.app._vpath}"  # noqa: SLF001
+        self.info.value = f"<b>Vpath: {app._vpath}</b>"  # noqa: SLF001
+        self.title.label = f"Log: {app._vpath}"  # noqa: SLF001
 
     def _add_record(self, record: logging.LogRecord):
         self._records.append(record)
         if self.connections:
             self.output.push(record.output)  # type: ignore
-        if record.levelno >= LogLevel.ERROR and ipylab.app._ready:  # noqa: SLF001
+        if record.levelno >= LogLevel.ERROR and self.app._ready:  # noqa: SLF001
             self._notify_exception(record)
 
     def _notify_exception(self, record: logging.LogRecord):
@@ -123,7 +127,7 @@ class LogViewer(Panel):
             if not self._log_notify_task.done():
                 return
             self._log_notify_task.result().close()
-        self._log_notify_task = ipylab.app.notification.notify(
+        self._log_notify_task = self.app.notification.notify(
             message=f"Error: {record.msg}",
             type=ipylab.NotificationType.error,
             actions=[
@@ -138,7 +142,7 @@ class LogViewer(Panel):
     def _button_on_click(self, b):
         if b is self.button_show_send_dialog:
             self.button_show_send_dialog.disabled = True
-            ipylab.app.dialog.to_task(
+            self.app.dialog.to_task(
                 self._show_send_dialog(),
                 hooks={"callbacks": [lambda _: self.button_show_send_dialog.set_trait("disabled", False)]},
             )
@@ -172,9 +176,9 @@ class LogViewer(Panel):
         select.observe(observe, "value")
         search.observe(observe, "value")
         try:
-            result = await ipylab.app.dialog.show_dialog("Send record to console", body=body)
+            result = await self.app.dialog.show_dialog("Send record to console", body=body)
             if result["value"] and select.value:
-                console = await ipylab.app.shell.open_console(objects={"record": select.value})
+                console = await self.app.shell.open_console(objects={"record": select.value})
                 await console.set_property("console.promptCell.model.sharedModel.source", "record")
                 await console.execute_method("console.execute")
         except Exception:

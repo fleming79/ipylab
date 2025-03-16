@@ -13,7 +13,7 @@ from traitlets import Callable as CallableTrait
 from traitlets import Container, Dict, Instance, Tuple, Unicode
 
 import ipylab
-from ipylab.common import IpylabKwgs, Obj, TaskHooks, TaskHookType, TransformType, pack
+from ipylab.common import IpylabKwgs, Obj, Singular, TaskHooks, TaskHookType, TransformType, pack
 from ipylab.connection import InfoConnection, ShellConnection
 from ipylab.ipylab import Ipylab, IpylabBase, Transform, register
 from ipylab.widgets import Icon
@@ -98,7 +98,7 @@ class CommandConnection(InfoConnection):
             args_ = args | {
                 "keys": keys,
                 "preventDefault": prevent_default,
-                "selector": selector or ipylab.app.selector,
+                "selector": selector or self.app.selector,
                 "command": str(self),
             }
             cid = KeybindingConnection.to_cid(self)
@@ -124,13 +124,11 @@ class CommandPalletItemConnection(InfoConnection):
         return super().to_cid(str(command), category)
 
 
-class CommandPalette(Ipylab):
+class CommandPalette(Singular, Ipylab):
     """
 
     https://jupyterlab.readthedocs.io/en/latest/api/interfaces/apputils.ICommandPalette.html
     """
-
-    SINGLE = True
 
     ipylab_base = IpylabBase(Obj.IpylabModel, "palette").tag(sync=True)
 
@@ -181,9 +179,7 @@ class CommandPalette(Ipylab):
 
 
 @register
-class CommandRegistry(Ipylab):
-    SINGLE = True
-
+class CommandRegistry(Singular, Ipylab):
     _model_name = Unicode("CommandRegistryModel").tag(sync=True)
     ipylab_base = IpylabBase(Obj.IpylabModel, "").tag(sync=True)
     name = Unicode(APP_COMMANDS_NAME, read_only=True).tag(sync=True)
@@ -192,8 +188,8 @@ class CommandRegistry(Ipylab):
 
     @classmethod
     @override
-    def _single_key(cls, kwgs: dict):
-        return cls, kwgs["name"]
+    def get_single_key(cls, name: str, **kwgs):
+        return name
 
     @classmethod
     def _check_belongs_to_application_registry(cls, cid: str):
@@ -221,14 +217,15 @@ class CommandRegistry(Ipylab):
         return await super()._do_operation_for_frontend(operation, payload, buffers)
 
     async def _execute_for_frontend(self, payload: dict, buffers: list):
-        conn = InfoConnection.get_existing_connection(payload["id"], quiet=True)
-        if not isinstance(conn, CommandConnection):
-            msg = f'Invalid command "{payload["id"]} {conn=}"'
+        cmd_cid = payload["id"]
+        if not CommandConnection.exists(cmd_cid):
+            msg = f'Invalid command "{cmd_cid}"'
             raise TypeError(msg)
+        conn = CommandConnection(cmd_cid)
         cmd = conn.python_command
         args = conn.args | (payload.get("args") or {})
 
-        ns = ipylab.app.get_namespace(conn.namespace_id)
+        ns = self.app.get_namespace(conn.namespace_id)
         kwgs = {}
         for n, p in inspect.signature(cmd).parameters.items():
             if n == "ref":
@@ -295,9 +292,9 @@ class CommandRegistry(Ipylab):
         """
 
         async def add_command():
-            cid = CommandConnection.to_cid(self.name, ipylab.app.vpath, name)
-            if cmd := CommandConnection.get_existing_connection(cid, quiet=True):
-                await cmd.ready()
+            cid = CommandConnection.to_cid(self.name, self.app.vpath, name)
+            if CommandConnection.exists(cid):
+                cmd = await CommandConnection(cid).ready()
                 cmd.close()
             kwgs_ = kwgs | {
                 "id": cid,
@@ -348,7 +345,7 @@ class CommandRegistry(Ipylab):
         async def execute_command():
             id_ = str(command_id)
             if id_ not in self.all_commands:
-                id_ = CommandConnection.to_cid(self.name, ipylab.app.vpath, id_)
+                id_ = CommandConnection.to_cid(self.name, self.app.vpath, id_)
                 if id_ not in self.all_commands:
                     msg = f"Command '{command_id}' not registered!"
                     raise ValueError(msg)

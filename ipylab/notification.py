@@ -11,9 +11,8 @@ import traitlets
 from ipywidgets import TypedTuple, register
 from traitlets import Container, Instance, Unicode
 
-import ipylab
 from ipylab import Transform, pack
-from ipylab.common import Obj, TaskHooks, TransformType
+from ipylab.common import Obj, Singular, TaskHooks, TransformType
 from ipylab.connection import InfoConnection
 from ipylab.ipylab import Ipylab, IpylabBase
 
@@ -67,25 +66,23 @@ class NotificationConnection(InfoConnection):
         to_object = ["args.id"]
 
         async def update():
-            actions_ = [await ipylab.app.notification._ensure_action(v) for v in actions]  # noqa: SLF001
+            actions_ = [await self.app.notification._ensure_action(v) for v in actions]  # noqa: SLF001
             if actions_:
                 args["actions"] = list(map(pack, actions_))  # type: ignore
                 to_object.extend(f"options.actions.{i}" for i in range(len(actions_)))
                 for action in actions_:
                     self.close_extras.add(action)
-            return await ipylab.app.notification.operation("update", {"args": args}, toObject=to_object)
+            return await self.app.notification.operation("update", {"args": args}, toObject=to_object)
 
         return self.to_task(update())
 
 
 @register
-class NotificationManager(Ipylab):
+class NotificationManager(Singular, Ipylab):
     """Create new notifications with access to the notification manager as base.
 
     ref: https://jupyterlab.readthedocs.io/en/stable/extension/ui_helpers.html#notifications
     """
-
-    SINGLE = True
 
     _model_name = Unicode("NotificationManagerModel").tag(sync=True)
     ipylab_base = IpylabBase(Obj.IpylabModel, "Notification.manager").tag(sync=True)
@@ -97,9 +94,12 @@ class NotificationManager(Ipylab):
     @override
     async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list):
         """Overload this function as required."""
+        action = ActionConnection(payload["cid"])
         match operation:
             case "action_callback":
-                callback = ActionConnection.get_existing_connection(payload["cid"]).callback
+                action = ActionConnection(payload["cid"])
+                await action.ready()
+                callback = action.callback
                 result = callback()
                 while inspect.isawaitable(result):
                     result = await result

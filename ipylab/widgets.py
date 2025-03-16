@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from ipywidgets import Box, DOMWidget, Layout, TypedTuple, register, widget_serialization
 from ipywidgets.widgets.trait_types import InstanceDict
@@ -12,7 +12,7 @@ from traitlets import Container, Dict, Instance, Tuple, Unicode, observe
 
 import ipylab
 import ipylab._frontend as _fe
-from ipylab.common import Area, InsertMode
+from ipylab.common import Area, Fixed, InsertMode
 from ipylab.connection import ShellConnection
 from ipylab.ipylab import WidgetBase
 
@@ -53,6 +53,7 @@ class Panel(Box):
     _view_module_version = Unicode(_fe.module_version, read_only=True).tag(sync=True)
     title: Instance[Title] = InstanceDict(Title, ()).tag(sync=True, **widget_serialization)
 
+    app = Fixed(cast(type["ipylab.App"], "ipylab.App"))
     connections: Container[tuple[ShellConnection, ...]] = TypedTuple(trait=Instance(ShellConnection))
 
     def add_to_shell(
@@ -67,7 +68,7 @@ class Panel(Box):
         **kwgs,
     ) -> Task[ShellConnection]:
         """Add this panel to the shell."""
-        return ipylab.app.shell.add(
+        return self.app.shell.add(
             self,
             area=area,
             mode=mode,
@@ -108,7 +109,7 @@ class SplitPanel(Panel):
             await asyncio.sleep(0.001)
             self.orientation = orientation
 
-        return ipylab.app.to_task(force_refresh(self.children))
+        return self.app.to_task(force_refresh(self.children))
 
     # ============== End temp fix =============
 
@@ -136,4 +137,6 @@ class ResizeBox(Box):
     _view_module = Unicode(_fe.module_name, read_only=True).tag(sync=True)
     _view_module_version = Unicode(_fe.module_version, read_only=True).tag(sync=True)
 
-    size: Container[tuple[int, int]] = Tuple(readonly=True, help="(clientWidth, clientHeight) in pixels").tag(sync=True)
+    size: Container[tuple[int, int]] = Tuple(read_only=True, help="(clientWidth, clientHeight) in pixels").tag(
+        sync=True
+    )

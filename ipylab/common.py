@@ -3,17 +3,30 @@
 
 from __future__ import annotations
 
+import importlib
 import inspect
 import typing
 import weakref
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Generic, Literal, NotRequired, TypedDict, TypeVar, override
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Generic,
+    Literal,
+    NotRequired,
+    Self,
+    TypedDict,
+    TypeVar,
+    override,
+)
 
 import pluggy
 from ipywidgets import Widget, widget_serialization
-from traitlets import HasTraits
+from traitlets import Any as AnyTrait
+from traitlets import Bool, HasTraits
 
 import ipylab
 
@@ -40,10 +53,8 @@ SVGSTR_TEST_TUBE = '<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/200
 T = TypeVar("T")
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable
+    from collections.abc import Awaitable, Callable, Hashable
     from typing import overload
-
-    from traitlets import HasTraits
 
     from ipylab.ipylab import Ipylab
 
@@ -83,6 +94,16 @@ def to_selector(*args, prefix="ipylab"):
         suffix = suffix.replace("--", "-")
     suffix = suffix.strip(" -")
     return f".{prefix}-{suffix}"
+
+
+def import_item(dottedname: str):
+    """Import an item from a module, given its dotted name.
+
+    For example:
+    >>> import_item("os.path.join")
+    """
+    modulename, objname = dottedname.rsplit(".", maxsplit=1)
+    return getattr(importlib.import_module(modulename), objname)
 
 
 class Obj(StrEnum):
@@ -208,9 +229,7 @@ class Transform(StrEnum):
                 mappings = typing.cast(TransformDictAdvanced, transform)["mappings"]
                 return {key: cls.transform_payload(mappings[key], payload[key]) for key in mappings}
             case Transform.connection | Transform.auto if isinstance(payload, dict) and (cid := payload.get("cid")):
-                conn = ipylab.Connection(cid)
-                conn._check_closed()  # noqa: SLF001
-                return conn
+                return ipylab.Connection.get_connection(cid)
         return payload
 
 
@@ -298,6 +317,76 @@ class LastUpdatedDict(OrderedDict):
             self._updating = False
 
 
+class Singular(HasTraits):
+    """A base class that ensures only one instance of a class exists for each unique key.
+
+    This class uses a class-level dictionary `_single_instances` to store instances,
+    keyed by a value obtained from the `get_single_key` method.  Subsequent calls to
+    the constructor with the same key will return the existing instance.
+
+    Attributes:
+        _limited_init_complete (bool): A flag to prevent multiple initializations.
+        _single_instances (dict[Hashable, Self]): A class-level dictionary storing the single instances.
+        _single_key (AnyTrait): A read-only trait storing the key for the instance.
+        closed (Bool): A read-only trait indicating whether the instance has been closed.
+
+    Methods:
+        get_single_key(*args, **kwgs) -> Hashable:
+            A class method that returns the key used to identify the single instance.
+            Defaults to returning the class itself.  Subclasses should override this
+            method to provide a key based on the constructor arguments.
+
+        __new__(cls, /, *args, **kwgs) -> Self:
+            Overrides the default `__new__` method to implement the singleton behavior.
+            It retrieves the key using `get_single_key`, and either returns an existing
+            instance from `_single_instances` or creates a new instance and stores it.
+
+        __init__(self, /, *args, **kwgs):
+            Overrides the default `__init__` method to prevent multiple initializations
+            of the same instance.  It only calls the superclass's `__init__` method once.
+
+        __init_subclass__(cls) -> None:
+            Overrides the default `__init_subclass__` method to reset the `_single_instances`
+            dictionary for each subclass.
+
+        close(self):
+            Removes the instance from the `_single_instances` dictionary and calls the
+            `close` method of the superclass, if it exists.  Sets the `closed` trait to True.
+    """
+
+    _limited_init_complete = False
+    _single_instances: ClassVar[dict[Hashable, Self]] = {}
+    _single_key = AnyTrait(read_only=True)
+    closed = Bool(read_only=True)
+
+    @classmethod
+    def get_single_key(cls, *args, **kwgs) -> Hashable:  # noqa: ARG003
+        return cls
+
+    def __new__(cls, /, *args, **kwgs) -> Self:
+        key = cls.get_single_key(*args, **kwgs)
+        if key not in cls._single_instances:
+            new = super().__new__
+            cls._single_instances[key] = inst = new(cls) if new is object.__new__ else new(cls, *args, **kwgs)
+            inst.set_trait("_single_key", key)
+        return cls._single_instances[key]
+
+    def __init__(self, /, *args, **kwgs):
+        if self._limited_init_complete:
+            return
+        super().__init__(*args, **kwgs)
+        self._limited_init_complete = True
+
+    def __init_subclass__(cls) -> None:
+        cls._single_instances = {}
+
+    def close(self):
+        self._single_instances.pop(self._single_key, None)
+        if callable(close := getattr(super(), "close", None)):
+            close()
+        self.set_trait("closed", True)
+
+
 class FixedCreate(Generic[T], TypedDict):
     "A TypedDict relevant to Fixed"
 
@@ -321,7 +410,7 @@ class Fixed(Generic[T]):
 
     def __init__(
         self,
-        klass: type[T],
+        klass: type[T] | str,
         *args,
         dynamic: list[str] | None = None,
         create: Callable[[FixedCreate[T]], T] | str = "",
@@ -375,6 +464,7 @@ class Fixed(Generic[T]):
         if obj is None:
             return self  # type: ignore
         if obj not in self.instances:
+            klass = import_item(self.klass) if isinstance(self.klass, str) else self.klass
             kwgs = self.kwgs
             if self.dynamic:
                 kwgs = kwgs.copy()
@@ -382,13 +472,13 @@ class Fixed(Generic[T]):
                     kwgs[k] = kwgs[k](obj)
             if self.create:
                 create = getattr(obj, self.create) if isinstance(self.create, str) else self.create
-                kw = FixedCreate(name=self.name, klass=self.klass, owner=obj, args=self.args, kwgs=kwgs)
-                instance = create(kw)
-                if not isinstance(instance, self.klass):
+                kw = FixedCreate(name=self.name, klass=klass, owner=obj, args=self.args, kwgs=kwgs)
+                instance = create(kw)  # type: ignore
+                if not isinstance(instance, klass):
                     msg = f"Expected {self.klass} but {create=} returned {type(instance)}"
                     raise TypeError(msg)
             else:
-                instance = self.klass(*self.args, **kwgs)
+                instance = klass(*self.args, **kwgs)
             self.instances[obj] = instance
             try:
                 if self.created:
