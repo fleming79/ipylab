@@ -142,6 +142,10 @@ jlpm lint
 #or
 jlpm lint:check
 
+# Pyright
+
+pip install pyright[nodejs]
+pyright
 ```
 
 ### VS code debugging
