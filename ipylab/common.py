@@ -409,6 +409,26 @@ class FixedCreated(Generic[S, T], TypedDict):
 
 
 class Fixed(Generic[S, T]):
+    """Descriptor for creating and caching a fixed instance of a class.
+
+    The ``Fixed`` descriptor provisions for each instance of the owner class
+    to dynamically load or import the managed class.  The managed instance
+    is created on first access and then cached for subsequent access.
+
+    Type Hints:
+        ``S``: Type of the owner class.
+        ``T``: Type of the managed class.
+
+    Examples:
+        >>> class MyClass:
+        ...     fixed_instance = Fixed(ManagedClass)
+        >>> my_object = MyClass()
+        >>> instance1 = my_object.fixed_instance
+        >>> instance2 = my_object.fixed_instance
+        >>> instance1 is instance2
+        True
+    """
+
     __slots__ = ["name", "instances", "create", "created"]
 
     def __init__(
@@ -429,7 +449,6 @@ class Fixed(Generic[S, T]):
                 case _:
                     msg = "'create' must be a callable the accepts None or one argument."
                     raise ValueError(msg)
-
         elif isinstance(create, str):
             self.create = lambda _: import_item(create)()
         else:
