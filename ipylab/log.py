@@ -6,17 +6,18 @@ from __future__ import annotations
 import logging
 import weakref
 from enum import IntEnum, StrEnum
-from typing import TYPE_CHECKING, Any, ClassVar, cast, override
+from typing import TYPE_CHECKING, Any, ClassVar, override
 
 from IPython.core.ultratb import FormattedTB
 from ipywidgets import CallbackDispatcher
 
+import ipylab
 from ipylab.common import Fixed
 
 if TYPE_CHECKING:
     from asyncio import Task
+    from collections.abc import MutableMapping
 
-    import ipylab
 
 __all__ = ["LogLevel", "IpylabLogHandler"]
 
@@ -73,7 +74,7 @@ def truncated_repr(obj: Any, maxlen=120, tail="…") -> str:
 
 
 class IpylabLoggerAdapter(logging.LoggerAdapter):
-    app = Fixed(cast(type["ipylab.App"], "ipylab.App"))
+    app = Fixed(lambda _: ipylab.App())
 
     def __init__(self, name: str, owner: Any) -> None:
         logger = logging.getLogger(name)
@@ -82,7 +83,7 @@ class IpylabLoggerAdapter(logging.LoggerAdapter):
         super().__init__(logger)
         self.owner_ref = weakref.ref(owner)
 
-    def process(self, msg: Any, kwargs: dict[str, Any]) -> tuple[Any, dict[str, Any]]:
+    def process(self, msg: Any, kwargs: MutableMapping[str, Any]) -> tuple[Any, MutableMapping[str, Any]]:
         obj = kwargs.pop("obj", None)
         kwargs["extra"] = {"owner": self.owner_ref, "obj": obj}
         return msg, kwargs
@@ -91,7 +92,7 @@ class IpylabLoggerAdapter(logging.LoggerAdapter):
 class IpylabLogHandler(logging.Handler):
     _log_notify_task: Task | None = None
     _loggers: ClassVar[weakref.WeakSet[logging.Logger]] = weakref.WeakSet()
-    formatter: IpylabLogFormatter
+    formatter: IpylabLogFormatter  # type: ignore
 
     def __init__(self, level: LogLevel) -> None:
         super().__init__(level)
@@ -104,7 +105,7 @@ class IpylabLogHandler(logging.Handler):
             logger.addHandler(self)
 
     @override
-    def setLevel(self, level: LogLevel) -> None:
+    def setLevel(self, level: LogLevel) -> None:  # type: ignore
         level = LogLevel(level)
         super().setLevel(level)
         for logger in self._loggers:
@@ -129,7 +130,7 @@ class IpylabLogHandler(logging.Handler):
 
 
 class IpylabLogFormatter(logging.Formatter):
-    app = Fixed(cast(type["ipylab.App"], "ipylab.App"))
+    app = Fixed(lambda _: ipylab.App())
 
     def __init__(self, *, colors: dict[LogLevel, ANSIColors] = COLORS, reset=ANSIColors.reset, **kwargs) -> None:
         """Initialize the formatter with specified format strings."""

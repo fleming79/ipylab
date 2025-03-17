@@ -51,7 +51,7 @@ class KeybindingConnection(InfoConnection):
 
     @override
     @classmethod
-    def to_cid(cls, command: CommandConnection):
+    def to_cid(cls, command: CommandConnection):  # type: ignore
         return super().to_cid(str(command), str(uuid.uuid4()))
 
 
@@ -68,7 +68,7 @@ class CommandConnection(InfoConnection):
 
     @override
     @classmethod
-    def to_cid(cls, command_registry: str, vpath: str, name: str):
+    def to_cid(cls, command_registry: str, vpath: str, name: str):  # type: ignore
         return super().to_cid(command_registry, vpath, name)
 
     @property
@@ -120,7 +120,7 @@ class CommandPalletItemConnection(InfoConnection):
 
     @override
     @classmethod
-    def to_cid(cls, command: CommandConnection, category: str):
+    def to_cid(cls, command: CommandConnection, category: str):  # type: ignore
         return super().to_cid(str(command), category)
 
 

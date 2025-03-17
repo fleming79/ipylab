@@ -7,7 +7,7 @@ import asyncio
 import inspect
 import typing
 from asyncio import Task
-from typing import TYPE_CHECKING, Any, NotRequired, TypedDict, cast, override
+from typing import TYPE_CHECKING, Any, NotRequired, Self, TypedDict, override
 
 from IPython.core import completer as IPC  # noqa: N812
 from IPython.utils.tokenutil import token_at_cursor
@@ -42,7 +42,7 @@ mime_types = (
 
 class IpylabCompleter(IPC.IPCompleter):
     code_editor: Instance[CodeEditor] = Instance("ipylab.CodeEditor")
-    app = Fixed(cast(type["ipylab.App"], "ipylab.App"))
+    app = Fixed(lambda _: ipylab.App())
     if TYPE_CHECKING:
         shell: InteractiveShell  # Set in IPV.IPCompleter.__init__
         namespace: LastUpdatedDict
@@ -211,14 +211,13 @@ class CodeEditor(Ipylab, _String):
     value = Unicode()
     _update_task: None | Task = None
     _setting_value = False
-
-    completer = Fixed(
-        IpylabCompleter,
-        code_editor=lambda c: c,
-        shell=lambda c: getattr(getattr(c.comm, "kernel", None), "shell", None),
-        dynamic=["code_editor", "shell"],
+    completer: Fixed[Self, IpylabCompleter] = Fixed(
+        lambda c: IpylabCompleter(
+            code_editor=c["owner"],
+            shell=getattr(getattr(c["owner"].comm, "kernel", None), "shell", None),
+            dynamic=["code_editor", "shell"],
+        ),
     )
-
     namespace_id = Unicode("")
     evaluate: Container[typing.Callable[[str], typing.Coroutine]] = Callable()  # type: ignore
     load_value: Container[typing.Callable[[str], None]] = Callable()  # type: ignore

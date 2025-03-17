@@ -52,6 +52,8 @@ hookimpl = pluggy.HookimplMarker("ipylab")  # Used for plugins
 SVGSTR_TEST_TUBE = '<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 392.493 392.493" xml:space="preserve" fill="#000000"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <polygon style="fill:#FFFFFF;" points="83.2,99.123 169.697,185.62 300.477,185.62 148.687,33.701 "></polygon> <g> <path style="fill:#56ACE0;" d="M21.851,348.917c0,12.024,9.826,21.786,21.786,21.786s21.786-9.826,21.786-21.786 c0-7.111-10.214-25.794-21.786-43.184C32,323.123,21.851,341.806,21.851,348.917z"></path> <path style="fill:#56ACE0;" d="M31.677,218.59c0,6.594,5.301,11.895,11.895,11.895s11.895-5.301,11.895-11.895 c-0.065-3.491-5.042-13.382-11.895-24.113C36.784,205.143,31.741,215.034,31.677,218.59z"></path> </g> <path style="fill:#194F82;" d="M372.622,226.864L164.073,18.315c3.943-4.267,3.879-10.925-0.323-15.063 c-3.62-3.556-10.02-5.042-15.451,0L52.687,98.864c-4.267,4.267-4.267,11.119,0,15.451c4.202,4.202,10.796,4.267,15.063,0.323 l208.549,208.55c25.471,27.345,73.503,25.729,96.259,0C399.127,296.618,399.127,253.499,372.622,226.864z M83.2,99.123 l65.422-65.358l151.919,151.919h-130.78L83.2,99.123z M357.172,307.737c-15.321,16.356-44.8,19.846-65.358,0L191.483,207.406 h130.844l34.844,34.844C375.208,260.351,375.208,289.701,357.172,307.737z"></path> <path style="fill:#FFC10D;" d="M357.172,307.737c18.036-18.036,18.036-47.386,0-65.422l-34.844-34.909H191.483l100.331,100.331 C312.436,327.584,341.851,324.093,357.172,307.737z"></path> <g> <path style="fill:#194F82;" d="M34.844,280.327C29.026,288.149,0,328.295,0,348.917c0,24.048,19.653,43.572,43.636,43.572 s43.572-19.523,43.572-43.572c0-20.622-29.026-60.768-34.844-68.59C48.291,274.767,39.046,274.767,34.844,280.327z M43.636,370.767 c-12.024,0-21.786-9.826-21.786-21.786c0-7.111,10.214-25.794,21.786-43.184c11.572,17.325,21.786,36.008,21.786,43.184 C65.422,360.941,55.661,370.767,43.636,370.767z"></path> <path style="fill:#194F82;" d="M43.636,252.335c18.618,0,33.745-15.127,33.745-33.681c0-15.063-19.071-41.956-24.954-49.842 c-4.073-5.56-13.382-5.56-17.519,0c-5.883,7.887-24.954,34.78-24.954,49.842C9.891,237.272,25.018,252.335,43.636,252.335z M43.636,194.541c6.853,10.731,11.895,20.622,11.895,24.113c0,6.594-5.301,11.895-11.895,11.895s-11.96-5.301-11.96-11.895 C31.741,215.163,36.784,205.272,43.636,194.541z"></path> </g> </g></svg>'
 
 T = TypeVar("T")
+S = TypeVar("S")
+
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Hashable
@@ -310,7 +312,7 @@ class LastUpdatedDict(OrderedDict):
             self.move_to_end(key, self._last)
 
     @override
-    def update(self, m, **kwargs):
+    def update(self, m, /, **kwargs):  # type: ignore
         self._updating = True
         try:
             super().update(m, **kwargs)
@@ -391,103 +393,66 @@ class Singular(HasTraits):
         self.set_trait("closed", True)
 
 
-class FixedCreate(Generic[T], TypedDict):
+class FixedCreate(Generic[S], TypedDict):
     "A TypedDict relevant to Fixed"
 
     name: str
-    klass: type[T]
-    owner: Any
-    args: tuple
-    kwgs: dict
+    owner: S
 
 
-class FixedCreated(Generic[T], TypedDict):
+class FixedCreated(Generic[S, T], TypedDict):
     "A TypedDict relevant to Fixed"
 
     name: str
+    owner: S
     obj: T
-    owner: Any
 
 
-class Fixed(Generic[T]):
-    __slots__ = ["name", "instances", "klass", "args", "kwgs", "dynamic", "create", "created"]
+class Fixed(Generic[S, T]):
+    __slots__ = ["name", "instances", "create", "created"]
 
     def __init__(
         self,
-        klass: type[T] | str,
-        *args,
-        dynamic: list[str] | None = None,
-        create: Callable[[FixedCreate[T]], T] | str = "",
-        created: Callable[[FixedCreated[T]]] | str = "",
-        **kwgs,
+        create: type[T] | Callable[[FixedCreate[S]], T] | str,
+        /,
+        *,
+        created: Callable[[FixedCreated[S, T]]] | None = None,
     ):
-        """Define an instance of `klass` as a cached read only property.
-        `args` and `kwgs` are used to instantiate `klass`.
+        if inspect.isclass(create):
+            self.create = lambda _: create()  # type: ignore
+        elif callable(create):
+            match len(inspect.signature(create).parameters):
+                case 0:
+                    self.create = lambda _: create()  # type: ignore
+                case 1:
+                    self.create = create
+                case _:
+                    msg = "'create' must be a callable the accepts None or one argument."
+                    raise ValueError(msg)
 
-        Parameters:
-        ----------
-
-        dynamic: list[str]:
-            A list of argument names to call during creation. It is called with obj (owner)
-            as an argument.
-
-        create: Callable[[FixedCreated], T] | str
-            A function or method name to call to create the instance of klass.
-
-        created: Callable[[FixedCreatedDict], None] | str
-            A function or method name to call after the instance is created.
-
-        **kwgs:
-            `kwgs` to pass when instantiating `klass`. Arguments listed in dynamic
-            are first called with obj as an argument to obtain the value to
-            substitute in place of the dynamic function.
-        """
-        if callable(create) and len(inspect.signature(create).parameters) != 1:
-            msg = "'create' must be a callable the accepts one argument."
-            raise ValueError(msg)
+        elif isinstance(create, str):
+            self.create = lambda _: import_item(create)()
+        else:
+            msg = "Unsure how to create"
+            raise TypeError(msg)
         if callable(created) and len(inspect.signature(created).parameters) != 1:
             msg = "'created' must be a callable the accepts one argument."
             raise ValueError(msg)
-        if dynamic:
-            for k in dynamic:
-                if not callable(kwgs[k]) or len(inspect.signature(kwgs[k]).parameters) != 1:
-                    msg = f"Argument'{k}' must a callable that accepts one argument."
-                    raise ValueError(msg)
         self.created = created
-        self.create = create
-        self.dynamic = dynamic
-        self.args = args
-        self.klass = klass
-        self.kwgs = kwgs
         self.instances = weakref.WeakKeyDictionary()
 
     def __set_name__(self, owner_cls, name: str):
         self.name = name
 
-    def __get__(self, obj, objtype=None) -> T:
+    def __get__(self, obj: S, objtype=None) -> T:
         if obj is None:
             return self  # type: ignore
         if obj not in self.instances:
-            klass = import_item(self.klass) if isinstance(self.klass, str) else self.klass
-            kwgs = self.kwgs
-            if self.dynamic:
-                kwgs = kwgs.copy()
-                for k in self.dynamic:
-                    kwgs[k] = kwgs[k](obj)
-            if self.create:
-                create = getattr(obj, self.create) if isinstance(self.create, str) else self.create
-                kw = FixedCreate(name=self.name, klass=klass, owner=obj, args=self.args, kwgs=kwgs)
-                instance = create(kw)  # type: ignore
-                if not isinstance(instance, klass):
-                    msg = f"Expected {self.klass} but {create=} returned {type(instance)}"
-                    raise TypeError(msg)
-            else:
-                instance = klass(*self.args, **kwgs)
+            instance: T = self.create(FixedCreate(name=self.name, owner=obj))  # type: ignore
             self.instances[obj] = instance
             try:
                 if self.created:
-                    created = getattr(obj, self.created) if isinstance(self.created, str) else self.created
-                    created(FixedCreated(owner=obj, obj=instance, name=self.name))
+                    self.created(FixedCreated(owner=obj, obj=instance, name=self.name))
             except Exception:
                 if log := getattr(obj, "log", None):
                     log.exception("Callback `created` failed", obj=self.created)

@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import collections
-from typing import TYPE_CHECKING, cast, override
+from typing import TYPE_CHECKING, Self, override
 
 from ipywidgets import HTML, BoundedIntText, Button, Checkbox, Combobox, Dropdown, HBox, Select, VBox
 from traitlets import directional_link, link, observe
@@ -29,59 +29,60 @@ class LogViewer(Panel):
 
     _log_notify_task: None | Task = None
     _updating = False
-    info = Fixed(HTML, layout={"flex": "1 0 auto", "margin": "0px 20px 0px 20px"})
-    app = Fixed(cast(type["ipylab.App"], "ipylab.App"))
+    info = Fixed(lambda _: HTML(layout={"flex": "1 0 auto", "margin": "0px 20px 0px 20px"}))
+    app = Fixed(lambda _: ipylab.App())
     log_level = Fixed(
-        Dropdown,
-        description="Level",
-        options=[(v.name.capitalize(), v) for v in LogLevel],
-        layout={"width": "max-content"},
+        lambda _: Dropdown(
+            description="Level",
+            options=[(v.name.capitalize(), v) for v in LogLevel],
+            layout={"width": "max-content"},
+        ),
     )
-    buffer_size = Fixed(
-        BoundedIntText,
-        description="Buffer size",
-        min=1,
-        max=1e6,
-        layout={"width": "max-content", "flex": "0 0 auto"},
+    buffer_size: Fixed[Self, BoundedIntText] = Fixed(
+        lambda _: BoundedIntText(
+            description="Buffer size", min=1, max=1e6, layout={"width": "max-content", "flex": "0 0 auto"}
+        ),
         created=lambda c: c["obj"].observe(c["owner"]._observe_buffer_size, "value"),  # noqa: SLF001
     )
     button_show_send_dialog = Fixed(
-        Button,
-        description="📪",
-        tooltip="Send the record to the console.\n"
-        "The record has the properties 'owner' and 'obj'attached "
-        "which may be of interest for debugging purposes.",
-        layout={"width": "auto", "flex": "0 0 auto"},
+        lambda _: Button(
+            description="📪",
+            tooltip="Send the record to the console.\n"
+            "The record has the properties 'owner' and 'obj'attached "
+            "which may be of interest for debugging purposes.",
+            layout={"width": "auto", "flex": "0 0 auto"},
+        ),
     )
     button_clear = Fixed(
-        Button,
-        description="⌧",
-        tooltip="Clear log",
-        layout={"width": "auto", "flex": "0 0 auto"},
+        lambda _: Button(
+            description="⌧",
+            tooltip="Clear log",
+            layout={"width": "auto", "flex": "0 0 auto"},
+        ),
     )
     autoscroll_enabled = Fixed(
-        Checkbox,
-        description="Auto scroll",
-        indent=False,
-        tooltip="Automatically scroll to the most recent logs.",
-        layout={"width": "auto", "flex": "0 0 auto"},
+        lambda _: Checkbox(
+            description="Auto scroll",
+            indent=False,
+            tooltip="Automatically scroll to the most recent logs.",
+            layout={"width": "auto", "flex": "0 0 auto"},
+        ),
     )
-    _default_header_children = (
-        "info",
-        "autoscroll_enabled",
-        "log_level",
-        "buffer_size",
-        "button_clear",
-        "button_show_send_dialog",
-    )
-    header = Fixed(
-        HBox,
-        children=lambda owner: [w for v in owner._default_header_children if (w := getattr(owner, v, None))],  # noqa: SLF001
-        layout={"justify_content": "space-between", "flex": "0 0 auto"},
-        dynamic=["children"],
+    header: Fixed[Self, HBox] = Fixed(
+        lambda c: HBox(
+            children=(
+                c["owner"].info,
+                c["owner"].autoscroll_enabled,
+                c["owner"].log_level,
+                c["owner"].buffer_size,
+                c["owner"].button_clear,
+                c["owner"].button_show_send_dialog,
+            ),
+            layout={"justify_content": "space-between", "flex": "0 0 auto"},
+        ),
     )
     output = Fixed(SimpleOutput)
-    autoscroll_widget = Fixed(AutoScroll, content=lambda v: v.output, dynamic=["content"])
+    autoscroll_widget: Fixed[Self, AutoScroll] = Fixed(lambda c: AutoScroll(content=c["owner"].output))
 
     def __init__(self, buffersize=100):
         self._records = collections.deque(maxlen=buffersize)

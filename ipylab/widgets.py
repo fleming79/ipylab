@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from ipywidgets import Box, DOMWidget, Layout, TypedTuple, register, widget_serialization
 from ipywidgets.widgets.trait_types import InstanceDict
@@ -53,7 +53,7 @@ class Panel(Box):
     _view_module_version = Unicode(_fe.module_version, read_only=True).tag(sync=True)
     title: Instance[Title] = InstanceDict(Title, ()).tag(sync=True, **widget_serialization)
 
-    app = Fixed(cast(type["ipylab.App"], "ipylab.App"))
+    app = Fixed(lambda _: ipylab.App())
     connections: Container[tuple[ShellConnection, ...]] = TypedTuple(trait=Instance(ShellConnection))
 
     def add_to_shell(

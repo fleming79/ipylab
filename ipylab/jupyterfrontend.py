@@ -6,7 +6,7 @@ from __future__ import annotations
 import contextlib
 import functools
 import inspect
-from typing import TYPE_CHECKING, Any, Unpack, override
+from typing import TYPE_CHECKING, Any, Self, Unpack, override
 
 from ipywidgets import Widget, register
 from traitlets import Bool, Container, Dict, Instance, Unicode, UseEnum, default, observe
@@ -46,11 +46,11 @@ class App(Singular, Ipylab):
     shell = Fixed(Shell)
     dialog = Fixed(Dialog)
     notification = Fixed(NotificationManager)
-    commands = Fixed(CommandRegistry, name=APP_COMMANDS_NAME)
+    commands = Fixed(lambda _: CommandRegistry(name=APP_COMMANDS_NAME))
     launcher = Fixed(Launcher)
     main_menu = Fixed(MainMenu)
     command_pallet = Fixed(CommandPalette)
-    context_menu = Fixed(ContextMenu, commands=lambda app: app.commands, dynamic=["commands"])
+    context_menu: Fixed[Self, ContextMenu] = Fixed(lambda c: ContextMenu(commands=c["owner"].commands))
     sessions = Fixed(SessionManager)
 
     logging_handler: Instance[IpylabLogHandler | None] = Instance(IpylabLogHandler, allow_none=True)  # type: ignore

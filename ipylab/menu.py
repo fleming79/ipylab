@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING, Self, override
 
 from ipywidgets import TypedTuple
 from traitlets import Container, Instance, Union
@@ -118,7 +118,7 @@ class Menu(Singular, RankedMenu):
     ipylab_base = IpylabBase(Obj.IpylabModel, "palette").tag(sync=True)
 
     commands = Instance(CommandRegistry)
-    connections: Container[tuple[MenuConnection, ...]] = TypedTuple(
+    connections: Container[tuple[MenuConnection, ...]] = TypedTuple(  # type: ignore
         trait=Union([Instance(MenuConnection), Instance(MenuItemConnection)])
     )
 
@@ -142,18 +142,34 @@ class MainMenu(Menu):
 
     ipylab_base = IpylabBase(Obj.IpylabModel, "mainMenu").tag(sync=True)
 
-    file_menu = Fixed(BuiltinMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.fileMenu"))
-    edit_menu = Fixed(BuiltinMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.editMenu"))
-    view_menu = Fixed(BuiltinMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.viewMenu"))
-    run_menu = Fixed(BuiltinMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.runMenu"))
-    kernel_menu = Fixed(BuiltinMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.kernelMenu"))
-    tabs_menu = Fixed(BuiltinMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.tabsMenu"))
-    settings_menu = Fixed(BuiltinMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.settingsMenu"))
-    help_menu = Fixed(BuiltinMenu, ipylab_base=(Obj.IpylabModel, "mainMenu.helpMenu"))
+    file_menu: Fixed[Self, BuiltinMenu] = Fixed(
+        lambda _: BuiltinMenu(ipylab_base=(Obj.IpylabModel, "mainMenu.fileMenu"))
+    )
+    edit_menu: Fixed[Self, BuiltinMenu] = Fixed(
+        lambda _: BuiltinMenu(ipylab_base=(Obj.IpylabModel, "mainMenu.editMenu"))
+    )
+    view_menu: Fixed[Self, BuiltinMenu] = Fixed(
+        lambda _: BuiltinMenu(ipylab_base=(Obj.IpylabModel, "mainMenu.viewMenu"))
+    )
+    run_menu: Fixed[Self, BuiltinMenu] = Fixed(
+        lambda _: BuiltinMenu(ipylab_base=(Obj.IpylabModel, "mainMenu.runMenu")),
+    )
+    kernel_menu: Fixed[Self, BuiltinMenu] = Fixed(
+        lambda _: BuiltinMenu(ipylab_base=(Obj.IpylabModel, "mainMenu.kernelMenu"))
+    )
+    tabs_menu: Fixed[Self, BuiltinMenu] = Fixed(
+        lambda _: BuiltinMenu(ipylab_base=(Obj.IpylabModel, "mainMenu.tabsMenu"))
+    )
+    help_menu: Fixed[Self, BuiltinMenu] = Fixed(
+        lambda _: BuiltinMenu(ipylab_base=(Obj.IpylabModel, "mainMenu.helpMenu"))
+    )
+    settings_menu: Fixed[Self, BuiltinMenu] = Fixed(
+        lambda _: BuiltinMenu(ipylab_base=(Obj.IpylabModel, "mainMenu.settingsMenu"))
+    )
 
     @classmethod
     @override
-    def get_single_key(cls, **kwgs):
+    def get_single_key(cls, **kwgs):  # type: ignore
         return cls
 
     def __init__(self):
@@ -168,7 +184,7 @@ class MainMenu(Menu):
         return self.execute_method("addMenu", menu, update, options, toObject=["args[0]"])
 
     @override
-    def activate(self):
+    def activate(self):  # type: ignore
         "Does nothing. Instead you should activate a submenu."
 
 
@@ -200,5 +216,5 @@ class ContextMenu(Menu):
         return self.to_task(add_item_())
 
     @override
-    def activate(self):
+    def activate(self):  # type: ignore
         "Does nothing for a context menu"

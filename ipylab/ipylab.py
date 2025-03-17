@@ -9,7 +9,7 @@ import inspect
 import json
 import uuid
 import weakref
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import traitlets
 from ipywidgets import Widget, register
@@ -117,9 +117,9 @@ class Ipylab(WidgetBase):
     _pending_operations: Dict[str, asyncio.Future] = Dict()
     _has_attrs_mappings: Container[set[tuple[HasTraits, str]]] = Set()
     ipylab_tasks: Container[set[asyncio.Task]] = Set()
-    close_extras: Fixed[weakref.WeakSet[Widget]] = Fixed(weakref.WeakSet)
+    close_extras: Fixed[Self, weakref.WeakSet[Widget]] = Fixed(weakref.WeakSet)
     log = Instance(IpylabLoggerAdapter, read_only=True)
-    app = Fixed(cast(type["ipylab.App"], "ipylab.App"))
+    app = Fixed(lambda _: ipylab.App())
 
     @property
     def repr_info(self) -> dict[str, Any] | str:
