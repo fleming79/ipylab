@@ -478,5 +478,5 @@ class Fixed(Generic[S, T]):
         return self.instances[obj]
 
     def __set__(self, obj, value):
-        msg = f"Setting {obj.__class__.__name__}.{self.name} is forbidden!"
+        msg = f"Setting `Fixed` parameter {obj.__class__.__name__}.{self.name} is forbidden!"
         raise AttributeError(msg)

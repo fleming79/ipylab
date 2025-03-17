@@ -254,7 +254,7 @@ class TestFixed:
             test_instance = Fixed(CommonTestClass)
 
         owner = TestOwner()
-        with pytest.raises(AttributeError, match="Setting TestOwner.test_instance is forbidden!"):
+        with pytest.raises(AttributeError, match="Setting `Fixed` parameter TestOwner.test_instance is forbidden!"):
             owner.test_instance = CommonTestClass()
 
     def test_readonly_lambda(self):
@@ -262,5 +262,5 @@ class TestFixed:
             test_instance = Fixed(lambda _: CommonTestClass())
 
         owner = TestOwner()
-        with pytest.raises(AttributeError, match="Setting TestOwner.test_instance is forbidden!"):
+        with pytest.raises(AttributeError, match="Setting `Fixed` parameter TestOwner.test_instance is forbidden!"):
             owner.test_instance = CommonTestClass()
