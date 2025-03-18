@@ -360,7 +360,7 @@ class Singular(HasTraits):
 
     _limited_init_complete = False
     _single_instances: ClassVar[dict[Hashable, Self]] = {}
-    _single_key = AnyTrait(read_only=True)
+    _single_key = AnyTrait(default_value=None, allow_none=True, read_only=True)
     closed = Bool(read_only=True)
 
     @classmethod
@@ -387,7 +387,8 @@ class Singular(HasTraits):
         cls._single_instances = {}
 
     def close(self):
-        self._single_instances.pop(self._single_key, None)
+        if self._single_key is not None:
+            self._single_instances.pop(self._single_key, None)
         if callable(close := getattr(super(), "close", None)):
             close()
         self.set_trait("closed", True)
@@ -433,30 +434,20 @@ class Fixed(Generic[S, T]):
 
     def __init__(
         self,
-        create: type[T] | Callable[[FixedCreate[S]], T] | str,
+        obj: type[T] | Callable[[FixedCreate[S]], T] | str,
         /,
         *,
         created: Callable[[FixedCreated[S, T]]] | None = None,
     ):
-        if inspect.isclass(create):
-            self.create = lambda _: create()  # type: ignore
-        elif callable(create):
-            match len(inspect.signature(create).parameters):
-                case 0:
-                    self.create = lambda _: create()  # type: ignore
-                case 1:
-                    self.create = create
-                case _:
-                    msg = "'create' must be a callable the accepts None or one argument."
-                    raise ValueError(msg)
-        elif isinstance(create, str):
-            self.create = lambda _: import_item(create)()
+        if inspect.isclass(obj):
+            self.create = lambda _: obj()  # type: ignore
+        elif callable(obj):
+            self.create = obj
+        elif isinstance(obj, str):
+            self.create = lambda _: import_item(obj)()
         else:
-            msg = "Unsure how to create"
+            msg = f"{obj=} is invalid. Wrap it with a lambda to make it 'constant'. Eg. lambda _: {obj}"
             raise TypeError(msg)
-        if callable(created) and len(inspect.signature(created).parameters) != 1:
-            msg = "'created' must be a callable the accepts one argument."
-            raise ValueError(msg)
         self.created = created
         self.instances = weakref.WeakKeyDictionary()
 
@@ -466,16 +457,19 @@ class Fixed(Generic[S, T]):
     def __get__(self, obj: S, objtype=None) -> T:
         if obj is None:
             return self  # type: ignore
-        if obj not in self.instances:
+        try:
+            return self.instances[obj]
+        except KeyError:
             instance: T = self.create(FixedCreate(name=self.name, owner=obj))  # type: ignore
             self.instances[obj] = instance
-            try:
-                if self.created:
+            if self.created:
+                try:
                     self.created(FixedCreated(owner=obj, obj=instance, name=self.name))
-            except Exception:
-                if log := getattr(obj, "log", None):
-                    log.exception("Callback `created` failed", obj=self.created)
-        return self.instances[obj]
+                except Exception:
+                    if log := getattr(obj, "log", None):
+                        msg = f"Callback `created` failed for {obj.__class__}.{self.name}"
+                        log.exception(msg, obj=self.created)
+            return instance
 
     def __set__(self, obj, value):
         msg = f"Setting `Fixed` parameter {obj.__class__.__name__}.{self.name} is forbidden!"

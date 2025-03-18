@@ -229,9 +229,15 @@ class TestFixed:
     def test_readonly_create_function(self, app: ipylab.App):
         class TestOwner:
             app = Fixed(lambda _: ipylab.App())
+            app1: Fixed[Self, ipylab.App] = Fixed("ipylab.App")
 
         owner = TestOwner()
         assert owner.app is app
+        assert owner.app1 is app
+
+    def test_readonly_create_invalid(self, app):
+        with pytest.raises(TypeError):
+            assert Fixed(123)  # type: ignore
 
     def test_readonly_created_callback_method(self):
         class TestOwner:
