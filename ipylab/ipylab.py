@@ -111,7 +111,7 @@ class Ipylab(WidgetBase):
     _on_ready_callbacks: Container[list[Callable[[], None | Awaitable] | Callable[[Self], None | Awaitable]]] = List(
         trait=traitlets.Callable()
     )
-    _ready_event: asyncio.Event | None = None
+    _ready_futures: Fixed[Self, set[asyncio.Future]] = Fixed(lambda _: set())
     _comm = None
     _ipylab_init_complete = False
     _pending_operations: Dict[str, asyncio.Future] = Dict()
@@ -161,14 +161,12 @@ class Ipylab(WidgetBase):
     def _observe_comm(self, change: dict):
         if not self.comm:
             self.close()
-        if change["name"] == "_ready":
-            if self._ready:
-                if self._ready_event:
-                    self._ready_event.set()
-                for cb in self._on_ready_callbacks:
-                    self.ensure_run(cb)
-            elif self._ready_event:
-                self._ready_event.clear()
+        if change["name"] == "_ready" and self._ready:
+            for f in self._ready_futures:
+                f.set_result(True)
+            self._ready_futures.clear()
+            for cb in self._on_ready_callbacks:
+                self.ensure_run(cb)
 
     def close(self):
         if self.comm:
@@ -341,17 +339,11 @@ class Ipylab(WidgetBase):
         if app is not self and not app._ready:  # noqa: SLF001
             await app.ready()
         if not self._ready:  # type: ignore
-            if self._ready_event:
-                try:
-                    await self._ready_event.wait()
-                    # Event.wait is pinned to the event loop in which Event was created.
-                    # A Runtime error will occur when called from a different event loop.
-                except RuntimeError:
-                    pass
-                else:
-                    return self
-            self._ready_event = asyncio.Event()
-            await self._ready_event.wait()
+            future = asyncio.get_running_loop().create_future()
+            self._ready_futures.add(future)
+            if not self._ready:
+                await future
+            self._ready_futures.discard(future)
         return self
 
     def on_ready(self, callback, remove=False):  # noqa: FBT002
