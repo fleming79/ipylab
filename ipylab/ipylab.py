@@ -196,7 +196,7 @@ class Ipylab(WidgetBase):
         try:
             result = await aw
         except Exception:
-            self.log.exception("Awaiting %s", aw, obj={"hooks": hooks, "aw": aw})
+            self.log.exception(f"Awaiting {aw}", obj={"hooks": hooks, "aw": aw})  # noqa: G004
             raise
         else:
             if hooks:
