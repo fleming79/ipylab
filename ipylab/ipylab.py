@@ -165,8 +165,6 @@ class Ipylab(WidgetBase):
             if self._ready:
                 if self._ready_event:
                     self._ready_event.set()
-                for cb in ipylab.plugin_manager.hook.ready(obj=self):
-                    self.ensure_run(cb)
                 for cb in self._on_ready_callbacks:
                     self.ensure_run(cb)
             elif self._ready_event:

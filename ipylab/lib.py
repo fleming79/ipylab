@@ -14,7 +14,6 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable
 
     from ipylab import App
-    from ipylab.ipylab import Ipylab
 
 
 @hookimpl
@@ -48,11 +47,6 @@ async def autostart_once(app: ipylab.App) -> None | Awaitable[None]:
 @hookimpl
 def vpath_getter(app: App, kwgs: dict) -> Awaitable[str] | str:
     return app.dialog.get_text(**kwgs)
-
-
-@hookimpl
-def ready(obj: Ipylab):
-    "Pass through"
 
 
 @hookimpl

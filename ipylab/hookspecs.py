@@ -23,11 +23,6 @@ def launch_jupyterlab():
     """
 
 
-@hookspec()
-async def ready(obj: ipylab.Ipylab) -> None | Awaitable[None]:
-    """A hook that is called by `obj` when it is ready."""
-
-
 @hookspec(historic=True)
 async def autostart_once(app: ipylab.App) -> None | Awaitable[None]:
     """A hook that is called when the `app` is ready for the first time.
