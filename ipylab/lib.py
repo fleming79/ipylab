@@ -50,10 +50,5 @@ def vpath_getter(app: App, kwgs: dict) -> Awaitable[str] | str:
 
 
 @hookimpl
-def default_editor_key_bindings(app: ipylab.App, obj: ipylab.CodeEditor):  # noqa: ARG001
-    return {}
-
-
-@hookimpl
 def default_namespace_objects(namespace_id: str, app: ipylab.App):
     return {"ipylab": ipylab, "ipw": ipywidgets, "app": app, "namespace_id": namespace_id}

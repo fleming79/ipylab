@@ -60,8 +60,3 @@ def vpath_getter(app: ipylab.App, kwgs: dict) -> Awaitable[str] | str:  # type: 
     This hook provides for dynamic determination of the vpath/kernel to use when
     adding 'evaluate' code to the shell. The default behaviour is prompt the user
     for a path."""
-
-
-@hookspec(firstresult=True)
-def default_editor_key_bindings(app: ipylab.App, obj: ipylab.CodeEditor):
-    """Get the key bindings to use for the editor."""

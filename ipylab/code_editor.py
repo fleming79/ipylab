@@ -230,7 +230,7 @@ class CodeEditor(Ipylab, _String):
             "evaluate": ["Shift Enter"],
             "undo": ["Ctrl Z"],
             "redo": ["Ctrl Shift Z"],
-        } | ipylab.plugin_manager.hook.default_editor_key_bindings(app=self.app, obj=self)
+        }
 
     @default("evaluate")
     def _default_evaluate(self):
