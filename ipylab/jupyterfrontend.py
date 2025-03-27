@@ -6,7 +6,7 @@ from __future__ import annotations
 import contextlib
 import functools
 import inspect
-from typing import TYPE_CHECKING, Any, Self, Unpack, override
+from typing import TYPE_CHECKING, Any, Self, Unpack, final, override
 
 from ipywidgets import Widget, register
 from traitlets import Bool, Container, Dict, Instance, Unicode, UseEnum, default, observe
@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from typing import ClassVar
 
 
+@final
 @register
 class App(Singular, Ipylab):
     """A connection to the 'app' in the frontend.
