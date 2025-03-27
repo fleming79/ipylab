@@ -454,7 +454,7 @@ class Fixed(Generic[S, T]):
     def __set_name__(self, owner_cls, name: str):
         self.name = name
 
-    def __get__(self, obj: S, objtype=None) -> T:
+    def __get__(self, obj: Any, objtype=None) -> T:
         if obj is None:
             return self  # type: ignore
         try:
@@ -469,7 +469,7 @@ class Fixed(Generic[S, T]):
                     if log := getattr(obj, "log", None):
                         msg = f"Callback `created` failed for {obj.__class__}.{self.name}"
                         log.exception(msg, obj=self.created)
-            return instance
+            return instance  # type: ignore
 
     def __set__(self, obj, value):
         msg = f"Setting `Fixed` parameter {obj.__class__.__name__}.{self.name} is forbidden!"
