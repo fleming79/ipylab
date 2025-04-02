@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import functools
 import inspect
@@ -56,6 +57,7 @@ class App(Singular, Ipylab):
 
     logging_handler: Instance[IpylabLogHandler | None] = Instance(IpylabLogHandler, allow_none=True)  # type: ignore
     log_level = UseEnum(LogLevel, LogLevel.ERROR)
+    asyncio_loop = Instance(asyncio.AbstractEventLoop, help="The asyncio loop to use for scheduling tasks")
 
     namespaces: Container[dict[str, LastUpdatedDict]] = Dict(read_only=True)  # type: ignore
 
@@ -70,6 +72,10 @@ class App(Singular, Ipylab):
         handler = IpylabLogHandler(self.log_level)
         handler.setFormatter(IpylabLogFormatter(fmt=fmt, style="%", datefmt="%H:%M:%S"))
         return handler
+
+    @default("asyncio_loop")
+    def _default_comm(self):
+        return ipylab.plugin_manager.hook.get_asyncio_loop(app=self)
 
     @observe("_ready", "log_level")
     def _app_observe_ready(self, change):

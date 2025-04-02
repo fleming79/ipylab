@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING
 
 import ipywidgets
@@ -32,10 +33,10 @@ async def autostart(app: ipylab.App) -> None | Awaitable[None]:
     # Register some default context menu items for Ipylab
     # To prevent registering the command use app.DEFAULT_COMMANDS.discard(<name>) in another autostart hookimpl.
     if "Open console" in app.DEFAULT_COMMANDS:
-        cmd = await app.commands.add_command("Open console", app.shell.open_console)
+        cmd = await app.commands.add_command("Open console", app.shell.open_console, as_coro=True)
         await app.context_menu.add_item(command=cmd, rank=70)
     if "Show log viewer" in app.DEFAULT_COMMANDS:
-        cmd = await app.commands.add_command("Show log viewer", app.shell.log_viewer.add_to_shell)
+        cmd = await app.commands.add_command("Show log viewer", app.shell.log_viewer.add_to_shell, as_coro=True)
         await app.context_menu.add_item(command=cmd, rank=71)
 
 
@@ -52,3 +53,10 @@ def vpath_getter(app: App, kwgs: dict) -> Awaitable[str] | str:
 @hookimpl
 def default_namespace_objects(namespace_id: str, app: ipylab.App):
     return {"ipylab": ipylab, "ipw": ipywidgets, "app": app, "namespace_id": namespace_id}
+
+
+@hookimpl
+def get_asyncio_loop(app: ipylab.App):
+    if (kernel := getattr(app.comm, "kernel", None)) and (loop := getattr(kernel, "asyncio_event_loop", None)):
+        return loop
+    return asyncio.get_running_loop()
