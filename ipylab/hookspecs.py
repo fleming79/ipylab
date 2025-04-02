@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING, Any
 
 import pluggy
@@ -60,3 +61,7 @@ def vpath_getter(app: ipylab.App, kwgs: dict) -> Awaitable[str] | str:  # type: 
     This hook provides for dynamic determination of the vpath/kernel to use when
     adding 'evaluate' code to the shell. The default behaviour is prompt the user
     for a path."""
+
+@hookspec(firstresult=True)
+def get_asyncio_loop(app: ipylab.App) -> asyncio.AbstractEventLoop:  # type: ignore
+    "Get the asyncio event loop."

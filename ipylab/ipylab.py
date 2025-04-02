@@ -121,6 +121,7 @@ class Ipylab(WidgetBase):
     log = Instance(IpylabLoggerAdapter, read_only=True)
     app = Fixed(lambda _: ipylab.App())
 
+
     @property
     def repr_info(self) -> dict[str, Any] | str:
         "Extra info to provide for __repr__."
@@ -162,8 +163,9 @@ class Ipylab(WidgetBase):
         if not self.comm:
             self.close()
         if change["name"] == "_ready" and self._ready:
-            for f in self._ready_futures:
-                f.set_result(True)
+            for f in tuple(self._ready_futures):
+                loop = f.get_loop()
+                loop.call_soon_threadsafe(f.set_result, True)
             self._ready_futures.clear()
             for cb in self._on_ready_callbacks:
                 self.ensure_run(cb)
@@ -266,10 +268,11 @@ class Ipylab(WidgetBase):
             c = json.loads(content)
             if "ipylab_PY" in c:
                 op = self._pending_operations.pop(c["ipylab_PY"])
+                loop = op.get_loop()
                 if "error" in c:
-                    op.set_exception(self._to_frontend_error(c))
+                    loop.call_soon_threadsafe(op.set_exception, self._to_frontend_error(c))
                 else:
-                    op.set_result(c.get("payload"))
+                    loop.call_soon_threadsafe(op.set_result, c.get("payload"))
             elif "ipylab_FE" in c:
                 return self.to_task(self._do_operation_for_fe(c["ipylab_FE"], c["operation"], c["payload"], buffers))
             elif "closed" in c:
@@ -339,7 +342,7 @@ class Ipylab(WidgetBase):
         if app is not self and not app._ready:  # noqa: SLF001
             await app.ready()
         if not self._ready:  # type: ignore
-            future = asyncio.get_running_loop().create_future()
+            future = self.app.asyncio_loop.create_future()
             self._ready_futures.add(future)
             if not self._ready:
                 await future
@@ -403,7 +406,7 @@ class Ipylab(WidgetBase):
         """
 
         self._check_closed()
-        task = asyncio.eager_task_factory(asyncio.get_running_loop(), self._wrap_awaitable(aw, hooks), name=name)
+        task = asyncio.eager_task_factory(self.app.asyncio_loop, self._wrap_awaitable(aw, hooks), name=name)
         if not task.done():
             self.ipylab_tasks.add(task)
             task.add_done_callback(self._task_done_callback)
@@ -456,7 +459,7 @@ class Ipylab(WidgetBase):
         if toObject:
             content["toObject"] = toObject
 
-        self._pending_operations[ipylab_PY] = op = asyncio.get_running_loop().create_future()
+        self._pending_operations[ipylab_PY] = op = self.app.asyncio_loop.create_future()
 
         async def _operation(content: dict):
             self._ipylab_send(content)
