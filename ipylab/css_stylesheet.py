@@ -36,7 +36,8 @@ class CSSStyleSheet(Ipylab):
 
     async def _css_operation(self, operation: str, kwgs: dict | None = None) -> tuple[str, ...]:
         # Updates css_rules once operation is done
-        self.css_rules = await self.operation(operation, kwgs=kwgs)
+        css_rules = await self.operation(operation, kwgs=kwgs)
+        self.set_trait("css_rules", css_rules)
         return self.css_rules
 
     async def delete_rule(self, item: int | str):

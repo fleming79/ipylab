@@ -166,7 +166,7 @@ class LogViewer(Panel):
 
     @autorun
     async def _show_error(self, record: logging.LogRecord):
-        out = SimpleOutput().push(Markdown(f"### record.levelname.capitalize(): {record.message}"))
+        out = SimpleOutput().push(Markdown(f"**record.levelname.capitalize():\n\n{record.message}"))
         try:
             out.push(record.output)  # type: ignore
         except Exception:
