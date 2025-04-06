@@ -87,9 +87,7 @@ These versions enable:
 - Viewing widgets from kernels inside from other kernels.
 
 ```bash
-# For per-kernel-widget-manager support (Install modified version of ipywidgets, jupyterlab_widgets & widgetsnbextension)
-
-pip install --no-binary --force-reinstall ipylab[per-kernel-widget-manager]
+pip install --no-binary --force-reinstall ipylab
 ```
 
 ## Running the examples locally
@@ -121,7 +119,7 @@ mamba create -n ipylab -c conda-forge nodejs python=3.12 -y
 conda activate ipylab
 
 # install the Python package
-pip install -e .[dev,per-kernel-widget-manager,test] # (with per-kernel-widget-manager)
+pip install -e .[dev,test]
 
 # link the extension files
 jupyter labextension develop . --overwrite

@@ -12,7 +12,6 @@ import weakref
 from typing import TYPE_CHECKING, Any, cast
 
 import anyio
-import anyio.to_thread
 import traitlets
 from anyio import Event, create_memory_object_stream
 from ipywidgets import Widget, register
