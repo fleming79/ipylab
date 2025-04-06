@@ -15,7 +15,6 @@ import ipylab
 from ipylab.common import Fixed
 
 if TYPE_CHECKING:
-    from asyncio import Task
     from collections.abc import MutableMapping
 
 
@@ -90,7 +89,6 @@ class IpylabLoggerAdapter(logging.LoggerAdapter):
 
 
 class IpylabLogHandler(logging.Handler):
-    _log_notify_task: Task | None = None
     _loggers: ClassVar[weakref.WeakSet[logging.Logger]] = weakref.WeakSet()
     formatter: IpylabLogFormatter  # type: ignore
 

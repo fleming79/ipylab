@@ -1,5 +1,7 @@
 from unittest.mock import AsyncMock, MagicMock
 
+import anyio
+
 from ipylab.ipylab import Ipylab
 from ipylab.jupyterfrontend import App
 
@@ -45,6 +47,6 @@ class TestOnReady:
         # Simulate the ready event
         obj.set_trait("_ready", True)
         callback.assert_called()
-        assert callback.await_count == 1  # With eager task factory this should already be called.
-        assert callback.call_args[0][0] is obj
+        await anyio.sleep(0.1)
+        assert callback.await_count == 1
         obj.close()

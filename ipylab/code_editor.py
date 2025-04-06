@@ -6,7 +6,6 @@ from __future__ import annotations
 import asyncio
 import inspect
 import typing
-from asyncio import Task
 from typing import TYPE_CHECKING, Any, NotRequired, Self, TypedDict, override
 
 from IPython.core import completer as IPC  # noqa: N812
@@ -209,7 +208,6 @@ class CodeEditor(Ipylab, _String):
     placeholder = None  # Presently not available
 
     value = Unicode()
-    _update_task: None | Task = None
     _setting_value = False
     completer: Fixed[Self, IpylabCompleter] = Fixed(
         lambda c: IpylabCompleter(
@@ -242,22 +240,19 @@ class CodeEditor(Ipylab, _String):
 
     @observe("value")
     def _observe_value(self, _):
-        if not self._setting_value and not self._update_task:
+        if not self._setting_value:
             # We use throttling to ensure there isn't a backlog of changes to synchronise.
             # When the value is set in Python, we the shared model in the frontend should exactly reflect it.
             async def send_value():
-                try:
-                    while True:
-                        value = self.value
-                        await self.operation("setValue", {"value": value})
-                        self._sync = self._sync + 1
-                        await asyncio.sleep(self.update_throttle_ms / 1e3)
-                        if self.value == value:
-                            return
-                finally:
-                    self._update_task = None
+                while True:
+                    value = self.value
+                    await self.operation("setValue", {"value": value})
+                    self._sync = self._sync + 1
+                    await asyncio.sleep(self.update_throttle_ms / 1e3)
+                    if self.value == value:
+                        return
 
-            self._update_task = self.to_task(send_value(), "Send value to frontend")
+            self.start_coro(send_value())
 
     @override
     async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list):
@@ -270,8 +265,6 @@ class CodeEditor(Ipylab, _String):
                 await self.evaluate(payload["code"])
                 return True
             case "setValue":
-                if self._update_task:
-                    await self._update_task
                 # Only set the value when a valid sync is provided
                 # sync is done
                 if payload["sync"] == self._sync:

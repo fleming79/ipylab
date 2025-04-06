@@ -3,21 +3,16 @@
 
 from __future__ import annotations
 
-import asyncio
-from typing import TYPE_CHECKING
-
-from ipywidgets import Box, DOMWidget, Layout, TypedTuple, register, widget_serialization
+import anyio
+from ipywidgets import Box, DOMWidget, Layout, TypedTuple, Widget, register, widget_serialization
 from ipywidgets.widgets.trait_types import InstanceDict
 from traitlets import Container, Dict, Instance, Tuple, Unicode, observe
 
 import ipylab
 import ipylab._frontend as _fe
-from ipylab.common import Area, Fixed, InsertMode
+from ipylab.common import Area, Fixed, InsertMode, autorun
 from ipylab.connection import ShellConnection
 from ipylab.ipylab import WidgetBase
-
-if TYPE_CHECKING:
-    from asyncio import Task
 
 
 @register
@@ -56,7 +51,7 @@ class Panel(Box):
     app = Fixed(lambda _: ipylab.App())
     connections: Container[tuple[ShellConnection, ...]] = TypedTuple(trait=Instance(ShellConnection))
 
-    def add_to_shell(
+    async def add_to_shell(
         self,
         *,
         area: Area = Area.main,
@@ -66,17 +61,10 @@ class Panel(Box):
         ref: ShellConnection | None = None,
         options: dict | None = None,
         **kwgs,
-    ) -> Task[ShellConnection]:
+    ) -> ShellConnection:
         """Add this panel to the shell."""
-        return self.app.shell.add(
-            self,
-            area=area,
-            mode=mode,
-            activate=activate,
-            rank=rank,
-            ref=ref,
-            options=options,
-            **kwgs,
+        return await self.app.shell.add(
+            self, area=area, mode=mode, activate=activate, rank=rank, ref=ref, options=options, **kwgs
         )
 
 
@@ -95,21 +83,18 @@ class SplitPanel(Panel):
 
     @observe("children", "connections")
     def _observer(self, _):
-        self._rerender()
+        self._toggle_orientation(children=self.children)
 
-    def _rerender(self):
+    @autorun
+    async def _toggle_orientation(self, children: tuple[Widget, ...]):
         """Toggle the orientation to cause lumino_widget.parent to re-render content."""
-
-        async def force_refresh(children):
-            if children != self.children:
-                return
-            await asyncio.sleep(0.1)
-            orientation = self.orientation
-            self.orientation = "horizontal" if orientation == "vertical" else "vertical"
-            await asyncio.sleep(0.001)
-            self.orientation = orientation
-
-        return self.app.to_task(force_refresh(self.children))
+        if children != self.children:
+            return
+        await anyio.sleep(0.1)
+        orientation = self.orientation
+        self.orientation = "horizontal" if orientation == "vertical" else "vertical"
+        await anyio.sleep(0.001)
+        self.orientation = orientation
 
     # ============== End temp fix =============
 

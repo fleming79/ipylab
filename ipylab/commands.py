@@ -13,13 +13,12 @@ from traitlets import Callable as CallableTrait
 from traitlets import Container, Dict, Instance, Tuple, Unicode
 
 import ipylab
-from ipylab.common import IpylabKwgs, Obj, Singular, TaskHooks, TaskHookType, TransformType, pack
+from ipylab.common import IpylabKwgs, Obj, Singular, TransformType, pack
 from ipylab.connection import InfoConnection, ShellConnection
 from ipylab.ipylab import Ipylab, IpylabBase, Transform, register
 from ipylab.widgets import Icon
 
 if TYPE_CHECKING:
-    from asyncio import Task
     from collections.abc import Callable, Coroutine
 
     from ipylab.menu import MenuConnection
@@ -75,42 +74,37 @@ class CommandConnection(InfoConnection):
     def repr_info(self):
         return {"name": self.commands.name} | {"info": self.info}
 
-    def configure(self, *, emit=True, **kwgs: Unpack[CommandOptions]) -> Task[CommandOptions]:
+    async def configure(self, *, emit=True, **kwgs: Unpack[CommandOptions]) -> CommandOptions:
+        await self.ready()
         if diff := set(kwgs).difference(self._config_options):
             msg = f"The following useless configuration options were detected for {diff} in {self}"
             raise KeyError(msg)
 
-        async def configure():
-            config: CommandOptions = await self.update_property("config", kwgs)  # type: ignore
-            if emit:
-                await self.commands.execute_method("commandChanged.emit", {"id": self.cid})
-            return config
+        config: CommandOptions = await self.update_property("config", kwgs)  # type: ignore
+        if emit:
+            await self.commands.execute_method("commandChanged.emit", ({"id": self.cid},))
+        return config
 
-        return self.to_task(configure())
-
-    def add_key_binding(
+    async def add_key_binding(
         self, keys: list, selector="", args: dict | None = None, *, prevent_default=True
-    ) -> Task[KeybindingConnection]:
+    ) -> KeybindingConnection:
         "Add a key binding for this command and selector."
-        args = args or {}
-
-        async def add_key_binding():
-            args_ = args | {
-                "keys": keys,
-                "preventDefault": prevent_default,
-                "selector": selector or self.app.selector,
-                "command": str(self),
-            }
-            cid = KeybindingConnection.to_cid(self)
-            transform: TransformType = {"transform": Transform.connection, "cid": cid}
-            hooks: TaskHooks = {
-                "add_to_tuple_fwd": [(self, "key_bindings")],
-                "trait_add_fwd": [("info", args_), ("command", self)],
-                "close_with_fwd": [self],
-            }
-            return await self.commands.execute_method("addKeyBinding", args_, transform=transform, hooks=hooks)
-
-        return self.to_task(add_key_binding())
+        await self.ready()
+        args = args or {} | {
+            "keys": keys,
+            "preventDefault": prevent_default,
+            "selector": selector or self.app.selector,
+            "command": str(self),
+        }
+        cid = KeybindingConnection.to_cid(self)
+        KeybindingConnection.close_if_exists(cid)
+        transform: TransformType = {"transform": Transform.connection, "cid": cid}
+        kb: KeybindingConnection = await self.commands.execute_method("addKeyBinding", (args,), transform=transform)
+        kb.add_to_tuple(self, "key_bindings")
+        kb.info = args
+        kb.command = self
+        self.close_with_self(kb)
+        return kb
 
 
 class CommandPalletItemConnection(InfoConnection):
@@ -137,9 +131,9 @@ class CommandPalette(Singular, Ipylab):
         trait=Instance("ipylab.commands.CommandPalletItemConnection")
     )
 
-    def add(
+    async def add(
         self, command: CommandConnection, category: str, *, rank=None, args: dict | None = None
-    ) -> Task[CommandPalletItemConnection]:
+    ) -> CommandPalletItemConnection:
         """Add a command to the command pallet (must be registered in this kernel).
 
         **args are used when calling the command.
@@ -166,16 +160,21 @@ class CommandPalette(Singular, Ipylab):
             If the ShellConnection relates to an Ipylab widget. The associated
             widget/panel is accessible as `ref.widget`.
         """
+        await self.ready()
+        await command.ready()
+        if str(command) not in self.app.commands.all_commands:
+            msg = f"{command=} is not registered in app command registry app.commands!"
+            raise RuntimeError(msg)
         cid = CommandPalletItemConnection.to_cid(command, category)
-        CommandRegistry._check_belongs_to_application_registry(cid)  # noqa: SLF001
+        CommandPalletItemConnection.close_if_exists(cid)
         info = {"args": args, "category": category, "command": str(command), "rank": rank}
         transform: TransformType = {"transform": Transform.connection, "cid": cid}
-        hooks: TaskHooks = {
-            "add_to_tuple_fwd": [(self, "connections")],
-            "trait_add_fwd": [("info", info), ("command", command)],
-            "close_with_fwd": [command],
-        }
-        return self.execute_method("addItem", info, transform=transform, hooks=hooks)
+        cpc: CommandPalletItemConnection = await self.execute_method("addItem", (info,), transform=transform)
+        self.close_with_self(cpc)
+        cpc.add_to_tuple(self, "connections")
+        cpc.info = info
+        cpc.command = command
+        return cpc
 
 
 @register
@@ -190,17 +189,6 @@ class CommandRegistry(Singular, Ipylab):
     @override
     def get_single_key(cls, name: str, **kwgs):
         return name
-
-    @classmethod
-    def _check_belongs_to_application_registry(cls, cid: str):
-        "Check the cid belongs to the application command registry."
-        if APP_COMMANDS_NAME not in cid:
-            msg = (
-                f"{cid=} doesn't correspond to an ipylab CommandConnection "
-                f'for the application command registry "{APP_COMMANDS_NAME}". '
-                "Use a command registered with `app.commands.add_command` instead."
-            )
-            raise ValueError(msg)
 
     @property
     def repr_info(self):
@@ -221,7 +209,7 @@ class CommandRegistry(Singular, Ipylab):
         if not CommandConnection.exists(cmd_cid):
             msg = f'Invalid command "{cmd_cid}"'
             raise TypeError(msg)
-        conn = CommandConnection(cmd_cid)
+        conn = await CommandConnection(cmd_cid).ready()
         cmd = conn.python_command
         args = conn.args | (payload.get("args") or {})
 
@@ -251,7 +239,7 @@ class CommandRegistry(Singular, Ipylab):
             result = await result
         return result
 
-    def add_command(
+    async def add_command(
         self,
         name: str,
         execute: Callable[..., Coroutine | Any],
@@ -262,9 +250,8 @@ class CommandRegistry(Singular, Ipylab):
         icon: Icon | None = None,
         args: dict | None = None,
         namespace_id="",
-        hooks: TaskHookType = None,
         **kwgs,
-    ) -> Task[CommandConnection]:
+    ) -> CommandConnection:
         """Add a python command that can be executed by Jupyterlab.
 
         The `cid` of the CommnandConnection is used as the `id` in the App
@@ -291,42 +278,36 @@ class CommandRegistry(Singular, Ipylab):
         ref: https://lumino.readthedocs.io/en/latest/api/interfaces/commands.CommandRegistry.ICommandOptions.html
         """
 
-        async def add_command():
-            cid = CommandConnection.to_cid(self.name, self.app.vpath, name)
-            if CommandConnection.exists(cid):
-                cmd = await CommandConnection(cid).ready()
-                cmd.close()
-            kwgs_ = kwgs | {
-                "id": cid,
-                "cid": cid,
-                "caption": caption,
-                "label": label or name,
-                "iconClass": icon_class,
-                "icon": f"{pack(icon)}.labIcon" if isinstance(icon, Icon) else None,
-            }
-            hooks: TaskHooks = {
-                "close_with_fwd": [self],
-                "add_to_tuple_fwd": [(self, "connections")],
-                "trait_add_fwd": [
-                    ("commands", self),
-                    ("namespace_id", namespace_id),
-                    ("python_command", execute),
-                    ("args", args or {}),
-                    ("info", kwgs_),
-                ],
-            }
+        await self.ready()
+        app = await self.app.ready()
+        cid = CommandConnection.to_cid(self.name, app.vpath, name)
+        CommandConnection.close_if_exists(cid)
+        kwgs = kwgs | {
+            "id": cid,
+            "cid": cid,
+            "caption": caption,
+            "label": label or name,
+            "iconClass": icon_class,
+            "icon": f"{pack(icon)}.labIcon" if isinstance(icon, Icon) else None,
+        }
+        cc: CommandConnection = await self.operation(
+            "addCommand",
+            kwgs,
+            transform={"transform": Transform.connection, "cid": cid},
+            toObject=["icon"] if isinstance(icon, Icon) else [],
+        )
+        self.close_with_self(cc)
+        cc.commands = self
+        cc.namespace_id = namespace_id
+        cc.python_command = execute
+        cc.args = args or {}
+        cc.info = kwgs
+        cc.add_to_tuple(self, "connections")
+        return cc
 
-            return await self.operation(
-                "addCommand",
-                kwgs_,
-                hooks=hooks,
-                transform={"transform": Transform.connection, "cid": cid},
-                toObject=["icon"] if isinstance(icon, Icon) else [],
-            )
-
-        return self.to_task(add_command(), hooks=hooks)
-
-    def execute(self, command_id: str | CommandConnection, args: dict | None = None, **kwargs: Unpack[IpylabKwgs]):
+    async def execute(
+        self, command_id: str | CommandConnection, args: dict | None = None, **kwargs: Unpack[IpylabKwgs]
+    ):
         """Execute a command registered in the frontend command registry returning
         the result.
 
@@ -341,34 +322,31 @@ class CommandRegistry(Singular, Ipylab):
         see https://github.com/jtpio/ipylab/issues/128#issuecomment-1683097383
         for hints on how to determine what args can be used.
         """
-
-        async def execute_command():
-            id_ = str(command_id)
+        await self.ready()
+        app = await self.app.ready()
+        id_ = str(command_id)
+        if id_ not in self.all_commands:
+            id_ = CommandConnection.to_cid(self.name, app.vpath, id_)
             if id_ not in self.all_commands:
-                id_ = CommandConnection.to_cid(self.name, self.app.vpath, id_)
-                if id_ not in self.all_commands:
-                    msg = f"Command '{command_id}' not registered!"
-                    raise ValueError(msg)
-            return await self.operation("execute", {"id": id_, "args": args or {}}, **kwargs)
+                msg = f"Command '{command_id}' not registered!"
+                raise ValueError(msg)
+        return await self.operation("execute", {"id": id_, "args": args or {}}, **kwargs)
 
-        return self.to_task(execute_command())
-
-    def create_menu(self, label: str, rank: int = 500) -> Task[MenuConnection]:
+    async def create_menu(self, label: str, rank: int = 500) -> MenuConnection:
         "Make a new menu that can be used where a menu is required."
+        await self.ready()
         cid = ipylab.menu.MenuConnection.to_cid()
+        ipylab.menu.MenuConnection.close_if_exists(cid)
         options = {"id": cid, "label": label, "rank": int(rank)}
-        hooks: TaskHooks = {
-            "trait_add_fwd": [("info", options), ("commands", self)],
-            "add_to_tuple_fwd": [(self, "connections")],
-            "close_with_fwd": [self],
-        }
-        return self.execute_method(
+        mc: MenuConnection = await self.execute_method(
             "generateMenu",
-            f"{pack(self)}.base",
-            options,
-            (Obj.this, "translator"),
+            (f"{pack(self)}.base", options, (Obj.this, "translator")),
             obj=Obj.MainMenu,
             toObject=["args[0]", "args[2]"],
             transform={"transform": Transform.connection, "cid": cid},
-            hooks=hooks,
         )
+        self.close_with_self(mc)
+        mc.info = options
+        mc.commands = self
+        mc.add_to_tuple(self, "connections")
+        return mc

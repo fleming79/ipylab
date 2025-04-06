@@ -57,7 +57,7 @@ class App(Singular, Ipylab):
 
     logging_handler: Instance[IpylabLogHandler | None] = Instance(IpylabLogHandler, allow_none=True)  # type: ignore
     log_level = UseEnum(LogLevel, LogLevel.ERROR)
-    asyncio_loop = Instance(asyncio.AbstractEventLoop, help="The asyncio loop to use for scheduling tasks")
+    asyncio_loop: Instance[asyncio.AbstractEventLoop | None] = Instance(asyncio.AbstractEventLoop, allow_none=True)  # type: ignore
 
     namespaces: Container[dict[str, LastUpdatedDict]] = Dict(read_only=True)  # type: ignore
 
@@ -74,8 +74,8 @@ class App(Singular, Ipylab):
         return handler
 
     @default("asyncio_loop")
-    def _default_comm(self):
-        return ipylab.plugin_manager.hook.get_asyncio_loop(app=self)
+    def _default_asyncio_loop(self):
+        return ipylab.plugin_manager.hook.get_asyncio_event_loop(app=self)
 
     @observe("_ready", "log_level")
     def _app_observe_ready(self, change):
@@ -91,13 +91,14 @@ class App(Singular, Ipylab):
                 ipylab.plugin_manager.hook.autostart.call_historic(
                     kwargs={"app": self}, result_callback=self._autostart_callback
                 )
-            except Exception:
-                self.log.exception("Error with autostart")
+            except Exception as e:
+                self.log.exception("Error with autostart", exc_info=e)
         if self.logging_handler:
             self.logging_handler.setLevel(self.log_level)
 
     def _autostart_callback(self, result):
-        self.ensure_run(result)
+        if inspect.iscoroutine(result):
+            self.start_coro(result)
 
     @property
     def repr_info(self):
@@ -144,7 +145,7 @@ class App(Singular, Ipylab):
         return self._selector
 
     @override
-    async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list) -> Any:
+    async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list):
         match operation:
             case "evaluate":
                 return await self._evaluate(payload, buffers)
@@ -158,9 +159,9 @@ class App(Singular, Ipylab):
 
         return await super()._do_operation_for_frontend(operation, payload, buffers)
 
-    def shutdown_kernel(self, vpath: str | None = None):
+    async def shutdown_kernel(self, vpath: str | None = None):
         "Shutdown the kernel"
-        return self.operation("shutdownKernel", {"vpath": vpath})
+        await self.operation("shutdownKernel", {"vpath": vpath})
 
     def start_iyplab_python_kernel(self, *, restart=False):
         "Start the 'ipylab' Python kernel."
@@ -244,7 +245,7 @@ class App(Singular, Ipylab):
             self.shell.add_objects_to_ipython_namespace(ns)
         return {"payload": payload, "buffers": buffers}
 
-    def evaluate(
+    async def evaluate(
         self,
         evaluate: str | inspect._SourceObjectType | Iterable[str | tuple[str, str | inspect._SourceObjectType]],
         *,
@@ -328,8 +329,9 @@ class App(Singular, Ipylab):
         # Task result should be a ShellConnection
         ```
         """
-        kwgs = (kwgs or {}) | {"evaluate": evaluate, "vpath": vpath, "namespace_id": namespace_id}
-        return self.operation("evaluate", kwgs, **kwargs)
+        await self.ready()
+        kwgs = (kwgs or {}) | {"evaluate": evaluate, "vpath": vpath or self.vpath, "namespace_id": namespace_id}
+        return await self.operation("evaluate", kwgs=kwgs, **kwargs)
 
 
 JupyterFrontEnd = App

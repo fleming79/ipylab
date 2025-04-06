@@ -6,8 +6,7 @@ from __future__ import annotations
 from typing import Self, override
 
 import pytest
-from ipywidgets import TypedTuple
-from traitlets import HasTraits, Unicode
+from traitlets import Unicode
 
 import ipylab
 from ipylab.common import (
@@ -19,7 +18,6 @@ from ipylab.common import (
     TransformDictAdvanced,
     TransformDictConnection,
     TransformDictFunction,
-    trait_tuple_add,
 )
 from ipylab.connection import Connection
 
@@ -27,19 +25,6 @@ from ipylab.connection import Connection
 class CommonTestClass:
     def __init__(self, value=1):
         self.value = value
-
-
-def test_trait_tuple_add():
-    class TestHasTraits(HasTraits):
-        test_tuple = TypedTuple(trait=Unicode(), default_value=())
-
-    owner = TestHasTraits()
-    trait_tuple_add(owner, "test_tuple", "value1")
-    assert owner.test_tuple == ("value1",)
-    trait_tuple_add(owner, "test_tuple", "value2")
-    assert owner.test_tuple == ("value1", "value2")
-    trait_tuple_add(owner, "test_tuple", "value1")  # Should not add duplicate
-    assert owner.test_tuple == ("value1", "value2")
 
 
 def test_last_updated_dict():
@@ -134,8 +119,13 @@ class TestTransformValidate:
             Transform.validate(transform)
 
 
+@pytest.fixture
+async def mock_connection(mocker):
+    mocker.patch.object(Connection, "_ready")
+
+
 class TestTransformPayload:
-    def test_transform_payload_advanced(self):
+    async def test_transform_payload_advanced(self, mock_connection):
         transform: TransformDictAdvanced = {
             "transform": Transform.advanced,
             "mappings": {
@@ -153,30 +143,30 @@ class TestTransformPayload:
             "key1": {"id": "test_id"},
             "key2": {"cid": "ipylab-Connection"},
         }
-        result = Transform.transform_payload(transform, payload)
+        result = await Transform.transform_payload(transform, payload)
         assert isinstance(result, dict)
         assert "key1" in result
         assert "key2" in result
 
-    def test_transform_payload_connection(self):
+    async def test_transform_payload_connection(self, mock_connection):
         transform: TransformDictConnection = {
             "transform": Transform.connection,
             "cid": "ipylab-Connection",
         }
         payload = {"cid": "ipylab-Connection"}
-        result = Transform.transform_payload(transform, payload)
+        result = await Transform.transform_payload(transform, payload)
         assert isinstance(result, Connection)
 
-    def test_transform_payload_auto(self):
+    async def test_transform_payload_auto(self, mock_connection):
         transform = Transform.auto
         payload = {"cid": "ipylab-Connection"}
-        result = Transform.transform_payload(transform, payload)
+        result = await Transform.transform_payload(transform, payload)
         assert isinstance(result, Connection)
 
-    def test_transform_payload_no_transform(self):
+    async def test_transform_payload_no_transform(self, mock_connection):
         transform = Transform.null
         payload = {"key": "value"}
-        result = Transform.transform_payload(transform, payload)
+        result = await Transform.transform_payload(transform, payload)
         assert result == payload
 
 

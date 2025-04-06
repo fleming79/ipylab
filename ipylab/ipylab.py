@@ -9,9 +9,12 @@ import inspect
 import json
 import uuid
 import weakref
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, cast
 
+import anyio
+import anyio.to_thread
 import traitlets
+from anyio import Event, create_memory_object_stream
 from ipywidgets import Widget, register
 from traitlets import (
     Bool,
@@ -30,29 +33,17 @@ from traitlets import (
 
 import ipylab
 import ipylab._frontend as _fe
-from ipylab.common import (
-    Fixed,
-    IpylabKwgs,
-    Obj,
-    TaskHooks,
-    TaskHookType,
-    Transform,
-    TransformType,
-    pack,
-    trait_tuple_add,
-)
-from ipylab.log import IpylabLoggerAdapter
+from ipylab.common import Fixed, IpylabKwgs, Obj, PosArgsT, T, Transform, TransformType, autorun, pack
+from ipylab.log import IpylabLoggerAdapter, LogLevel
 
 if TYPE_CHECKING:
-    from asyncio import Task
     from collections.abc import Awaitable, Callable
+    from types import CoroutineType
     from typing import Self, Unpack
 
+    from anyio.streams.memory import MemoryObjectSendStream
 
 __all__ = ["Ipylab", "WidgetBase"]
-
-T = TypeVar("T")
-L = TypeVar("L", bound="Ipylab")
 
 
 class IpylabBase(TraitType[tuple[str, str], None]):
@@ -86,41 +77,22 @@ class Ipylab(WidgetBase):
     Ipylab widgets are Jupyter widgets that are designed to interact with the
     JupyterLab application. They provide a way to extend the functionality
     of JupyterLab with custom Python code.
-
-    Attributes:
-        _model_name (Unicode): The name of the model.
-        _python_class (Unicode): The name of the Python class.
-        ipylab_base (IpylabBase): The base ipylab object.
-        _ready (Bool): Whether the widget is ready.
-        _on_ready_callbacks (List): A list of callbacks to execute when the widget is ready.
-        _ready_event (asyncio.Event): An event that is set when the widget is ready.
-        _comm: The comm object.
-        _ipylab_init_complete (bool): Whether the ipylab initialization is complete.
-        _pending_operations (Dict): A dictionary of pending operations.
-        _has_attrs_mappings (Set): A set of attribute mappings.
-        ipylab_tasks (Set): A set of ipylab tasks.
-        close_extras (Fixed): A set of extra widgets to close.
-        log (Instance): A logger instance.
-        app (Fixed): A reference to the ipylab App instance.
     """
 
     _model_name = Unicode("IpylabModel", help="Name of the model.", read_only=True).tag(sync=True)
     _python_class = Unicode().tag(sync=True)
     ipylab_base = IpylabBase(Obj.this, "").tag(sync=True)
     _ready = Bool(read_only=True, help="Set to by frontend when ready").tag(sync=True)
-    _on_ready_callbacks: Container[list[Callable[[], None | Awaitable] | Callable[[Self], None | Awaitable]]] = List(
-        trait=traitlets.Callable()
-    )
-    _ready_futures: Fixed[Self, set[asyncio.Future]] = Fixed(lambda _: set())
+    _on_ready_callbacks: Container[list[Callable[[Self], None | CoroutineType]]] = List(trait=traitlets.Callable())
+    _ready_event = Instance(Event, ())
     _comm = None
     _ipylab_init_complete = False
-    _pending_operations: Dict[str, asyncio.Future] = Dict()
+    _pending_operations: Dict[str, MemoryObjectSendStream] = Dict()
     _has_attrs_mappings: Container[set[tuple[HasTraits, str]]] = Set()
-    ipylab_tasks: Container[set[asyncio.Task]] = Set()
-    close_extras: Fixed[Self, weakref.WeakSet[Widget]] = Fixed(weakref.WeakSet)
+    _close_extras: Fixed[Self, weakref.WeakSet[Widget]] = Fixed(weakref.WeakSet)
+
     log = Instance(IpylabLoggerAdapter, read_only=True)
     app = Fixed(lambda _: ipylab.App())
-
 
     @property
     def repr_info(self) -> dict[str, Any] | str:
@@ -163,21 +135,18 @@ class Ipylab(WidgetBase):
         if not self.comm:
             self.close()
         if change["name"] == "_ready" and self._ready:
-            for f in tuple(self._ready_futures):
-                loop = f.get_loop()
-                loop.call_soon_threadsafe(f.set_result, True)
-            self._ready_futures.clear()
+            self._ready_event.set()
+            self._ready_event = Event()
             for cb in self._on_ready_callbacks:
-                self.ensure_run(cb)
+                result = cb(self)
+                if inspect.iscoroutine(result):
+                    self.start_coro(result)
 
     def close(self):
         if self.comm:
             self._ipylab_send({"close": True})
         super().close()
-        for task in self.ipylab_tasks:
-            task.cancel()
-        self.ipylab_tasks.clear()
-        for item in list(self.close_extras):
+        for item in list(self._close_extras):
             item.close()
         for obj, name in list(self._has_attrs_mappings):
             if val := getattr(obj, name, None):
@@ -193,105 +162,53 @@ class Ipylab(WidgetBase):
             msg = f"This widget is closed {self!r}"
             raise RuntimeError(msg)
 
-    async def _wrap_awaitable(self, aw: Awaitable[T], hooks: TaskHookType) -> T:
-        await self.ready()
+    async def catch_exceptions(self, aw: Awaitable) -> None:
+        """Catches exceptions that occur when awaiting an awaitable.
+
+        The exception is logged, but otherwise ignored.
+
+        Args:
+            aw: The awaitable to await.
+        """
         try:
-            result = await aw
-        except Exception:
-            self.log.exception(f"Awaiting {aw}", obj={"hooks": hooks, "aw": aw})  # noqa: G004
-            raise
-        else:
-            if hooks:
-                try:
-                    self._task_result(result, hooks)
-                except Exception:
-                    self.log.exception("Running hooks", obj={"result": result, "hooks": hooks, "aw": aw})
-                    raise
-            return result
-
-    def _task_result(self: Ipylab, result: Any, hooks: TaskHooks):
-        # close with
-        for owner in hooks.pop("close_with_fwd", ()):
-            # Close result with each item.
-            if isinstance(owner, Ipylab) and isinstance(result, Widget):
-                if not owner.comm:
-                    result.close()
-                    raise RuntimeError(str(owner))
-                owner.close_extras.add(result)
-        for obj_ in hooks.pop("close_with_rev", ()):
-            # Close each item with the result.
-            if isinstance(result, Ipylab):
-                result.close_extras.add(obj_)
-        # tuple add
-        for owner, name in hooks.pop("add_to_tuple_fwd", ()):
-            # Add each item of to tuple of result.
-            if isinstance(result, Ipylab):
-                result.add_to_tuple(owner, name)
-            else:
-                trait_tuple_add(owner, name, result)
-        for name, value in hooks.pop("add_to_tuple_rev", ()):
-            # Add the result the the tuple with 'name' for each item.
-            if isinstance(value, Ipylab):
-                value.add_to_tuple(result, name)
-            else:
-                trait_tuple_add(result, name, value)
-        # trait add
-        for name, value in hooks.pop("trait_add_fwd", ()):
-            # Set each trait of result with value.
-            if isinstance(value, Ipylab):
-                value.add_as_trait(result, name)
-            else:
-                result.set_trait(name, value)
-        for owner, name in hooks.pop("trait_add_rev", ()):
-            # Set set trait of each value with result.
-            if isinstance(result, Ipylab):
-                result.add_as_trait(owner, name)
-            else:
-                owner.set_trait(name, result)
-        for cb in hooks.pop("callbacks", ()):
-            self.ensure_run(cb(result))
-        if hooks:
-            msg = f"Invalid hooks detected: {hooks}"
-            raise ValueError(msg)
-
-    def _task_done_callback(self, task: Task):
-        self.ipylab_tasks.discard(task)
-        # TODO: It'd be great if we could cancel in the frontend.
-        # Unfortunately it looks like Javascript Promises can't be cancelled.
-        # https://stackoverflow.com/questions/30233302/promise-is-it-possible-to-force-cancel-a-promise#30235261
+            await aw
+        except BaseException as e:
+            self.log.exception(f"Calling {aw}", obj={"aw": aw}, exc_info=e)  # noqa: G004
+            if self.app.log_level == LogLevel.DEBUG:
+                raise
 
     def _on_custom_msg(self, _, msg: dict, buffers: list):
         content = msg.get("ipylab")
         if not content:
             return
         try:
-            c = json.loads(content)
+            c: dict[str, Any] = json.loads(content)
             if "ipylab_PY" in c:
-                op = self._pending_operations.pop(c["ipylab_PY"])
-                loop = op.get_loop()
-                if "error" in c:
-                    loop.call_soon_threadsafe(op.set_exception, self._to_frontend_error(c))
-                else:
-                    loop.call_soon_threadsafe(op.set_result, c.get("payload"))
+                self._set_result(content=c)
             elif "ipylab_FE" in c:
-                return self.to_task(self._do_operation_for_fe(c["ipylab_FE"], c["operation"], c["payload"], buffers))
+                self._do_operation_for_fe(True, c["ipylab_FE"], c["operation"], c["payload"], buffers)
             elif "closed" in c:
                 self.close()
             else:
                 raise NotImplementedError(msg)  # noqa: TRY301
-        except Exception:
-            self.log.exception("Message processing error", obj=msg)
+        except Exception as e:
+            self.log.exception("Message processing error", obj=msg, exc_info=e)
 
-    def _to_frontend_error(self, content):
-        error = content["error"]
-        operation = content.get("operation")
-        if operation:
-            msg = f'Operation "{operation}" failed with the message "{error}"'
-            return IpylabFrontendError(msg)
-        return IpylabFrontendError(error)
+    @autorun
+    async def _set_result(self, content: dict[str, Any]):
+        send_stream = self._pending_operations.pop(content["ipylab_PY"])
+        if error := content.get("error"):
+            e = IpylabFrontendError(error)
+            e.add_note(f"{content=}")
+            value = e
+        else:
+            value = content.get("payload")
+        await send_stream.send(value)
 
+    @autorun
     async def _do_operation_for_fe(self, ipylab_FE: str, operation: str, payload: dict, buffers: list | None):
         """Handle operation requests from the frontend and reply with a result."""
+        await self.ready()
         content: dict[str, Any] = {"ipylab_FE": ipylab_FE}
         buffers = []
         try:
@@ -302,51 +219,30 @@ class Ipylab(WidgetBase):
             content["payload"] = result
         except asyncio.CancelledError:
             content["error"] = "Cancelled"
-        except Exception:
-            self.log.exception("Operation for frontend error", obj={"operation": operation, "payload": payload})
+        except Exception as e:
+            self.log.exception("Frontend operation", obj={"operation": operation, "payload": payload}, exc_info=e)
         finally:
             self._ipylab_send(content, buffers)
 
-    async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list):
+    async def _obj_operation(self, base: Obj, subpath: str, operation: str, kwgs, kwargs: IpylabKwgs):
+        await self.ready()
+        kwgs |= {"genericOperation": operation, "basename": base, "subpath": subpath}
+        return await self.operation("genericOperation", kwgs=kwgs, **kwargs)
+
+    async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list) -> Any:
         """Perform an operation for a custom message with an ipylab_FE uuid."""
+        # Overload as required
         raise NotImplementedError(operation)
 
-    def _obj_operation(self, base: Obj, subpath: str, operation: str, kwgs, kwargs: IpylabKwgs):
-        kwgs |= {"genericOperation": operation, "basename": base, "subpath": subpath}
-        return self.operation("genericOperation", kwgs, **kwargs)
-
-    def ensure_run(self, aw: Callable | Awaitable | None) -> None:
-        """Ensure aw is run.
-
-        Parameters
-        ----------
-        aw: Callable | Awaitable | None
-            `aw` can be a function that accepts either no arguments or one keyword argument 'obj'.
-        """
-        try:
-            if callable(aw):
-                aw = aw(self) if len(inspect.signature(len).parameters) == 1 else aw()
-            if inspect.iscoroutine(aw):
-                self.to_task(aw, f"Ensure run {aw}")
-        except Exception:
-            self.log.exception("Ensure run", obj=aw)
-            raise
-
     async def ready(self) -> Self:
-        """Wait for the application to be ready.
+        """Wait for the instance to be ready.
 
         If this is not the main application instance, it waits for the
         main application instance to be ready first.
         """
-        app = self.app
-        if app is not self and not app._ready:  # noqa: SLF001
-            await app.ready()
-        if not self._ready:  # type: ignore
-            future = self.app.asyncio_loop.create_future()
-            self._ready_futures.add(future)
-            if not self._ready:
-                await future
-            self._ready_futures.discard(future)
+        self._check_closed()
+        if not self._ready:
+            await self._ready_event.wait()
         return self
 
     def on_ready(self, callback, remove=False):  # noqa: FBT002
@@ -383,36 +279,72 @@ class Ipylab(WidgetBase):
         # see: _observe_comm for removal
         self._has_attrs_mappings.add((obj, name))
 
+    def close_with_self(self, obj: Widget):
+        "Close the widget when self closes. If self is already closed, object will be closed immediately."
+        if not self.comm:
+            obj.close()
+            msg = f"{self} is closed"
+            raise anyio.ClosedResourceError(msg)
+        self._close_extras.add(obj)
+
     def _ipylab_send(self, content, buffers: list | None = None):
         try:
             self.send({"ipylab": json.dumps(content, default=pack)}, buffers)
-        except Exception:
-            self.log.exception("Send error", obj=content)
+        except Exception as e:
+            self.log.exception("Send error", obj=content, exc_info=e)
             raise
 
-    def to_task(self, aw: Awaitable[T], name: str | None = None, *, hooks: TaskHookType = None) -> Task[T]:
-        """Run aw in an eager task.
+    def start_coro(self, coro: CoroutineType[None, None, T]) -> None:
+        """Start a coroutine in the main event loop.
 
-        If the task is running when this object is closed the task will be cancel.
-        Noting the corresponding promise in the frontend will run to completion.
+        If the kernel has a `start_soon` method, use it to start the coroutine.
+        Otherwise, if the application has an asyncio loop, use
+        `asyncio.run_coroutine_threadsafe` to start the coroutine in the loop.
+        If neither of these is available, raise a RuntimeError.
 
-        aw: An awaitable to run in the task.
+        Tip: Use anyio primiatives in the coroutine to ensure it will run in
+        the chosen backend of the kernel.
 
-        name: str
-            The name of the task.
+        Parameters
+        ----------
+        coro : CoroutineType[None, None, T]
+            The coroutine to start.
 
-        hooks: TaskHookType
-
+        Raises
+        ------
+        RuntimeError
+            If there is no running loop to start the task.
         """
 
         self._check_closed()
-        task = asyncio.eager_task_factory(self.app.asyncio_loop, self._wrap_awaitable(aw, hooks), name=name)
-        if not task.done():
-            self.ipylab_tasks.add(task)
-            task.add_done_callback(self._task_done_callback)
-        return task
+        self.start_soon(self.catch_exceptions, coro)
 
-    def operation(
+    def start_soon(self, func: Callable[[Unpack[PosArgsT]], CoroutineType], *args: Unpack[PosArgsT]):
+        """Start a function soon in the main event loop.
+
+        If the kernel has a start_soon method, use it.
+        Otherwise, if the app has an asyncio loop, run the function in that loop.
+        Otherwise, raise a RuntimeError.
+
+        This is a simple wrapper to ensure the function is called in the main
+        event loop. No error reporting is done.
+
+        Consider using start_coro which performs additional checks and automatically
+        logs exceptions.
+        """
+        try:
+            start_soon = self.comm.kernel.start_soon  # type: ignore
+        except AttributeError:
+            if loop := self.app.asyncio_loop:
+                coro = func(*args)
+                asyncio.run_coroutine_threadsafe(coro, loop)
+            else:
+                msg = f"We don't have a running loop to run {func}"
+                raise RuntimeError(msg) from None
+        else:
+            start_soon(func, *args)
+
+    async def operation(
         self,
         operation: str,
         kwgs: dict | None = None,
@@ -420,9 +352,8 @@ class Ipylab(WidgetBase):
         transform: TransformType = Transform.auto,
         toLuminoWidget: list[str] | None = None,
         toObject: list[str] | None = None,
-        hooks: TaskHookType = None,
-    ) -> Task[Any]:
-        """Create a new task requesting an operation to be performed in the frontend.
+    ) -> Any:
+        """Perform an operation in the frontend.
 
         operation: str
             Name corresponding to operation in JS frontend.
@@ -438,12 +369,9 @@ class Ipylab(WidgetBase):
         toObject:  List[str] | None
             A list of item name mappings to convert to objects in the frontend prior
             to performing the operation.
-
-        hooks: TaskHookType
-            see: TaskHooks
         """
         # validation
-        self._check_closed()
+        await self.ready()
         if not operation or not isinstance(operation, str):
             msg = f"Invalid {operation=}"
             raise ValueError(msg)
@@ -459,28 +387,29 @@ class Ipylab(WidgetBase):
         if toObject:
             content["toObject"] = toObject
 
-        self._pending_operations[ipylab_PY] = op = self.app.asyncio_loop.create_future()
+        send_stream, receive_stream = create_memory_object_stream()
+        self._pending_operations[ipylab_PY] = send_stream
+        self._ipylab_send(content)
+        result = await receive_stream.receive()
+        if isinstance(result, Exception):
+            raise result
+        result = await Transform.transform_payload(content["transform"], result)
+        return cast(Any, result)
 
-        async def _operation(content: dict):
-            self._ipylab_send(content)
-            payload = await op
-            return Transform.transform_payload(content["transform"], payload)
+    async def execute_method(self, subpath: str, args: tuple = (), obj=Obj.base, **kwargs: Unpack[IpylabKwgs]) -> Any:
+        return await self._obj_operation(obj, subpath, "executeMethod", {"args": args}, kwargs)
 
-        return self.to_task(_operation(content), name=ipylab_PY, hooks=hooks)
-
-    def execute_method(self, subpath: str, *args, obj=Obj.base, **kwargs: Unpack[IpylabKwgs]):
-        return self._obj_operation(obj, subpath, "executeMethod", {"args": args}, kwargs)
-
-    def get_property(self, subpath: str, *, obj=Obj.base, null_if_missing=False, **kwargs: Unpack[IpylabKwgs]):
+    async def get_property(self, subpath: str, *, obj=Obj.base, null_if_missing=False, **kwargs: Unpack[IpylabKwgs]):
         return self._obj_operation(obj, subpath, "getProperty", {"null_if_missing": null_if_missing}, kwargs)
 
-    def set_property(self, subpath: str, value, *, obj=Obj.base, **kwargs: Unpack[IpylabKwgs]):
-        return self._obj_operation(obj, subpath, "setProperty", {"value": value}, kwargs)
+    async def set_property(self, subpath: str, value, *, obj=Obj.base, **kwargs: Unpack[IpylabKwgs]):
+        return await self._obj_operation(obj, subpath, "setProperty", {"value": value}, kwargs)
 
-    def update_property(self, subpath: str, value: dict[str, Any], *, obj=Obj.base, **kwargs: Unpack[IpylabKwgs]):
-        return self._obj_operation(obj, subpath, "updateProperty", {"value": value}, kwargs)
+    async def update_property(self, subpath: str, value: dict[str, Any], *, obj=Obj.base, **kwargs: Unpack[IpylabKwgs]):
+        return await self._obj_operation(obj, subpath, "updateProperty", {"value": value}, kwargs)
 
-    def list_properties(
+    async def list_properties(
         self, subpath="", *, obj=Obj.base, depth=3, skip_hidden=True, **kwargs: Unpack[IpylabKwgs]
-    ) -> Task[dict]:
-        return self._obj_operation(obj, subpath, "listProperties", {"depth": depth, "omitHidden": skip_hidden}, kwargs)
+    ) -> dict:
+        kwgs = {"depth": depth, "omitHidden": skip_hidden}
+        return await self._obj_operation(obj, subpath, "listProperties", kwgs, kwargs)

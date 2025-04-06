@@ -6,4 +6,4 @@ from __future__ import annotations
 import ipylab
 
 if __name__ == "__main__":
-    ipylab.plugin_manager.hook.launch_jupyterlab()
+    ipylab.plugin_manager.hook.launch_ipylab()

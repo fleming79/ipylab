@@ -13,7 +13,6 @@ from ipylab.common import Singular
 from ipylab.ipylab import Ipylab
 
 if TYPE_CHECKING:
-    from asyncio import Task
     from collections.abc import Hashable
     from typing import Self
 
@@ -61,6 +60,11 @@ class Connection(Singular, Ipylab):
     @classmethod
     def exists(cls, cid: str) -> bool:
         return cid in cls._single_instances
+
+    @classmethod
+    def close_if_exists(cls, cid: str):
+        if inst := cls._single_instances.pop(cid, None):
+            inst.close()
 
     def __init_subclass__(cls, **kwargs) -> None:
         cls.prefix = f"{cls._PREFIX}{cls.__name__}{cls._SEP}"
@@ -144,11 +148,11 @@ class ShellConnection(Connection):
         # Losing strong references doesn't mean the widget should be closed.
         self.close(dispose=False)
 
-    def activate(self):
+    async def activate(self):
         "Activate the connected widget in the shell."
 
-        return self.operation("activate")
+        return await self.operation("activate")
 
-    def get_session(self) -> Task[dict]:
+    async def get_session(self) -> dict:
         """Get the session of the connected widget."""
-        return self.operation("getSession")
+        return await self.operation("getSession")

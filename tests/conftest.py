@@ -1,5 +1,3 @@
-import asyncio
-
 import pytest
 
 import ipylab
@@ -18,6 +16,6 @@ async def anyio_backend_autouse(anyio_backend):
 @pytest.fixture
 async def app(mocker):
     app = ipylab.App()
+    app._trait_values.pop("asyncio_loop", None)
     mocker.patch.object(app, "ready")
-    app.asyncio_loop = asyncio.get_running_loop()
     return app

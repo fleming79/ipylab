@@ -11,7 +11,6 @@ from traitlets import Bool, Callable, Enum, Int, Unicode, default
 from ipylab.ipylab import Ipylab
 
 if TYPE_CHECKING:
-    from asyncio import Task
     from typing import Any, Unpack
 
     from IPython.display import TextDisplayObject
@@ -25,7 +24,6 @@ from traitlets import Instance, observe
 from ipylab.ipylab import WidgetBase
 
 if TYPE_CHECKING:
-    from asyncio import Task
     from typing import Unpack
 
 
@@ -53,7 +51,7 @@ class SimpleOutput(Ipylab, DOMWidget):
     def _pack_outputs(self, outputs: tuple[dict[str, str] | Widget | str | TextDisplayObject | Any, ...]):
         fmt = self.format
         for output in outputs:
-            if isinstance(output, dict):
+            if isinstance(output, dict) and "output_type" in output:
                 yield output
             elif isinstance(output, str):
                 yield {"output_type": "stream", "name": "stdout", "text": output}
@@ -69,7 +67,7 @@ class SimpleOutput(Ipylab, DOMWidget):
         """Add one or more items to the output.
 
         Consecutive `streams` of the same type are placed in the same 'output' up to `max_outputs`.
-        Outputs passed as dicts are assumed to be correctly packed as `repr_mime` data.
+        Outputs passed as dicts with a key "output_type" are assumed to be correctly packed as `repr_mime` data.
 
         Parameters
         ----------
@@ -84,9 +82,9 @@ class SimpleOutput(Ipylab, DOMWidget):
             self.send({"add": items, "clear": clear})
         return self
 
-    def set(
+    async def set(
         self, *outputs: dict[str, str] | Widget | str | TextDisplayObject | Any, **kwgs: Unpack[IpylabKwgs]
-    ) -> Task[int]:
+    ) -> int:
         """Set the output explicitly by first clearing and then adding the outputs.
 
         Compared to `push`, this is performed asynchronously and will wait for
@@ -98,7 +96,7 @@ class SimpleOutput(Ipylab, DOMWidget):
         outputs:
             Items to be displayed.
         """
-        return self.operation("setOutputs", {"items": list(self._pack_outputs(outputs))}, **kwgs)
+        return await self.operation("setOutputs", {"items": list(self._pack_outputs(outputs))}, **kwgs)
 
 
 @register

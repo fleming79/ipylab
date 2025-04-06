@@ -25,6 +25,7 @@ classifiers = [
 ]
 
 dependencies = [
+  "anyio",
   "jupyterlab>=4.3",
   "ipywidgets>=8.1.5",
   "ipython>=8.32",

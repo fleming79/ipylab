@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from typing import TYPE_CHECKING, Any
 
 import pluggy
@@ -17,7 +16,7 @@ if TYPE_CHECKING:
 
 
 @hookspec(firstresult=True)
-def launch_jupyterlab():
+def launch_ipylab():
     """A hook called to start Jupyterlab.
 
     This is called by with the shell command `ipylab`.
@@ -54,7 +53,7 @@ def default_namespace_objects(namespace_id: str, app: ipylab.App) -> dict[str, A
 
 
 @hookspec(firstresult=True)
-def vpath_getter(app: ipylab.App, kwgs: dict) -> Awaitable[str] | str:  # type: ignore
+async def vpath_getter(app: ipylab.App, kwgs: dict) -> str:  # type: ignore
     """A hook called during `app.shell.add` when `evaluate` is code and `vpath`
     is passed as a dict.
 
@@ -62,6 +61,7 @@ def vpath_getter(app: ipylab.App, kwgs: dict) -> Awaitable[str] | str:  # type: 
     adding 'evaluate' code to the shell. The default behaviour is prompt the user
     for a path."""
 
+
 @hookspec(firstresult=True)
-def get_asyncio_loop(app: ipylab.App) -> asyncio.AbstractEventLoop:  # type: ignore
+def get_asyncio_event_loop(app: ipylab.App) -> asyncio.AbstractEventLoop:  # type: ignore  # noqa: F821
     "Get the asyncio event loop."

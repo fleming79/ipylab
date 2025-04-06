@@ -6,9 +6,9 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
-import uuid
 from typing import TYPE_CHECKING, Any
 
+import anyio
 import pytest
 
 if TYPE_CHECKING:
@@ -19,14 +19,7 @@ def example_callable(a=None):
     return a
 
 
-async def example_async_callable(c, *, return_task=False):
-    if return_task:
-        import asyncio
-
-        async def f():
-            return "return task"
-
-        return asyncio.create_task(f())
+async def example_async_callable(c):
     return c
 
 
@@ -70,50 +63,25 @@ async def example_async_callable(c, *, return_task=False):
             },
             "async callable",
         ),
-        (
-            {
-                "evaluate": example_async_callable,
-                "kwgs": {"c": 123, "return_task": True},
-            },
-            "return task",
-        ),
     ],
 )
 async def test_app_evaluate(app: ipylab.App, kw: dict[str, Any], result, mocker):
     "Tests for app.evaluate"
-    import asyncio
 
     ready = mocker.patch.object(app, "ready")
     send = mocker.patch.object(app, "send")
 
-    task1 = app.evaluate(**kw, vpath="irrelevant")
-    await asyncio.sleep(0)
-    assert ready.call_count == 1
+    app.start_coro(app.evaluate(**kw, vpath="irrelevant"))
+    await anyio.sleep(0.01)
+    assert ready.call_count == 2
     assert send.call_count == 1
 
     # Simulate relaying the message from the frontend to a kernel (this kernel).
     be_msg = json.loads(send.call_args[0][0]["ipylab"])
-    data = {
-        "ipylab_FE": str(uuid.uuid4()),
-        "operation": be_msg["operation"],
-        "payload": be_msg["kwgs"],
-    }
-    fe_msg = {"ipylab": json.dumps(data)}
-
-    # Simulate the message arriving in kernel and being processed
-    task2 = app._on_custom_msg(None, fe_msg, [])
-    assert isinstance(task2, asyncio.Task)
-    async with asyncio.timeout(1):
-        await task2
-    assert send.call_count == 2
-    be_msg2 = json.loads(send.call_args[0][0]["ipylab"])
-    assert be_msg2["ipylab_FE"] == data["ipylab_FE"]
-
+    assert list(be_msg) == ["ipylab_PY", "operation", "kwgs", "transform"]
+    result_ = await app._evaluate(be_msg["kwgs"], [])
     # Check expected result
-    assert be_msg2["payload"] == result
-
-    # Don't attempt to relay the result back
-    task1.cancel()
+    assert result_["payload"] == result
 
 
 loops = set()

@@ -12,15 +12,12 @@ from traitlets import Container, Instance, Unicode
 
 import ipylab
 from ipylab import Area, InsertMode, Ipylab, ShellConnection, Transform, pack
-from ipylab.common import Fixed, IpylabKwgs, Obj, Singular, TaskHookType
+from ipylab.common import Fixed, IpylabKwgs, Obj, Singular, TransformType
 from ipylab.ipylab import IpylabBase
 from ipylab.log_viewer import LogViewer
 
 if TYPE_CHECKING:
-    from asyncio import Task
     from typing import Literal
-
-    from ipylab.common import TaskHooks
 
 
 __all__ = ["Shell", "ConsoleConnection"]
@@ -42,7 +39,7 @@ class Shell(Singular, Ipylab):
     connections: Container[tuple[ShellConnection, ...]] = TypedTuple(trait=Instance(ShellConnection))
     console: Instance[ConsoleConnection | None] = Instance(ConsoleConnection, default_value=None, allow_none=True)  # type: ignore
 
-    def add(
+    async def add(
         self,
         obj: Widget | inspect._SourceObjectType,
         *,
@@ -53,9 +50,8 @@ class Shell(Singular, Ipylab):
         ref: ShellConnection | None = None,
         options: dict | None = None,
         vpath: str | dict[Literal["title"], str] = "",
-        hooks: TaskHookType = None,
         **args,
-    ) -> Task[ShellConnection]:
+    ) -> ShellConnection:
         """Add a widget to the shell.
 
         If the widget is already in the shell, it may be moved or activated.
@@ -101,7 +97,8 @@ class Shell(Singular, Ipylab):
         app.shell.add("ipylab.Panel([ipw.HTML('<h1>Test')])", vpath="test")
         ```
         """
-        hooks_: TaskHooks = {"add_to_tuple_fwd": [(self, "connections")]}
+        app = await self.app.ready()
+        vpath = vpath or app.vpath
         args["options"] = {
             "activate": activate,
             "mode": InsertMode(mode),
@@ -125,28 +122,27 @@ class Shell(Singular, Ipylab):
                     if c.widget is obj:
                         args["cid"] = c.cid
                         break
-            hooks_["trait_add_fwd"] = [("widget", obj)]
-            if isinstance(obj, ipylab.Panel):
-                hooks_["add_to_tuple_fwd"].append((obj, "connections"))
             args["ipy_model"] = obj.model_id
         else:
             args["evaluate"] = pack(obj)
+        if isinstance(obj, DOMWidget):
+            obj.add_class(app.selector.removeprefix("."))
+        if "evaluate" in args and isinstance(vpath, dict):
+            val = ipylab.plugin_manager.hook.vpath_getter(app=app, kwgs=vpath)
+            while inspect.isawaitable(val):
+                val = await val
+            vpath = val
+        args["vpath"] = vpath
 
-        async def add_to_shell() -> ShellConnection:
-            vpath_ = vpath or self.app.vpath
-            if isinstance(obj, DOMWidget):
-                obj.add_class(self.app.selector.removeprefix("."))
-            if "evaluate" in args and isinstance(vpath, dict):
-                result = ipylab.plugin_manager.hook.vpath_getter(app=self.app, kwgs=vpath)
-                while inspect.isawaitable(result):
-                    result = await result
-                vpath_ = result
-            args["vpath"] = vpath_
-            if vpath_ != self.app.vpath:
-                hooks_["trait_add_fwd"] = [("auto_dispose", False)]
-            return await self.operation("addToShell", {"args": args}, transform=Transform.connection, hooks=hooks_)
-
-        return self.to_task(add_to_shell(), "Add to shell", hooks=hooks)
+        sc: ShellConnection = await self.operation("addToShell", {"args": args}, transform=Transform.connection)
+        sc.add_to_tuple(self, "connections")
+        if vpath != app.vpath:
+            sc.auto_dispose = False
+        if isinstance(obj, Widget):
+            sc.widget = obj
+            if isinstance(obj, ipylab.Panel):
+                sc.add_to_tuple(obj, "connections")
+        return sc
 
     def add_objects_to_ipython_namespace(self, objects: dict, *, reset=False):
         "Load objects into the IPython/console namespace."
@@ -155,7 +151,7 @@ class Shell(Singular, Ipylab):
                 self.comm.kernel.shell.reset()  # type: ignore
             self.comm.kernel.shell.push(objects)  # type: ignore
 
-    def open_console(
+    async def open_console(
         self,
         *,
         mode=InsertMode.split_bottom,
@@ -163,8 +159,7 @@ class Shell(Singular, Ipylab):
         ref: ShellConnection | str = "",
         objects: dict | None = None,
         reset_shell=False,
-        hooks: TaskHookType = None,
-    ) -> Task[ConsoleConnection]:
+    ) -> ConsoleConnection:
         """Open/activate a Jupyterlab console for this python kernel shell (path=app.vpath).
 
         Parameters
@@ -177,49 +172,37 @@ class Shell(Singular, Ipylab):
         reset_shell:
             Set true to reset the shell (clear the namespace).
         """
+        await self.ready()
+        app = await self.app.ready()
+        ref_ = ref or self.current_widget_id
+        if not isinstance(ref_, ShellConnection):
+            ref_ = await self.connect_to_widget(ref_)
+        objects_ = {"ref": ref_} | (objects or {})
+        args = {"path": app.vpath, "insertMode": InsertMode(mode), "activate": activate, "ref": f"{pack(ref_)}.id"}
+        tf: TransformType = {"transform": Transform.connection, "cid": ConsoleConnection.to_cid(app.vpath)}
+        cc: ConsoleConnection = await app.commands.execute("console:open", args, toObject=["args[ref]"], transform=tf)
+        self.console = cc
+        cc.add_to_tuple(self, "connections")
+        self.add_objects_to_ipython_namespace(objects_, reset=reset_shell)
+        return cc
 
-        async def open_console():
-            ref_ = ref or self.current_widget_id
-            if not isinstance(ref_, ShellConnection):
-                ref_ = await self.connect_to_widget(ref_)
-            objects_ = {"ref": ref_} | (objects or {})
-            vpath = self.app.vpath
-            args = {
-                "path": vpath,
-                "insertMode": InsertMode(mode),
-                "activate": activate,
-                "ref": f"{pack(ref_)}.id",
-            }
-            kwgs = IpylabKwgs(
-                transform={"transform": Transform.connection, "cid": ConsoleConnection.to_cid(vpath)},
-                toObject=["args[ref]"],
-                hooks={
-                    "trait_add_rev": [(self, "console")],
-                    "add_to_tuple_fwd": [(self, "connections")],
-                    "callbacks": [lambda _: self.add_objects_to_ipython_namespace(objects_, reset=reset_shell)],
-                },
-            )
-            return await self.app.commands.execute("console:open", args, **kwgs)
+    async def expand_left(self):
+        await self.execute_method("expandLeft")
 
-        return self.to_task(open_console(), "Open console", hooks=hooks)
+    async def expand_right(self):
+        await self.execute_method("expandRight")
 
-    def expand_left(self):
-        return self.execute_method("expandLeft")
+    async def collapse_left(self):
+        await self.execute_method("collapseLeft")
 
-    def expand_right(self):
-        return self.execute_method("expandRight")
+    async def collapse_right(self):
+        await self.execute_method("collapseRight")
 
-    def collapse_left(self):
-        return self.execute_method("collapseLeft")
-
-    def collapse_right(self):
-        return self.execute_method("collapseRight")
-
-    def connect_to_widget(self, widget_id="", **kwgs: Unpack[IpylabKwgs]) -> Task[ShellConnection]:
+    async def connect_to_widget(self, widget_id="", **kwgs: Unpack[IpylabKwgs]) -> ShellConnection:
         "Make a connection to a widget in the shell (see also `get_widget_ids`)."
         kwgs["transform"] = Transform.connection
-        return self.operation("getWidget", {"id": widget_id}, **kwgs)
+        return await self.operation("getWidget", {"id": widget_id}, **kwgs)
 
-    def list_widget_ids(self, **kwgs: Unpack[IpylabKwgs]) -> Task[dict[Area, list[str]]]:
+    async def list_widget_ids(self, **kwgs: Unpack[IpylabKwgs]) -> dict[Area, list[str]]:
         "Get a mapping of Areas to a list of widget ids in that area in the shell."
-        return self.operation("getWidgetIds", **kwgs)
+        return await self.operation("getWidgetIds", **kwgs)

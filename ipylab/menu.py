@@ -14,11 +14,9 @@ from ipylab.connection import InfoConnection
 from ipylab.ipylab import Ipylab, IpylabBase, Transform
 
 if TYPE_CHECKING:
-    from asyncio import Task
     from typing import Literal
 
     from ipylab.commands import CommandConnection
-    from ipylab.common import TaskHooks, TransformType
 
 
 __all__ = ["MenuItemConnection", "MenuConnection", "MainMenu", "ContextMenu"]
@@ -38,7 +36,7 @@ class RankedMenu(Ipylab):
 
     connections: Container[tuple[MenuItemConnection, ...]] = TypedTuple(trait=Instance(MenuItemConnection))
 
-    def add_item(
+    async def add_item(
         self,
         *,
         command: str | CommandConnection = "",
@@ -46,15 +44,15 @@ class RankedMenu(Ipylab):
         rank: float | None = None,
         type: Literal["command", "submenu", "separator"] = "command",  # noqa: A002
         args: dict | None = None,
-    ) -> Task[MenuItemConnection]:
+    ) -> MenuItemConnection:
         """Add command, subitem or separator.
         **args are 'defaults' used with command only.
 
         ref: https://jupyterlab.readthedocs.io/en/4.0.x/api/classes/ui_components.RankedMenu.html#addItem.addItem-1
         """
-        return self._add_item(command, submenu, rank, type, args)
+        return await self._add_item(command, submenu, rank, type, args)
 
-    def _add_item(
+    async def _add_item(
         self,
         command: str | CommandConnection,
         submenu: MenuConnection | None,
@@ -85,27 +83,29 @@ class RankedMenu(Ipylab):
             case _:
                 msg = f"Invalid type {type}"
                 raise ValueError(msg)
-        hooks: TaskHooks = {
-            "trait_add_fwd": [("info", info), ("menu", self)],
-            "close_with_fwd": [self],
-            "add_to_tuple_fwd": [(self, "connections")],
-        }
-        transform: TransformType = {"transform": Transform.connection, "cid": MenuItemConnection.to_cid()}
-        return self.execute_method("addItem", info, hooks=hooks, transform=transform, toObject=to_object)
 
-    def activate(self):
-        async def activate():
-            await self.app.main_menu.set_property("activeMenu", self, toObject=["value"])
-            await self.app.main_menu.execute_method("openActiveMenu")
+        mic: MenuItemConnection = await self.execute_method(
+            subpath="addItem",
+            args=(info,),
+            transform={"transform": Transform.connection, "cid": MenuItemConnection.to_cid()},
+            toObject=to_object,
+        )
+        self.close_with_self(mic)
+        mic.info = info
+        mic.menu = self
+        mic.add_to_tuple(self, "connections")
+        return mic
 
-        return self.to_task(activate())
+    async def activate(self):
+        await self.app.main_menu.set_property("activeMenu", self, toObject=["value"])
+        await self.app.main_menu.execute_method("openActiveMenu")
 
 
 class BuiltinMenu(RankedMenu):
     @override
-    def activate(self):
+    async def activate(self):
         name = self.ipylab_base[-1].removeprefix("mainMenu.").lower()
-        return self.app.commands.execute(f"{name}:open")
+        await self.app.commands.execute(f"{name}:open")
 
 
 class MenuConnection(InfoConnection, RankedMenu):
@@ -130,7 +130,7 @@ class Menu(Singular, RankedMenu):
     def __init__(self, *, commands: CommandRegistry, **kwgs):
         if self._ipylab_init_complete:
             return
-        commands.close_extras.add(self)
+        commands.close_with_self(self)
         super().__init__(commands=commands, **kwgs)
 
 
@@ -175,13 +175,13 @@ class MainMenu(Menu):
     def __init__(self):
         super().__init__(commands=CommandRegistry(name=APP_COMMANDS_NAME))
 
-    def add_menu(self, menu: MenuConnection, *, update=True, rank: int = 500) -> Task[None]:
+    async def add_menu(self, menu: MenuConnection, *, update=True, rank: int = 500) -> None:
         """Add a top level menu to the shell.
 
         ref: https://jupyterlab.readthedocs.io/en/4.0.x/api/classes/mainmenu.MainMenu.html#addMenu
         """
         options = {"rank": rank}
-        return self.execute_method("addMenu", menu, update, options, toObject=["args[0]"])
+        return await self.execute_method("addMenu", (menu, update, options), toObject=["args[0]"])
 
     @override
     def activate(self):  # type: ignore
@@ -194,7 +194,7 @@ class ContextMenu(Menu):
     ipylab_base = IpylabBase(Obj.IpylabModel, "app.contextMenu").tag(sync=True)
 
     @override
-    def add_item(
+    async def add_item(  # type: ignore
         self,
         *,
         command: str | CommandConnection = "",
@@ -203,17 +203,14 @@ class ContextMenu(Menu):
         rank: float | None = None,
         type: Literal["command", "submenu", "separator"] = "command",
         args: dict | None = None,
-    ) -> Task[MenuItemConnection]:
+    ) -> MenuItemConnection:
         """Add command, subitem or separator.
         args are used when calling the command only.
 
         ref: https://jupyterlab.readthedocs.io/en/stable/extension/extension_points.html#context-menu
         """
-
-        async def add_item_():
-            return await self._add_item(command, submenu, rank, type, args, selector or self.app.selector)
-
-        return self.to_task(add_item_())
+        app = await self.app.ready()
+        return await self._add_item(command, submenu, rank, type, args, selector or app.selector)
 
     @override
     def activate(self):  # type: ignore
