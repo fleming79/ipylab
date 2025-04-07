@@ -4,11 +4,12 @@
 from __future__ import annotations
 
 import collections
-from typing import TYPE_CHECKING, Self, override
+from typing import TYPE_CHECKING, Self
 
 from IPython.display import Markdown
 from ipywidgets import HTML, BoundedIntText, Button, Checkbox, Combobox, Dropdown, HBox, Select, VBox
 from traitlets import directional_link, link, observe
+from typing_extensions import override
 
 import ipylab
 from ipylab.common import SVGSTR_TEST_TUBE, Area, Fixed, InsertMode, autorun

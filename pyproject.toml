@@ -10,7 +10,7 @@ build-backend = "hatchling.build"
 name = "ipylab"
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 classifiers = [
   "Framework :: Jupyter",
   "Framework :: Jupyter :: JupyterLab",
@@ -20,6 +20,7 @@ classifiers = [
   "License :: OSI Approved :: BSD License",
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
 ]
@@ -31,6 +32,7 @@ dependencies = [
   "ipython>=8.32",
   "jupyterlab_widgets>=3.0.11",
   "pluggy~=1.5",
+  "typing_extensions",
   "traitlets @ {root:uri}/pkg/traitlets-5.14.3-py3-none-any.whl",
   "ipykernel @ {root:uri}/pkg/ipykernel-7.0.0a1-py3-none-any.whl",
   "widgetsnbextension @ {root:uri}/pkg/widgetsnbextension-4.0.13-py3-none-any.whl",
@@ -44,7 +46,7 @@ dev = ["hatch", "ruff", "pre-commit"]
 test = ["pytest", "anyio", "pytest-cov", "pytest-mock"]
 
 [project.scripts]
-ipylab = "ipylab:plugin_manager.hook.launch_jupyterlab"
+ipylab = "ipylab:plugin_manager.hook.launch_ipylab"
 
 [tool.hatch.version]
 source = "nodejs"

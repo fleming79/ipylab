@@ -113,7 +113,7 @@ jupyter lab
 
 ```bash
 # create a new conda environment
-mamba create -n ipylab -c conda-forge nodejs python=3.12 -y
+conda create -n ipylab -c conda-forge nodejs python=3.11 -y
 
 # activate the environment
 conda activate ipylab

@@ -5,11 +5,12 @@ from __future__ import annotations
 
 import inspect
 from enum import StrEnum
-from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict, override
+from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict
 
 import traitlets
 from ipywidgets import TypedTuple, register
 from traitlets import Container, Instance, Unicode
+from typing_extensions import override
 
 from ipylab import Transform, pack
 from ipylab.common import Obj, Singular, TransformType

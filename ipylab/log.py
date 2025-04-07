@@ -6,10 +6,11 @@ from __future__ import annotations
 import logging
 import weakref
 from enum import IntEnum, StrEnum
-from typing import TYPE_CHECKING, Any, ClassVar, override
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from IPython.core.ultratb import FormattedTB
 from ipywidgets import CallbackDispatcher
+from typing_extensions import override
 
 import ipylab
 from ipylab.common import Fixed

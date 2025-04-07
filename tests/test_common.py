@@ -3,10 +3,11 @@
 
 from __future__ import annotations
 
-from typing import Self, override
+from typing import Self
 
 import pytest
 from traitlets import Unicode
+from typing_extensions import override
 
 import ipylab
 from ipylab.common import (

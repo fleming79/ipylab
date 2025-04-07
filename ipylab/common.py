@@ -25,13 +25,13 @@ from typing import (
     TypeVarTuple,
     final,
     overload,
-    override,
 )
 
 import pluggy
 from ipywidgets import Widget, widget_serialization
 from traitlets import Any as AnyTrait
 from traitlets import Bool, HasTraits
+from typing_extensions import override
 
 import ipylab
 

@@ -7,10 +7,11 @@ import asyncio
 import contextlib
 import functools
 import inspect
-from typing import TYPE_CHECKING, Any, Self, Unpack, final, override
+from typing import TYPE_CHECKING, Any, Self, Unpack, final
 
 from ipywidgets import Widget, register
 from traitlets import Bool, Container, Dict, Instance, Unicode, UseEnum, default, observe
+from typing_extensions import override
 
 import ipylab
 from ipylab import Ipylab

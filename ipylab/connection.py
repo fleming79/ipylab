@@ -4,10 +4,11 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, ClassVar, override
+from typing import TYPE_CHECKING, ClassVar
 
 from ipywidgets import Widget, register
 from traitlets import Bool, Dict, Instance, Unicode
+from typing_extensions import override
 
 from ipylab.common import Singular
 from ipylab.ipylab import Ipylab

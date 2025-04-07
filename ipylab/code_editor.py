@@ -6,7 +6,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import typing
-from typing import TYPE_CHECKING, Any, NotRequired, Self, TypedDict, override
+from typing import TYPE_CHECKING, Any, NotRequired, Self, TypedDict
 
 from IPython.core import completer as IPC  # noqa: N812
 from IPython.utils.tokenutil import token_at_cursor
@@ -15,6 +15,7 @@ from ipywidgets.widgets.trait_types import InstanceDict
 from ipywidgets.widgets.widget_description import DescriptionStyle
 from ipywidgets.widgets.widget_string import _String
 from traitlets import Callable, Container, Dict, Instance, Int, Unicode, default, observe
+from typing_extensions import override
 
 import ipylab
 from ipylab.common import Fixed, LastUpdatedDict

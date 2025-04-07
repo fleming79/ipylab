@@ -3,10 +3,11 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Self, override
+from typing import TYPE_CHECKING, Self
 
 from ipywidgets import TypedTuple
 from traitlets import Container, Instance, Union
+from typing_extensions import override
 
 from ipylab.commands import APP_COMMANDS_NAME, CommandRegistry
 from ipylab.common import Fixed, Obj, Singular
