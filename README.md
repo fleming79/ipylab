@@ -119,7 +119,7 @@ conda create -n ipylab -c conda-forge nodejs python=3.11 -y
 conda activate ipylab
 
 # install the Python package
-pip install -e .[dev,test]
+pip install -e .[dev,test,examples]
 
 # link the extension files
 jupyter labextension develop . --overwrite
