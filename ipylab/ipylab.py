@@ -409,19 +409,91 @@ class Ipylab(WidgetBase):
         return cast(Any, result)
 
     async def execute_method(self, subpath: str, args: tuple = (), obj=Obj.base, **kwargs: Unpack[IpylabKwgs]) -> Any:
+        """Execute a method on a remote object in the frontend.
+
+        Parameters
+        ----------
+        subpath : str
+            The path to the method to execute, relative to the object.
+        args : tuple, optional
+            The positional arguments to pass to the method, by default ().
+        obj : Obj, optional
+            The object on which to execute the method, by default Obj.base.
+        **kwargs : Unpack[IpylabKwgs]
+            The keyword arguments to pass to the method.
+
+        Returns
+        -------
+        Any
+            The result of the method call.
+        """
         return await self._obj_operation(obj, subpath, "executeMethod", {"args": args}, kwargs)
 
     async def get_property(self, subpath: str, *, obj=Obj.base, null_if_missing=False, **kwargs: Unpack[IpylabKwgs]):
+        """Get a property from an object in the frontend.
+
+        Parameters
+        ----------
+        subpath: str
+            The path to the property to get, e.g. "foo.bar".
+        obj: Obj
+            The object to get the property from.
+        null_if_missing: bool
+            If True, return None if the property is missing.
+        **kwargs: Unpack[IpylabKwgs]
+            Keyword arguments to pass to the Javascript function.
+
+        Returns
+        -------
+        Any
+            The value of the property.
+        """
         return self._obj_operation(obj, subpath, "getProperty", {"null_if_missing": null_if_missing}, kwargs)
 
-    async def set_property(self, subpath: str, value, *, obj=Obj.base, **kwargs: Unpack[IpylabKwgs]):
+    async def set_property(self, subpath: str, value, *, obj=Obj.base, **kwargs: Unpack[IpylabKwgs]) -> None:
+        """Set a property of an object in the frontend.
+
+        Args:
+            subpath: The path to the property to set.
+            value: The value to set the property to.
+            obj: The JavaScript object to set the property on. Defaults to Obj.base.
+            **kwargs: Keyword arguments to pass to the JavaScript function.
+
+        Returns:
+            None
+        """
         return await self._obj_operation(obj, subpath, "setProperty", {"value": value}, kwargs)
 
-    async def update_property(self, subpath: str, value: dict[str, Any], *, obj=Obj.base, **kwargs: Unpack[IpylabKwgs]):
+    async def update_property(
+        self, subpath: str, value: dict[str, Any], *, obj=Obj.base, **kwargs: Unpack[IpylabKwgs]
+    ) -> dict[str, Any]:
+        """Update a property of an object in the frontend equivalent to a `dict.update` call.
+
+        Args:
+            subpath: The path to the property to update.
+            value: A mapping of the items to override (existing non-mapped values remain).
+            obj: The object to update. Defaults to Obj.base.
+            **kwargs: Keyword arguments to pass to the _obj_operation method.
+
+        Returns:
+            The updated property.
+        """
         return await self._obj_operation(obj, subpath, "updateProperty", {"value": value}, kwargs)
 
     async def list_properties(
         self, subpath="", *, obj=Obj.base, depth=3, skip_hidden=True, **kwargs: Unpack[IpylabKwgs]
-    ) -> dict:
+    ) -> dict[str, Any]:
+        """List properties of a given object in the frontend.
+
+        Args:
+            subpath (str, optional): Subpath to the object. Defaults to "".
+            obj (Obj, optional): Object to list properties from. Defaults to Obj.base.
+            depth (int, optional): Depth of the listing. Defaults to 3.
+            skip_hidden (bool, optional): Whether to skip hidden properties. Defaults to True.
+            **kwargs (Unpack[IpylabKwgs]): Additional keyword arguments.
+
+        Returns:
+            dict[str, Any]: Dictionary of properties.
+        """
         kwgs = {"depth": depth, "omitHidden": skip_hidden}
         return await self._obj_operation(obj, subpath, "listProperties", kwgs, kwargs)
