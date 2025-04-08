@@ -12,15 +12,14 @@ from traitlets import directional_link, link, observe
 from typing_extensions import override
 
 import ipylab
-from ipylab.common import SVGSTR_TEST_TUBE, Area, Fixed, InsertMode, autorun
+from ipylab.common import SVGSTR_TEST_TUBE, Fixed, InsertMode, autorun
 from ipylab.log import LogLevel
 from ipylab.simple_output import AutoScroll, SimpleOutput
-from ipylab.widgets import Icon, Panel
+from ipylab.widgets import AddToShellType, Icon, Panel
 
 if TYPE_CHECKING:
     import logging
 
-    from ipylab.connection import ShellConnection
 
 __all__ = ["LogViewer"]
 
@@ -30,7 +29,8 @@ class LogViewer(Panel):
 
     _updating = False
     info = Fixed(lambda _: HTML(layout={"flex": "1 0 auto", "margin": "0px 20px 0px 20px"}))
-    app = Fixed[Self, "ipylab.App"](lambda _: ipylab.App())
+    add_to_shell_defaults = AddToShellType(mode=InsertMode.split_bottom)
+
     log_level = Fixed[Self, Dropdown](
         lambda _: Dropdown(
             description="Level",
@@ -167,7 +167,7 @@ class LogViewer(Panel):
 
     @autorun
     async def _show_error(self, record: logging.LogRecord):
-        out = SimpleOutput().push(Markdown(f"**record.levelname.capitalize():\n\n{record.message}"))
+        out = SimpleOutput().push(Markdown(f"**{record.levelname.capitalize()}**:\n\n{record.message}"))
         try:
             out.push(record.output)  # type: ignore
         except Exception:
@@ -226,18 +226,3 @@ class LogViewer(Panel):
             b.disabled = False
             for w in [search, body, select]:
                 w.close()
-
-    async def add_to_shell(
-        self,
-        *,
-        area=Area.main,
-        activate: bool = True,
-        mode=InsertMode.split_bottom,
-        rank: int | None = None,
-        ref: ipylab.ShellConnection | None = None,
-        options: dict | None = None,
-        **kwgs,
-    ) -> ShellConnection:
-        return await super().add_to_shell(
-            area=area, activate=activate, mode=mode, rank=rank, ref=ref, options=options, **kwgs
-        )

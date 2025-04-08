@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from typing import ClassVar, NotRequired, TypedDict, Unpack
+
 import anyio
 from ipywidgets import Box, DOMWidget, Layout, TypedTuple, Widget, register, widget_serialization
 from ipywidgets.widgets.trait_types import InstanceDict
@@ -13,6 +15,15 @@ import ipylab._frontend as _fe
 from ipylab.common import Area, Fixed, InsertMode, autorun
 from ipylab.connection import ShellConnection
 from ipylab.ipylab import WidgetBase
+
+
+class AddToShellType(TypedDict):
+    area: NotRequired[Area]
+    activate: NotRequired[bool]
+    mode: NotRequired[InsertMode]
+    rank: NotRequired[int | None]
+    ref: NotRequired[ShellConnection | None]
+    options: NotRequired[dict | None]
 
 
 @register
@@ -50,22 +61,11 @@ class Panel(Box):
 
     app = Fixed(lambda _: ipylab.App())
     connections: Container[tuple[ShellConnection, ...]] = TypedTuple(trait=Instance(ShellConnection))
+    add_to_shell_defaults: ClassVar = AddToShellType(mode=InsertMode.tab_after)
 
-    async def add_to_shell(
-        self,
-        *,
-        area: Area = Area.main,
-        activate: bool = True,
-        mode: InsertMode = InsertMode.tab_after,
-        rank: int | None = None,
-        ref: ShellConnection | None = None,
-        options: dict | None = None,
-        **kwgs,
-    ) -> ShellConnection:
+    async def add_to_shell(self, **kwgs: Unpack[AddToShellType]) -> ShellConnection:
         """Add this panel to the shell."""
-        return await self.app.shell.add(
-            self, area=area, mode=mode, activate=activate, rank=rank, ref=ref, options=options, **kwgs
-        )
+        return await self.app.shell.add(self, **self.add_to_shell_defaults | kwgs)
 
 
 @register
