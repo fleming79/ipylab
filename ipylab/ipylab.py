@@ -137,9 +137,7 @@ class Ipylab(WidgetBase):
             self._ready_event.set()
             self._ready_event = Event()
             for cb in self._on_ready_callbacks:
-                result = cb(self)
-                if inspect.iscoroutine(result):
-                    self.start_coro(result)
+                self._call_ready_callback(cb)
 
     def close(self):
         if self.comm:
@@ -233,6 +231,11 @@ class Ipylab(WidgetBase):
         # Overload as required
         raise NotImplementedError(operation)
 
+    def _call_ready_callback(self, callback: Callable[[Self], None | CoroutineType]):
+        result = callback(self)
+        if inspect.iscoroutine(result):
+            self.start_coro(result)
+
     async def ready(self) -> Self:
         """Wait for the instance to be ready.
 
@@ -244,8 +247,16 @@ class Ipylab(WidgetBase):
             await self._ready_event.wait()
         return self
 
-    def on_ready(self, callback, remove=False):  # noqa: FBT002
-        """Register a callback to execute when the application is ready.
+    def on_ready(self, callback: Callable[[Self], None | CoroutineType], remove=False):  # noqa: FBT002
+        """Register a historic callback to execute when the frontend indicates
+        it is ready.
+
+        `historic` meaning that the callback will be called immediately if the
+        instance is already ready.
+
+        It will be called when the instance is first created, and subsequently
+        when the fronted is reloaded, such as when the page is refreshed or the
+        workspace is reloaded.
 
         The callback will be executed only once.
 
@@ -257,8 +268,10 @@ class Ipylab(WidgetBase):
             If True, remove the callback from the list of callbacks.
             By default, False.
         """
-        if not remove:
+        if not remove and callback not in self._on_ready_callbacks:
             self._on_ready_callbacks.append(callback)
+            if self._ready:
+                self._call_ready_callback(callback)
         elif callback in self._on_ready_callbacks:
             self._on_ready_callbacks.remove(callback)
 

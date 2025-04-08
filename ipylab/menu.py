@@ -125,7 +125,7 @@ class Menu(Singular, RankedMenu):
 
     @classmethod
     @override
-    def get_single_key(cls, commands: str, **kwgs):
+    def get_single_key(cls, commands: CommandRegistry, **kwgs):
         return commands
 
     def __init__(self, *, commands: CommandRegistry, **kwgs):
@@ -185,7 +185,7 @@ class MainMenu(Menu):
         return await self.execute_method("addMenu", (menu, update, options), toObject=["args[0]"])
 
     @override
-    def activate(self):  # type: ignore
+    async def activate(self):
         "Does nothing. Instead you should activate a submenu."
 
 
@@ -214,5 +214,5 @@ class ContextMenu(Menu):
         return await self._add_item(command, submenu, rank, type, args, selector or app.selector)
 
     @override
-    def activate(self):  # type: ignore
+    async def activate(self):
         "Does nothing for a context menu"
