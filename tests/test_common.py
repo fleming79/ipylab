@@ -10,6 +10,7 @@ from traitlets import Unicode
 from typing_extensions import override
 
 import ipylab
+import ipylab.common
 from ipylab.common import (
     Fixed,
     FixedCreated,
@@ -261,3 +262,8 @@ class TestFixed:
         owner = TestOwner()
         with pytest.raises(AttributeError, match="Setting `Fixed` parameter TestOwner.test_instance is forbidden!"):
             owner.test_instance = CommonTestClass()
+
+    def test_function_to_eval(self):
+        eval_str = ipylab.common.module_obj_to_import_string(test_last_updated_dict)
+        obj = eval(eval_str, {"import_item": ipylab.common.import_item})  # noqa: S307
+        assert obj is test_last_updated_dict

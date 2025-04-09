@@ -211,14 +211,17 @@ class App(Singular, Ipylab):
             ns = self.get_namespace(namespace_id, buffers=buffers)
             for row in evaluate:
                 name, expression = ("payload", row) if isinstance(row, str) else row
-                try:
-                    source = compile(expression, "-- Evaluate --", "eval")
-                except SyntaxError:
-                    source = compile(expression, "-- Expression --", "exec")
-                    exec(source, ns)  # noqa: S102
-                    result = next(reversed(ns.values()))  # Requires: LastUpdatedDict
+                if expression.startswith("import_item(dottedname="):
+                    result = eval(expression, {"import_item": ipylab.common.import_item})  # noqa: S307
                 else:
-                    result = eval(source, ns)  # noqa: S307
+                    try:
+                        source = compile(expression, "-- Evaluate --", "eval")
+                    except SyntaxError:
+                        source = compile(expression, "-- Expression --", "exec")
+                        exec(source, ns)  # noqa: S102
+                        result = next(reversed(ns.values()))  # Requires: LastUpdatedDict
+                    else:
+                        result = eval(source, ns)  # noqa: S307
                 if not name:
                     continue
                 while callable(result) or inspect.isawaitable(result):

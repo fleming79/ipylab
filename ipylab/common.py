@@ -3,8 +3,10 @@
 
 from __future__ import annotations
 
+import contextlib
 import importlib
 import inspect
+import textwrap
 import typing
 import weakref
 from collections import OrderedDict
@@ -136,7 +138,9 @@ def pack(obj):
     if isinstance(obj, Widget):
         return widget_serialization["to_json"](obj, None)
     if inspect.isfunction(obj) or inspect.ismodule(obj):
-        return inspect.getsource(obj)
+        with contextlib.suppress(BaseException):
+            return module_obj_to_import_string(obj)
+        return textwrap.dedent(inspect.getsource(obj))
     return obj
 
 
@@ -158,6 +162,35 @@ def import_item(dottedname: str):
     """
     modulename, objname = dottedname.rsplit(".", maxsplit=1)
     return getattr(importlib.import_module(modulename), objname)
+
+
+def module_obj_to_import_string(obj):
+    """Convert a module object to an import string compatible with `app.evaluate`.
+
+    Parameters
+    ----------
+    obj : object
+        The module object to convert.
+
+    Returns
+    -------
+    str
+        The import string for the module object.
+
+    Raises
+    ------
+    TypeError
+        If the module object cannot be imported correctly.
+    """
+    dottedname = f"{obj.__module__}.{obj.__qualname__}"
+    if dottedname.startswith("__main__"):
+        msg = f"{obj=} is not in a module"
+        raise TypeError(msg)
+    item = import_item(dottedname)
+    if item is not obj:
+        msg = "Failed to import item correctly"
+        raise TypeError(msg)
+    return f"import_item({dottedname=})"
 
 
 class Obj(StrEnum):
