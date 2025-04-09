@@ -76,7 +76,6 @@ class SplitPanel(Panel):
     layout = InstanceDict(Layout, kw={"width": "100%", "height": "100%", "overflow": "hidden"}).tag(
         sync=True, **widget_serialization
     )
-    _force_update_in_progress = False
 
     # ============== Start temp fix =============
     # Below here is added as a temporary fix to address issue https://github.com/jtpio/ipylab/issues/129

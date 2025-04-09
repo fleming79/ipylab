@@ -12,4 +12,4 @@ module_name = "ipylab"
 path = pathlib.Path(__file__).parent.joinpath("labextension", "package.json")
 with path.open("rb") as f:
     data = json.load(f)
-module_version = data["version"]
+module_version: str = data["version"]
