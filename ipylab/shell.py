@@ -64,6 +64,7 @@ class Shell(Singular, Ipylab):
         obj:
             When `obj` is NOT a Widget it is assumed `obj` should be evaluated
             in a python kernel.
+            specify additional keyword arguments directly in **args
         area: Area
             The area in the shell where to put obj.
         activate: bool

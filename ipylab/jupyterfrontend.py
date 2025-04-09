@@ -212,10 +212,13 @@ class App(Singular, Ipylab):
             for row in evaluate:
                 name, expression = ("payload", row) if isinstance(row, str) else row
                 try:
-                    result = eval(expression, ns)  # noqa: S307
+                    source = compile(expression, "-- Evaluate --", "eval")
                 except SyntaxError:
-                    exec(expression, ns)  # noqa: S102
+                    source = compile(expression, "-- Expression --", "exec")
+                    exec(source, ns)  # noqa: S102
                     result = next(reversed(ns.values()))  # Requires: LastUpdatedDict
+                else:
+                    result = eval(source, ns)  # noqa: S307
                 if not name:
                     continue
                 while callable(result) or inspect.isawaitable(result):
@@ -228,7 +231,8 @@ class App(Singular, Ipylab):
                                 kwgs[p] = ns[p]
                         # We use a partial so that we can evaluate with the same namespace.
                         ns["_partial_call"] = functools.partial(result, **kwgs)
-                        result = eval("_partial_call()", ns)  # type: ignore # noqa: S307
+                        source = compile("_partial_call()", "-- Result call --", "eval")
+                        result = eval(source, ns)  # type: ignore # noqa: S307
                         ns.pop("_partial_call")
                     if inspect.isawaitable(result):
                         result = await result
