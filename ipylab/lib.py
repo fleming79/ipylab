@@ -9,6 +9,7 @@ import ipywidgets
 
 import ipylab
 from ipylab.common import hookimpl
+from ipylab.log import IpylabLogFormatter, IpylabLogHandler
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable
@@ -62,3 +63,11 @@ def get_asyncio_event_loop(app: ipylab.App):
         import asyncio
 
         return asyncio.get_running_loop()
+
+
+@hookimpl
+def get_logging_handler(app: ipylab.App) -> IpylabLogHandler:
+    fmt = "%(color)s%(level_symbol)s %(asctime)s.%(msecs)d %(name)s %(owner_rep)s: %(message)s %(reset)s\n"
+    handler = IpylabLogHandler(app.log_level)
+    handler.setFormatter(IpylabLogFormatter(fmt=fmt, style="%", datefmt="%H:%M:%S"))
+    return handler

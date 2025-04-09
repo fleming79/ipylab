@@ -141,12 +141,12 @@ class LogViewer(Panel):
     async def _notify_exception(self, record: logging.LogRecord):
         "Create a notification that an error occurred."
         await self.app.notification.notify(
-            message=f"Error: {record.msg}",
+            message=f"vpath:'{self.app.vpath}' Error: {record.msg}",
             type=ipylab.NotificationType.error,
             actions=[
                 ipylab.NotifyAction(
                     label="📄",
-                    caption="Show log viewer.",
+                    caption="Show exception.",
                     callback=lambda: self._show_error(record=record),
                     keep_open=True,
                 )
@@ -167,7 +167,9 @@ class LogViewer(Panel):
 
     @autorun
     async def _show_error(self, record: logging.LogRecord):
-        out = SimpleOutput().push(Markdown(f"**{record.levelname.capitalize()}**:\n\n{record.message}"))
+        out = SimpleOutput().push(
+            Markdown(f"vpath='{self.app.vpath}': **{record.levelname.capitalize()}**:\n\n{record.message}")
+        )
         try:
             out.push(record.output)  # type: ignore
         except Exception:

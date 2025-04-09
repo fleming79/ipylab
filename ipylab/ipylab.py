@@ -217,6 +217,7 @@ class Ipylab(WidgetBase):
         except asyncio.CancelledError:
             content["error"] = "Cancelled"
         except Exception as e:
+            content["error"] = f"{e.__class__.__name__}: {e}"
             self.log.exception("Frontend operation", obj={"operation": operation, "payload": payload}, exc_info=e)
         finally:
             self._ipylab_send(content, buffers)

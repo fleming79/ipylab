@@ -20,7 +20,7 @@ from ipylab.common import Fixed, IpylabKwgs, LastUpdatedDict, Obj, Singular, to_
 from ipylab.dialog import Dialog
 from ipylab.ipylab import IpylabBase
 from ipylab.launcher import Launcher
-from ipylab.log import IpylabLogFormatter, IpylabLogHandler, LogLevel
+from ipylab.log import IpylabLogHandler, LogLevel
 from ipylab.menu import ContextMenu, MainMenu
 from ipylab.notification import NotificationManager
 from ipylab.sessions import SessionManager
@@ -56,7 +56,10 @@ class App(Singular, Ipylab):
     context_menu: Fixed[Self, ContextMenu] = Fixed(lambda c: ContextMenu(commands=c["owner"].commands))
     sessions = Fixed(SessionManager)
 
-    logging_handler: Instance[IpylabLogHandler | None] = Instance(IpylabLogHandler, allow_none=True)  # type: ignore
+    logging_handler: Fixed[Self, IpylabLogHandler] = Fixed(
+        lambda c: ipylab.plugin_manager.hook.get_logging_handler(app=c["owner"]),
+        created=lambda c: c["owner"].shell.log_viewer,
+    )
     log_level = UseEnum(LogLevel, LogLevel.ERROR)
     asyncio_loop: Instance[asyncio.AbstractEventLoop | None] = Instance(asyncio.AbstractEventLoop, allow_none=True)  # type: ignore
 
@@ -66,13 +69,6 @@ class App(Singular, Ipylab):
     def close(self, *, force=False):
         if force:
             super().close()
-
-    @default("logging_handler")
-    def _default_logging_handler(self):
-        fmt = "%(color)s%(level_symbol)s %(asctime)s.%(msecs)d %(name)s %(owner_rep)s: %(message)s %(reset)s\n"
-        handler = IpylabLogHandler(self.log_level)
-        handler.setFormatter(IpylabLogFormatter(fmt=fmt, style="%", datefmt="%H:%M:%S"))
-        return handler
 
     @default("asyncio_loop")
     def _default_asyncio_loop(self):
@@ -207,44 +203,50 @@ class App(Singular, Ipylab):
 
         A call to this method should originate from a call to `evaluate` from
         app in another kernel. The call is sent as a message via the frontend."""
-        evaluate = options["evaluate"]
-        if isinstance(evaluate, str):
-            evaluate = (evaluate,)
-        namespace_id = options.get("namespace_id", "")
-        ns = self.get_namespace(namespace_id, buffers=buffers)
-        for row in evaluate:
-            name, expression = ("payload", row) if isinstance(row, str) else row
-            try:
-                result = eval(expression, ns)  # noqa: S307
-            except SyntaxError:
-                exec(expression, ns)  # noqa: S102
-                result = next(reversed(ns.values()))  # Requires: LastUpdatedDict
-            if not name:
-                continue
-            while callable(result) or inspect.isawaitable(result):
-                if callable(result):
-                    kwgs = {}
-                    for p in inspect.signature(result).parameters:
-                        if p in options:
-                            kwgs[p] = options[p]
-                        elif p in ns:
-                            kwgs[p] = ns[p]
-                    # We use a partial so that we can evaluate with the same namespace.
-                    ns["_partial_call"] = functools.partial(result, **kwgs)
-                    result = eval("_partial_call()", ns)  # type: ignore # noqa: S307
-                    ns.pop("_partial_call")
-                if inspect.isawaitable(result):
-                    result = await result
-            if name:
-                ns[name] = result
-        buffers = ns.pop("buffers", [])
-        payload = ns.pop("payload", None)
-        if payload is not None:
-            ns["_call_count"] = n = ns.get("_call_count", 0) + 1
-            ns[f"payload_{n}"] = payload
-        if namespace_id == "":
-            self.shell.add_objects_to_ipython_namespace(ns)
-        return {"payload": payload, "buffers": buffers}
+        try:
+            evaluate = options["evaluate"]
+            if isinstance(evaluate, str):
+                evaluate = (evaluate,)
+            namespace_id = options.get("namespace_id", "")
+            ns = self.get_namespace(namespace_id, buffers=buffers)
+            for row in evaluate:
+                name, expression = ("payload", row) if isinstance(row, str) else row
+                try:
+                    result = eval(expression, ns)  # noqa: S307
+                except SyntaxError:
+                    exec(expression, ns)  # noqa: S102
+                    result = next(reversed(ns.values()))  # Requires: LastUpdatedDict
+                if not name:
+                    continue
+                while callable(result) or inspect.isawaitable(result):
+                    if callable(result):
+                        kwgs = {}
+                        for p in inspect.signature(result).parameters:
+                            if p in options:
+                                kwgs[p] = options[p]
+                            elif p in ns:
+                                kwgs[p] = ns[p]
+                        # We use a partial so that we can evaluate with the same namespace.
+                        ns["_partial_call"] = functools.partial(result, **kwgs)
+                        result = eval("_partial_call()", ns)  # type: ignore # noqa: S307
+                        ns.pop("_partial_call")
+                    if inspect.isawaitable(result):
+                        result = await result
+                if name:
+                    ns[name] = result
+            buffers = ns.pop("buffers", [])
+            payload = ns.pop("payload", None)
+            if payload is not None:
+                ns["_call_count"] = n = ns.get("_call_count", 0) + 1
+                ns[f"payload_{n}"] = payload
+            if namespace_id == "":
+                self.shell.add_objects_to_ipython_namespace(ns)
+        except BaseException as e:
+            if isinstance(e, NameError):
+                e.add_note("Tip: Check for missing an imports?")
+            raise
+        else:
+            return {"payload": payload, "buffers": buffers}
 
     async def evaluate(
         self,

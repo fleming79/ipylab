@@ -10,9 +10,11 @@ import pluggy
 hookspec = pluggy.HookspecMarker("ipylab")
 
 if TYPE_CHECKING:
+    import asyncio
     from collections.abc import Awaitable
 
     import ipylab
+    from ipylab.log import IpylabLogHandler
 
 
 @hookspec(firstresult=True)
@@ -63,5 +65,10 @@ async def vpath_getter(app: ipylab.App, kwgs: dict) -> str:  # type: ignore
 
 
 @hookspec(firstresult=True)
-def get_asyncio_event_loop(app: ipylab.App) -> asyncio.AbstractEventLoop:  # type: ignore  # noqa: F821
+def get_asyncio_event_loop(app: ipylab.App) -> asyncio.AbstractEventLoop:  # type: ignore
+    "Get the asyncio event loop."
+
+
+@hookspec(firstresult=True)
+def get_logging_handler(app: ipylab.App) -> IpylabLogHandler:  # type: ignore
     "Get the asyncio event loop."
