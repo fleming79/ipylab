@@ -101,7 +101,7 @@ class Shell(Singular, Ipylab):
         app = await self.app.ready()
         vpath = vpath or app.vpath
         args["options"] = {
-            "activate": activate,
+            "activate": False,
             "mode": InsertMode(mode),
             "rank": int(rank) if rank else None,
             "ref": f"{pack(ref)}.id" if isinstance(ref, ShellConnection) else None,
@@ -143,6 +143,8 @@ class Shell(Singular, Ipylab):
             sc.widget = obj
             if isinstance(obj, ipylab.Panel):
                 sc.add_to_tuple(obj, "connections")
+        if activate:
+            await sc.activate()
         return sc
 
     def add_objects_to_ipython_namespace(self, objects: dict, *, reset=False):
