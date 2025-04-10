@@ -184,7 +184,7 @@ def module_obj_to_import_string(obj):
     """
     dottedname = f"{obj.__module__}.{obj.__qualname__}"
     if dottedname.startswith("__main__"):
-        msg = f"{obj=} is not in a module"
+        msg = f"{obj=} won't be importable from a new kernel"
         raise TypeError(msg)
     item = import_item(dottedname)
     if item is not obj:

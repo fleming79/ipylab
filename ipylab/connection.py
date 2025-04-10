@@ -10,7 +10,7 @@ from ipywidgets import Widget, register
 from traitlets import Bool, Dict, Instance, Unicode
 from typing_extensions import override
 
-from ipylab.common import Singular
+from ipylab.common import Area, Singular
 from ipylab.ipylab import Ipylab
 
 if TYPE_CHECKING:
@@ -152,6 +152,11 @@ class ShellConnection(Connection):
     async def activate(self):
         "Activate the connected widget in the shell."
 
+        ids = await self.app.shell.list_widget_ids()
+        if self.cid in ids[Area.left]:
+            await self.app.shell.expand_left()
+        elif self.cid in ids[Area.right]:
+            await self.app.shell.expand_right()
         return await self.operation("activate")
 
     async def get_session(self) -> dict:
