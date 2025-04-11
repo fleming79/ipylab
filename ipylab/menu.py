@@ -9,15 +9,13 @@ from ipywidgets import TypedTuple
 from traitlets import Container, Instance, Union
 from typing_extensions import override
 
-from ipylab.commands import APP_COMMANDS_NAME, CommandRegistry
+from ipylab.commands import APP_COMMANDS_NAME, CommandConnection, CommandRegistry
 from ipylab.common import Fixed, Obj, Singular
 from ipylab.connection import InfoConnection
 from ipylab.ipylab import Ipylab, IpylabBase, Transform
 
 if TYPE_CHECKING:
     from typing import Literal
-
-    from ipylab.commands import CommandConnection
 
 
 __all__ = ["MenuItemConnection", "MenuConnection", "MainMenu", "ContextMenu"]
@@ -92,6 +90,10 @@ class RankedMenu(Ipylab):
             toObject=to_object,
         )
         self.close_with_self(mic)
+        if isinstance(command, CommandConnection):
+            command.close_with_self(mic)
+        if submenu:
+            submenu.close_with_self(mic)
         mic.info = info
         mic.menu = self
         mic.add_to_tuple(self, "connections")
