@@ -98,8 +98,13 @@ class RankedMenu(Ipylab):
         return mic
 
     async def activate(self):
+        "Open this menu assuming it is in the main menu"
         await self.app.main_menu.set_property("activeMenu", self, toObject=["value"])
         await self.app.main_menu.execute_method("openActiveMenu")
+
+    async def open_somewhere(self):
+        "Open this menu somewhere"
+        await self.execute_method("open")
 
 
 class BuiltinMenu(RankedMenu):
