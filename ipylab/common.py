@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import importlib
 import inspect
@@ -12,6 +13,7 @@ import weakref
 from collections import OrderedDict
 from collections.abc import Callable
 from enum import StrEnum
+from types import CoroutineType
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -25,24 +27,27 @@ from typing import (
     TypedDict,
     TypeVar,
     TypeVarTuple,
+    Unpack,
     final,
     overload,
 )
 
+import anyio
 import pluggy
 from ipywidgets import Widget, widget_serialization
 from traitlets import Any as AnyTrait
-from traitlets import Bool, HasTraits
+from traitlets import Bool, HasTraits, Instance, default, observe
 from typing_extensions import override
 
 import ipylab
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Hashable
+    from collections.abc import Awaitable, Callable, Hashable
     from types import CoroutineType
     from typing import overload
 
     from ipylab.ipylab import Ipylab
+    from ipylab.log import IpylabLoggerAdapter
 
 __all__ = [
     "Area",
@@ -57,6 +62,7 @@ __all__ = [
     "Fixed",
     "FixedCreate",
     "FixedCreated",
+    "HasApp",
     "Singular",
 ]
 
@@ -373,80 +379,6 @@ class LastUpdatedDict(OrderedDict):
             self._updating = False
 
 
-class Singular(HasTraits):
-    """A base class that ensures only one instance of a class exists for each unique key.
-
-    This class uses a class-level dictionary `_single_instances` to store instances,
-    keyed by a value obtained from the `get_single_key` method.  Subsequent calls to
-    the constructor with the same key will return the existing instance. If key is
-    None, a new instance is always created and a reference is not kept to the object.
-
-    Attributes:
-        _limited_init_complete (bool): A flag to prevent multiple initializations.
-        _single_instances (dict[Hashable, Self]): A class-level dictionary storing the single instances.
-        _single_key (AnyTrait): A read-only trait storing the key for the instance.
-        closed (Bool): A read-only trait indicating whether the instance has been closed.
-
-    Methods:
-        get_single_key(*args, **kwgs) -> Hashable:
-            A class method that returns the key used to identify the single instance.
-            Defaults to returning the class itself.  Subclasses should override this
-            method to provide a key based on the constructor arguments.
-
-        __new__(cls, /, *args, **kwgs) -> Self:
-            Overrides the default `__new__` method to implement the singleton behavior.
-            It retrieves the key using `get_single_key`, and either returns an existing
-            instance from `_single_instances` or creates a new instance and stores it.
-
-        __init__(self, /, *args, **kwgs):
-            Overrides the default `__init__` method to prevent multiple initializations
-            of the same instance.  It only calls the superclass's `__init__` method once.
-
-        __init_subclass__(cls) -> None:
-            Overrides the default `__init_subclass__` method to reset the `_single_instances`
-            dictionary for each subclass.
-
-        close(self):
-            Removes the instance from the `_single_instances` dictionary and calls the
-            `close` method of the superclass, if it exists.  Sets the `closed` trait to True.
-    """
-
-    _limited_init_complete = False
-    _single_instances: ClassVar[dict[Hashable, Self]] = {}
-    _single_key = AnyTrait(default_value=None, allow_none=True, read_only=True)
-    closed = Bool(read_only=True)
-
-    @classmethod
-    def get_single_key(cls, *args, **kwgs) -> Hashable:  # noqa: ARG003
-        return cls
-
-    def __new__(cls, /, *args, **kwgs) -> Self:
-        key = cls.get_single_key(*args, **kwgs)
-        if key is None or not (inst := cls._single_instances.get(key)):
-            new = super().__new__
-            inst = new(cls) if new is object.__new__ else new(cls, *args, **kwgs)
-            if key:
-                cls._single_instances[key] = inst
-                inst.set_trait("_single_key", key)
-        return inst
-
-    def __init__(self, /, *args, **kwgs):
-        if self._limited_init_complete:
-            return
-        super().__init__(*args, **kwgs)
-        self._limited_init_complete = True
-
-    def __init_subclass__(cls) -> None:
-        cls._single_instances = {}
-
-    def close(self):
-        if self._single_key is not None:
-            self._single_instances.pop(self._single_key, None)
-        if callable(close := getattr(super(), "close", None)):
-            close()
-        self.set_trait("closed", True)
-
-
 class FixedCreate(Generic[S], TypedDict):
     "A TypedDict relevant to Fixed"
 
@@ -527,3 +459,183 @@ class Fixed(Generic[S, T]):
     def __set__(self, obj, value):
         msg = f"Setting `Fixed` parameter {obj.__class__.__name__}.{self.name} is forbidden!"
         raise AttributeError(msg)
+
+
+class HasApp(HasTraits):
+    """A mixin class that provides access to the ipylab application.
+
+    It provides methods for:
+
+    - Closing other widgets when the widget is closed.
+    - Adding the widget to a tuple of widgets owned by another object.
+    - Starting coroutines in the main event loop.
+    - Logging exceptions that occur when awaiting an awaitable.
+    """
+
+    _tuple_owners: Fixed[Self, set[tuple[HasTraits, str]]] = Fixed(set)
+    _close_extras: Fixed[Self, weakref.WeakSet[Widget | HasApp]] = Fixed(weakref.WeakSet)
+
+    closed = Bool(read_only=True)
+    log: Instance[IpylabLoggerAdapter] = Instance("ipylab.log.IpylabLoggerAdapter")
+    app = Fixed(lambda _: ipylab.App())
+    add_traits = None  # type: ignore # Don't support the method HasTraits.add_traits as it creates a new type that isn't a subclass of its origin)
+
+    @default("log")
+    def _default_log(self):
+        return ipylab.log.IpylabLoggerAdapter(self.__module__, owner=self)
+
+    @observe("closed")
+    def _observe_closed(self, _):
+        if self.closed:
+            self.log.debug("closed")
+            for item in list(self._close_extras):
+                item.close()
+            for obj, name in list(self._tuple_owners):
+                if val := getattr(obj, name, None):
+                    if (isinstance(obj, HasApp) and obj.closed) or (isinstance(obj, Widget) and not obj.comm):
+                        return
+                    obj.set_trait(name, tuple(v for v in val if v is not self))
+
+    def _check_closed(self):
+        if self.closed:
+            msg = f"This instance is closed {self!r}"
+            raise RuntimeError(msg)
+
+    def close_with_self(self, obj: Widget | HasApp):
+        """Register an object to be closed when this object is closed.
+
+        Parameters
+        ----------
+        obj : Widget | HasApp
+            Object to close.
+
+        Raises
+        ------
+        anyio.ClosedResourceError
+            If this object is already closed.
+        """
+        if self.closed:
+            obj.close()
+            msg = f"{self} is closed"
+            raise anyio.ClosedResourceError(msg)
+        self._close_extras.add(obj)
+
+    def add_to_tuple(self, owner: HasTraits, name: str):
+        """Add self to the tuple of obj and remove self when closed."""
+
+        items = getattr(owner, name)
+        if not self.closed and self not in items:
+            owner.set_trait(name, (*items, self))
+        self._tuple_owners.add((owner, name))
+
+    def close(self):
+        if close := getattr(super(), "close", None):
+            close()
+        self.set_trait("closed", True)
+
+    async def _catch_exceptions(self, aw: Awaitable) -> None:
+        """Catches exceptions that occur when awaiting an awaitable.
+
+        The exception is logged, but otherwise ignored.
+
+        Args:
+            aw: The awaitable to await.
+        """
+        try:
+            await aw
+        except BaseException as e:
+            self.log.exception(f"Calling {aw}", obj={"aw": aw}, exc_info=e)  # noqa: G004
+            if self.app.log_level == ipylab.log.LogLevel.DEBUG:
+                raise
+
+    def start_coro(self, coro: CoroutineType[None, None, T]) -> None:
+        """Start a coroutine in the main event loop.
+
+        If the kernel has a `start_soon` method, use it to start the coroutine.
+        Otherwise, if the application has an asyncio loop, use
+        `asyncio.run_coroutine_threadsafe` to start the coroutine in the loop.
+        If neither of these is available, raise a RuntimeError.
+
+        Tip: Use anyio primiatives in the coroutine to ensure it will run in
+        the chosen backend of the kernel.
+
+        Parameters
+        ----------
+        coro : CoroutineType[None, None, T]
+            The coroutine to start.
+
+        Raises
+        ------
+        RuntimeError
+            If there is no running loop to start the task.
+        """
+
+        self._check_closed()
+        self.start_soon(self._catch_exceptions, coro)
+
+    def start_soon(self, func: Callable[[Unpack[PosArgsT]], CoroutineType], *args: Unpack[PosArgsT]):
+        """Start a function soon in the main event loop.
+
+        If the kernel has a start_soon method, use it.
+        Otherwise, if the app has an asyncio loop, run the function in that loop.
+        Otherwise, raise a RuntimeError.
+
+        This is a simple wrapper to ensure the function is called in the main
+        event loop. No error reporting is done.
+
+        Consider using start_coro which performs additional checks and automatically
+        logs exceptions.
+        """
+        try:
+            start_soon = self.app.kernel.start_soon  # type: ignore
+        except AttributeError:
+            if loop := self.app.asyncio_loop:
+                coro = func(*args)
+                asyncio.run_coroutine_threadsafe(coro, loop)
+            else:
+                msg = f"We don't have a running loop to run {func}"
+                raise RuntimeError(msg) from None
+        else:
+            start_soon(func, *args)
+
+
+class Singular(HasApp):
+    """A base class that ensures only one instance of a class exists for each unique key.
+
+    This class uses a class-level dictionary `_single_instances` to store instances,
+    keyed by a value obtained from the `get_single_key` method.  Subsequent calls to
+    the constructor with the same key will return the existing instance. If key is
+    None, a new instance is always created and a reference is not kept to the object.
+    """
+
+    _limited_init_complete = False
+    _single_instances: ClassVar[dict[Hashable, Self]] = {}
+    _single_key = AnyTrait(default_value=None, allow_none=True, read_only=True)
+
+    @classmethod
+    def get_single_key(cls, *args, **kwgs) -> Hashable:  # noqa: ARG003
+        return cls
+
+    def __new__(cls, /, *args, **kwgs) -> Self:
+        key = cls.get_single_key(*args, **kwgs)
+        if key is None or not (inst := cls._single_instances.get(key)):
+            new = super().__new__
+            inst = new(cls) if new is object.__new__ else new(cls, *args, **kwgs)
+            if key:
+                cls._single_instances[key] = inst
+                inst.set_trait("_single_key", key)
+        return inst
+
+    def __init__(self, /, *args, **kwgs):
+        if self._limited_init_complete:
+            return
+        super().__init__(*args, **kwgs)
+        self._limited_init_complete = True
+
+    def __init_subclass__(cls) -> None:
+        cls._single_instances = {}
+
+    def close(self):
+        if self._single_key is not None:
+            self._single_instances.pop(self._single_key, None)
+        super().close()

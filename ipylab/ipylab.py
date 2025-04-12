@@ -4,45 +4,27 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import inspect
 import json
 import uuid
-import weakref
 from typing import TYPE_CHECKING, Any, cast
 
-import anyio
 import traitlets
 from anyio import Event, create_memory_object_stream
 from ipywidgets import Widget, register
-from traitlets import (
-    Bool,
-    Container,
-    Dict,
-    HasTraits,
-    Instance,
-    List,
-    Set,
-    TraitError,
-    TraitType,
-    Unicode,
-    default,
-    observe,
-)
+from traitlets import Bool, Container, Dict, Instance, List, TraitType, Unicode, observe
 
-import ipylab
 import ipylab._frontend as _fe
-from ipylab.common import Fixed, IpylabKwgs, Obj, PosArgsT, T, Transform, TransformType, autorun, pack
-from ipylab.log import IpylabLoggerAdapter, LogLevel
+from ipylab.common import HasApp, IpylabKwgs, Obj, Transform, TransformType, autorun, pack
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable
+    from collections.abc import Callable
     from types import CoroutineType
     from typing import Self, Unpack
 
     from anyio.streams.memory import MemoryObjectSendStream
 
-__all__ = ["Ipylab", "WidgetBase"]
+__all__ = ["Ipylab", "IpylabBase", "WidgetBase"]
 
 
 class IpylabBase(TraitType[tuple[str, str], None]):
@@ -60,18 +42,37 @@ class IpylabFrontendError(IOError):
 
 
 class WidgetBase(Widget):
+    """Base class for ipylab widgets.
+
+    Inherits from HasApp and Widget.
+
+    Attributes:
+        _model_name (Unicode): The name of the model. Must be overloaded.
+        _model_module (Unicode): The module name of the model.
+        _model_module_version (Unicode): The module version of the model.
+        _view_module (Unicode): The module name of the view.
+        _view_module_version (Unicode): The module version of the view.
+        _comm (Comm): The comm object.
+
+    """
+
     _model_name = None  # Ensure this gets overloaded
     _model_module = Unicode(_fe.module_name, read_only=True).tag(sync=True)
     _model_module_version = Unicode(_fe.module_version, read_only=True).tag(sync=True)
     _view_module = Unicode(_fe.module_name, read_only=True).tag(sync=True)
     _view_module_version = Unicode(_fe.module_version, read_only=True).tag(sync=True)
     _comm = None
-    add_traits = None  # type: ignore # Don't support the method HasTraits.add_traits as it creates a new type that isn't a subclass of its origin)
+
+    @observe("comm")
+    def _observe_comm(self, _: dict):
+        if not self.comm:
+            self.close()
 
 
 @register
-class Ipylab(WidgetBase):
-    """A base class for creating ipylab widgets.
+class Ipylab(HasApp, WidgetBase):
+    """A base class for creating ipylab widgets that inherit from an IpylabModel
+    in the frontend.
 
     Ipylab widgets are Jupyter widgets that are designed to interact with the
     JupyterLab application. They provide a way to extend the functionality
@@ -87,20 +88,11 @@ class Ipylab(WidgetBase):
     _comm = None
     _ipylab_init_complete = False
     _pending_operations: Dict[str, MemoryObjectSendStream] = Dict()
-    _has_attrs_mappings: Container[set[tuple[HasTraits, str]]] = Set()
-    _close_extras: Fixed[Self, weakref.WeakSet[Widget]] = Fixed(weakref.WeakSet)
-
-    log = Instance(IpylabLoggerAdapter, read_only=True)
-    app = Fixed(lambda _: ipylab.App())
 
     @property
     def repr_info(self) -> dict[str, Any] | str:
         "Extra info to provide for __repr__."
         return {}
-
-    @default("log")
-    def _default_log(self):
-        return IpylabLoggerAdapter(self.__module__, owner=self)
 
     def __init__(self, **kwgs):
         if self._ipylab_init_complete:
@@ -129,11 +121,9 @@ class Ipylab(WidgetBase):
             return f"< {status}: {self.__class__.__name__}({info}) >"
         return f"{status}{self.__class__.__name__}({info})"
 
-    @observe("comm", "_ready")
-    def _observe_comm(self, change: dict):
-        if not self.comm:
-            self.close()
-        if change["name"] == "_ready" and self._ready:
+    @observe("_ready")
+    def _observe_ready(self, _: dict):
+        if self._ready:
             self._ready_event.set()
             self._ready_event = Event()
             for cb in self._on_ready_callbacks:
@@ -143,36 +133,7 @@ class Ipylab(WidgetBase):
         if self.comm:
             self._ipylab_send({"close": True})
         super().close()
-        for item in list(self._close_extras):
-            item.close()
-        for obj, name in list(self._has_attrs_mappings):
-            if val := getattr(obj, name, None):
-                if val is self:
-                    with contextlib.suppress(TraitError):
-                        obj.set_trait(name, None)
-                elif isinstance(val, tuple):
-                    obj.set_trait(name, tuple(v for v in val if v.comm))
         self._on_ready_callbacks.clear()
-
-    def _check_closed(self):
-        if not self._repr_mimebundle_:
-            msg = f"This widget is closed {self!r}"
-            raise RuntimeError(msg)
-
-    async def catch_exceptions(self, aw: Awaitable) -> None:
-        """Catches exceptions that occur when awaiting an awaitable.
-
-        The exception is logged, but otherwise ignored.
-
-        Args:
-            aw: The awaitable to await.
-        """
-        try:
-            await aw
-        except BaseException as e:
-            self.log.exception(f"Calling {aw}", obj={"aw": aw}, exc_info=e)  # noqa: G004
-            if self.app.log_level == LogLevel.DEBUG:
-                raise
 
     def _on_custom_msg(self, _, msg: dict, buffers: list):
         content = msg.get("ipylab")
@@ -276,86 +237,12 @@ class Ipylab(WidgetBase):
         elif callback in self._on_ready_callbacks:
             self._on_ready_callbacks.remove(callback)
 
-    def add_to_tuple(self, owner: HasTraits, name: str):
-        """Add self to the tuple of obj."""
-
-        items = getattr(owner, name)
-        if self.comm and self not in items:
-            owner.set_trait(name, (*items, self))
-        # see: _observe_comm for removal
-        self._has_attrs_mappings.add((owner, name))
-
-    def add_as_trait(self, obj: HasTraits, name: str):
-        "Add self as a trait to obj."
-        self._check_closed()
-        obj.set_trait(name, self)
-        # see: _observe_comm for removal
-        self._has_attrs_mappings.add((obj, name))
-
-    def close_with_self(self, obj: Widget):
-        "Close the widget when self closes. If self is already closed, object will be closed immediately."
-        if not self.comm:
-            obj.close()
-            msg = f"{self} is closed"
-            raise anyio.ClosedResourceError(msg)
-        self._close_extras.add(obj)
-
     def _ipylab_send(self, content, buffers: list | None = None):
         try:
             self.send({"ipylab": json.dumps(content, default=pack)}, buffers)
         except Exception as e:
             self.log.exception("Send error", obj=content, exc_info=e)
             raise
-
-    def start_coro(self, coro: CoroutineType[None, None, T]) -> None:
-        """Start a coroutine in the main event loop.
-
-        If the kernel has a `start_soon` method, use it to start the coroutine.
-        Otherwise, if the application has an asyncio loop, use
-        `asyncio.run_coroutine_threadsafe` to start the coroutine in the loop.
-        If neither of these is available, raise a RuntimeError.
-
-        Tip: Use anyio primiatives in the coroutine to ensure it will run in
-        the chosen backend of the kernel.
-
-        Parameters
-        ----------
-        coro : CoroutineType[None, None, T]
-            The coroutine to start.
-
-        Raises
-        ------
-        RuntimeError
-            If there is no running loop to start the task.
-        """
-
-        self._check_closed()
-        self.start_soon(self.catch_exceptions, coro)
-
-    def start_soon(self, func: Callable[[Unpack[PosArgsT]], CoroutineType], *args: Unpack[PosArgsT]):
-        """Start a function soon in the main event loop.
-
-        If the kernel has a start_soon method, use it.
-        Otherwise, if the app has an asyncio loop, run the function in that loop.
-        Otherwise, raise a RuntimeError.
-
-        This is a simple wrapper to ensure the function is called in the main
-        event loop. No error reporting is done.
-
-        Consider using start_coro which performs additional checks and automatically
-        logs exceptions.
-        """
-        try:
-            start_soon = self.comm.kernel.start_soon  # type: ignore
-        except AttributeError:
-            if loop := self.app.asyncio_loop:
-                coro = func(*args)
-                asyncio.run_coroutine_threadsafe(coro, loop)
-            else:
-                msg = f"We don't have a running loop to run {func}"
-                raise RuntimeError(msg) from None
-        else:
-            start_soon(func, *args)
 
     async def operation(
         self,

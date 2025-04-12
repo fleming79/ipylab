@@ -10,10 +10,9 @@ from ipywidgets import Box, DOMWidget, Layout, TypedTuple, Widget, register, wid
 from ipywidgets.widgets.trait_types import InstanceDict
 from traitlets import Container, Dict, Instance, Tuple, Unicode, observe
 
-import ipylab
 import ipylab._frontend as _fe
-from ipylab.common import Area, Fixed, InsertMode, autorun
-from ipylab.connection import ShellConnection
+from ipylab.common import Area, HasApp, InsertMode, autorun
+from ipylab.connection import Connection, ShellConnection
 from ipylab.ipylab import WidgetBase
 
 
@@ -50,17 +49,12 @@ class Title(WidgetBase):
 
 
 @register
-class Panel(Box):
+class Panel(HasApp, WidgetBase, Box):
     _model_name = Unicode("PanelModel").tag(sync=True)
     _view_name = Unicode("PanelView").tag(sync=True)
-    _model_module = Unicode(_fe.module_name, read_only=True).tag(sync=True)
-    _model_module_version = Unicode(_fe.module_version, read_only=True).tag(sync=True)
-    _view_module = Unicode(_fe.module_name, read_only=True).tag(sync=True)
-    _view_module_version = Unicode(_fe.module_version, read_only=True).tag(sync=True)
     title: Instance[Title] = InstanceDict(Title, ()).tag(sync=True, **widget_serialization)
 
-    app = Fixed(lambda _: ipylab.App())
-    connections: Container[tuple[ShellConnection, ...]] = TypedTuple(trait=Instance(ShellConnection))
+    connections: Container[tuple[Connection, ...]] = TypedTuple(trait=Instance(Connection))
     add_to_shell_defaults: ClassVar = AddToShellType(mode=InsertMode.tab_after)
 
     async def add_to_shell(self, **kwgs: Unpack[AddToShellType]) -> ShellConnection:
