@@ -336,7 +336,7 @@ class Ipylab(HasApp, WidgetBase):
         Any
             The value of the property.
         """
-        return self._obj_operation(obj, subpath, "getProperty", {"null_if_missing": null_if_missing}, kwargs)
+        return await self._obj_operation(obj, subpath, "getProperty", {"null_if_missing": null_if_missing}, kwargs)
 
     async def set_property(self, subpath: str, value, *, obj=Obj.base, **kwargs: Unpack[IpylabKwgs]) -> None:
         """Set a property of an object in the frontend.
