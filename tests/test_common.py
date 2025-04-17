@@ -174,8 +174,11 @@ class TestTransformPayload:
 
 class TestLimited:
     async def test_limited_new_single(self):
-        obj1 = Singular()
-        obj2 = Singular()
+        class MySingular(Singular):
+            pass
+
+        obj1 = MySingular()
+        obj2 = MySingular()
         assert obj1 is obj2
         obj1.close()
         assert obj1 not in obj1._single_instances

@@ -34,9 +34,10 @@ from typing import (
 
 import anyio
 import pluggy
-from ipywidgets import Widget, widget_serialization
+import traitlets
+from ipywidgets import TypedTuple, Widget, widget_serialization
 from traitlets import Any as AnyTrait
-from traitlets import Bool, HasTraits, Instance, default, observe
+from traitlets import Bool, Container, HasTraits, Instance, default, observe
 from typing_extensions import override
 
 import ipylab
@@ -485,7 +486,7 @@ class HasApp(HasTraits):
         return ipylab.log.IpylabLoggerAdapter(self.__module__, owner=self)
 
     @observe("closed")
-    def _observe_closed(self, _):
+    def _hasapp_observe_closed(self, _):
         if self.closed:
             self.log.debug("closed")
             for item in list(self._close_extras):
@@ -599,18 +600,32 @@ class HasApp(HasTraits):
             start_soon(func, *args)
 
 
-class Singular(HasApp):
-    """A base class that ensures only one instance of a class exists for each unique key.
+class _SingularInstances(HasTraits, Generic[T]):
+    instances: Container[tuple[T, ...]] = TypedTuple(trait=traitlets.Any(), read_only=True)
+
+
+class Singular(HasTraits):
+    """A base class that ensures only one instance of a class exists for each unique
+    key (except for None).
 
     This class uses a class-level dictionary `_single_instances` to store instances,
     keyed by a value obtained from the `get_single_key` method.  Subsequent calls to
     the constructor with the same key will return the existing instance. If key is
     None, a new instance is always created and a reference is not kept to the object.
+
+    The class attribute `singular` maintains a tuple of the instances on a per-subclass basis
+    (only instances with a `single_key` that is not None are included).
     """
 
-    _limited_init_complete = False
+    singular_init_started = traitlets.Bool(read_only=True)
     _single_instances: ClassVar[dict[Hashable, Self]] = {}
-    _single_key = AnyTrait(default_value=None, allow_none=True, read_only=True)
+    single_key = AnyTrait(default_value=None, allow_none=True, read_only=True)
+    closed = Bool(read_only=True)
+    singular: ClassVar[_SingularInstances[Self]]
+
+    def __init_subclass__(cls) -> None:
+        cls._single_instances = {}
+        cls.singular = _SingularInstances()
 
     @classmethod
     def get_single_key(cls, *args, **kwgs) -> Hashable:  # noqa: ARG003
@@ -623,19 +638,23 @@ class Singular(HasApp):
             inst = new(cls) if new is object.__new__ else new(cls, *args, **kwgs)
             if key:
                 cls._single_instances[key] = inst
-                inst.set_trait("_single_key", key)
+                inst.set_trait("single_key", key)
         return inst
 
     def __init__(self, /, *args, **kwgs):
-        if self._limited_init_complete:
+        if self.singular_init_started:
             return
+        self.set_trait("singular_init_started", True)
         super().__init__(*args, **kwgs)
-        self._limited_init_complete = True
+        self.singular.set_trait("instances", tuple(self._single_instances.values()))
 
-    def __init_subclass__(cls) -> None:
-        cls._single_instances = {}
+    @observe("closed")
+    def _singular_observe_closed(self, _):
+        if self.closed and self.single_key is not None:
+            self._single_instances.pop(self.single_key, None)
+            self.singular.set_trait("instances", tuple(self._single_instances.values()))
 
     def close(self):
-        if self._single_key is not None:
-            self._single_instances.pop(self._single_key, None)
-        super().close()
+        if close := getattr(super(), "close", None):
+            close()
+        self.set_trait("closed", True)
