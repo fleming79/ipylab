@@ -60,11 +60,11 @@ class Connection(Singular, Ipylab):
 
     @classmethod
     def exists(cls, cid: str) -> bool:
-        return cid in cls._single_instances
+        return cid in cls._singular_instances
 
     @classmethod
     def close_if_exists(cls, cid: str):
-        if inst := cls._single_instances.pop(cid, None):
+        if inst := cls._singular_instances.pop(cid, None):
             inst.close()
 
     def __init_subclass__(cls, **kwargs) -> None:

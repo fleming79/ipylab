@@ -609,8 +609,8 @@ class Singular(HasTraits):
     """A base class that ensures only one instance of a class exists for each unique
     key (except for None).
 
-    This class uses a class-level dictionary `_single_instances` to store instances,
-    keyed by a value obtained from the `get_single_key` method.  Subsequent calls to
+    This class uses a class-level dictionary `_singular_instances` to store instances,
+    keyed by a value obtained from the `get_single_key` classmethod.  Subsequent calls to
     the constructor with the same key will return the existing instance. If key is
     None, a new instance is always created and a reference is not kept to the object.
 
@@ -619,13 +619,13 @@ class Singular(HasTraits):
     """
 
     singular_init_started = traitlets.Bool(read_only=True)
-    _single_instances: ClassVar[dict[Hashable, Self]] = {}
+    _singular_instances: ClassVar[dict[Hashable, Self]] = {}
     single_key = AnyTrait(default_value=None, allow_none=True, read_only=True)
     closed = Bool(read_only=True)
     singular: ClassVar[_SingularInstances[Self]]
 
     def __init_subclass__(cls) -> None:
-        cls._single_instances = {}
+        cls._singular_instances = {}
         cls.singular = _SingularInstances()
 
     @classmethod
@@ -634,11 +634,11 @@ class Singular(HasTraits):
 
     def __new__(cls, /, *args, **kwgs) -> Self:
         key = cls.get_single_key(*args, **kwgs)
-        if key is None or not (inst := cls._single_instances.get(key)):
+        if key is None or not (inst := cls._singular_instances.get(key)):
             new = super().__new__
             inst = new(cls) if new is object.__new__ else new(cls, *args, **kwgs)
             if key:
-                cls._single_instances[key] = inst
+                cls._singular_instances[key] = inst
                 inst.set_trait("single_key", key)
         return inst
 
@@ -647,13 +647,13 @@ class Singular(HasTraits):
             return
         self.set_trait("singular_init_started", True)
         super().__init__(*args, **kwgs)
-        self.singular.set_trait("instances", tuple(self._single_instances.values()))
+        self.singular.set_trait("instances", tuple(self._singular_instances.values()))
 
     @observe("closed")
     def _singular_observe_closed(self, _):
         if self.closed and self.single_key is not None:
-            self._single_instances.pop(self.single_key, None)
-            self.singular.set_trait("instances", tuple(self._single_instances.values()))
+            self._singular_instances.pop(self.single_key, None)
+            self.singular.set_trait("instances", tuple(self._singular_instances.values()))
 
     def close(self):
         if close := getattr(super(), "close", None):

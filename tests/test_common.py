@@ -181,7 +181,7 @@ class TestLimited:
         obj2 = MySingular()
         assert obj1 is obj2
         obj1.close()
-        assert obj1 not in obj1._single_instances
+        assert obj1 not in obj1._singular_instances
         assert obj1.closed
 
     async def test_limited_newget_single_keyed(self):
@@ -204,12 +204,12 @@ class TestLimited:
         obj5 = KeyedSingle(None)
         obj6 = KeyedSingle(None)
 
-        assert obj1 in KeyedSingle._single_instances.values()
+        assert obj1 in KeyedSingle._singular_instances.values()
         assert obj1 is obj2
         assert obj1 is not obj3
         assert obj4 is obj3
         assert obj5 is not obj6
-        assert obj5 not in KeyedSingle._single_instances.values()
+        assert obj5 not in KeyedSingle._singular_instances.values()
 
 
 class TestFixed:
