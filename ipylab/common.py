@@ -144,11 +144,12 @@ def pack(obj):
 
     if isinstance(obj, Widget):
         return widget_serialization["to_json"](obj, None)
-    if inspect.isfunction(obj) or inspect.ismodule(obj):
+    if inspect.isfunction(obj) or inspect.ismodule(obj) or inspect.isclass(obj):
         with contextlib.suppress(BaseException):
             return module_obj_to_import_string(obj)
         return textwrap.dedent(inspect.getsource(obj))
-    return obj
+    msg = f"Unable pack this type of object {type(obj)}: {obj!r}"
+    raise TypeError(msg)
 
 
 def to_selector(*args, prefix="ipylab"):
