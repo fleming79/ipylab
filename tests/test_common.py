@@ -3,40 +3,30 @@
 
 from __future__ import annotations
 
-import pytest
-from ipywidgets import TypedTuple
-from traitlets import HasTraits, Unicode
+from typing import Self
 
+import pytest
+from traitlets import Unicode
+from typing_extensions import override
+
+import ipylab
+import ipylab.common
 from ipylab.common import (
     Fixed,
-    FixedCreate,
     FixedCreated,
     LastUpdatedDict,
+    Singular,
     Transform,
     TransformDictAdvanced,
     TransformDictConnection,
     TransformDictFunction,
-    trait_tuple_add,
 )
 from ipylab.connection import Connection
 
 
 class CommonTestClass:
-    def __init__(self, value):
+    def __init__(self, value=1):
         self.value = value
-
-
-def test_trait_tuple_add():
-    class TestHasTraits(HasTraits):
-        test_tuple = TypedTuple(trait=Unicode(), default_value=())
-
-    owner = TestHasTraits()
-    trait_tuple_add(owner, "test_tuple", "value1")
-    assert owner.test_tuple == ("value1",)
-    trait_tuple_add(owner, "test_tuple", "value2")
-    assert owner.test_tuple == ("value1", "value2")
-    trait_tuple_add(owner, "test_tuple", "value1")  # Should not add duplicate
-    assert owner.test_tuple == ("value1", "value2")
 
 
 def test_last_updated_dict():
@@ -131,8 +121,13 @@ class TestTransformValidate:
             Transform.validate(transform)
 
 
+@pytest.fixture
+async def mock_connection(mocker):
+    mocker.patch.object(Connection, "_ready")
+
+
 class TestTransformPayload:
-    def test_transform_payload_advanced(self):
+    async def test_transform_payload_advanced(self, mock_connection):
         transform: TransformDictAdvanced = {
             "transform": Transform.advanced,
             "mappings": {
@@ -150,80 +145,101 @@ class TestTransformPayload:
             "key1": {"id": "test_id"},
             "key2": {"cid": "ipylab-Connection"},
         }
-        result = Transform.transform_payload(transform, payload)
+        result = await Transform.transform_payload(transform, payload)
         assert isinstance(result, dict)
         assert "key1" in result
         assert "key2" in result
 
-    def test_transform_payload_connection(self):
+    async def test_transform_payload_connection(self, mock_connection):
         transform: TransformDictConnection = {
             "transform": Transform.connection,
             "cid": "ipylab-Connection",
         }
         payload = {"cid": "ipylab-Connection"}
-        result = Transform.transform_payload(transform, payload)
+        result = await Transform.transform_payload(transform, payload)
         assert isinstance(result, Connection)
 
-    def test_transform_payload_auto(self):
+    async def test_transform_payload_auto(self, mock_connection):
         transform = Transform.auto
         payload = {"cid": "ipylab-Connection"}
-        result = Transform.transform_payload(transform, payload)
+        result = await Transform.transform_payload(transform, payload)
         assert isinstance(result, Connection)
 
-    def test_transform_payload_no_transform(self):
+    async def test_transform_payload_no_transform(self, mock_connection):
         transform = Transform.null
         payload = {"key": "value"}
-        result = Transform.transform_payload(transform, payload)
+        result = await Transform.transform_payload(transform, payload)
         assert result == payload
+
+
+class TestLimited:
+    async def test_limited_new_single(self):
+        class MySingular(Singular):
+            pass
+
+        obj1 = MySingular()
+        obj2 = MySingular()
+        assert obj1 is obj2
+        obj1.close()
+        assert obj1 not in obj1._singular_instances
+        assert obj1.closed
+
+    async def test_limited_newget_single_keyed(self):
+        # Test that the get_single_key method and arguments are passed
+        class KeyedSingle(Singular):
+            key = Unicode(allow_none=True)
+
+            def __init__(self, /, key: str | None, **kwgs):
+                super().__init__(key=key, **kwgs)
+
+            @override
+            @classmethod
+            def get_single_key(cls, key: str, **kwgs):
+                return key
+
+        obj1 = KeyedSingle(key="key1")
+        obj2 = KeyedSingle(key="key1")
+        obj3 = KeyedSingle(key="key2")
+        obj4 = KeyedSingle("key2")
+        obj5 = KeyedSingle(None)
+        obj6 = KeyedSingle(None)
+
+        assert obj1 in KeyedSingle._singular_instances.values()
+        assert obj1 is obj2
+        assert obj1 is not obj3
+        assert obj4 is obj3
+        assert obj5 is not obj6
+        assert obj5 not in KeyedSingle._singular_instances.values()
 
 
 class TestFixed:
     def test_readonly_basic(self):
         class TestOwner:
-            test_instance = Fixed(CommonTestClass, 42)
+            test_instance = Fixed(CommonTestClass)
 
         owner = TestOwner()
-        instance = owner.test_instance
-        assert isinstance(instance, CommonTestClass)
-        assert instance.value == 42
-
-    def test_readonly_dynamic(self):
-        class TestOwner:
-            value: int
-            test_instance = Fixed(CommonTestClass, value=lambda obj: obj.value, dynamic=["value"])
-
-        owner = TestOwner()
-        owner.value = 100
         assert isinstance(owner.test_instance, CommonTestClass)
-        assert owner.test_instance.value == 100
+        assert owner.test_instance.value == 1
 
-    def test_readonly_create_function(self):
+    def test_readonly_create_function(self, app: ipylab.App):
         class TestOwner:
-            test_instance = Fixed(CommonTestClass, create=lambda info: CommonTestClass(**info["kwgs"]), value=200)
+            app = Fixed(lambda _: ipylab.App())
+            app1: Fixed[Self, ipylab.App] = Fixed("ipylab.App")
 
         owner = TestOwner()
-        instance = owner.test_instance
-        assert isinstance(instance, CommonTestClass)
-        assert instance.value == 200
+        assert owner.app is app
+        assert owner.app1 is app
 
-    def test_readonly_create_method(self):
-        class TestOwner:
-            test_instance = Fixed(CommonTestClass, create="_create_callback", value=200)
-
-            def _create_callback(self, info: FixedCreate):
-                assert info["owner"] is self
-                assert info["klass"] is CommonTestClass
-                assert info["kwgs"] == {"value": 200}
-                return CommonTestClass(*info["args"], **info["kwgs"])
-
-        owner = TestOwner()
-        instance = owner.test_instance
-        assert isinstance(instance, CommonTestClass)
-        assert instance.value == 200
+    def test_readonly_create_invalid(self, app):
+        with pytest.raises(TypeError):
+            assert Fixed(123)  # type: ignore
 
     def test_readonly_created_callback_method(self):
         class TestOwner:
-            test_instance = Fixed(CommonTestClass, created="instance_created", value=300)
+            test_instance: Fixed[Self, CommonTestClass] = Fixed(
+                lambda _: CommonTestClass(value=300),
+                created=lambda c: c["owner"].instance_created(c),
+            )
 
             def instance_created(self, info: FixedCreated):
                 assert isinstance(info["obj"], CommonTestClass)
@@ -236,8 +252,21 @@ class TestFixed:
 
     def test_readonly_forbidden_set(self):
         class TestOwner:
-            test_instance = Fixed(CommonTestClass, 42)
+            test_instance = Fixed(CommonTestClass)
 
         owner = TestOwner()
-        with pytest.raises(AttributeError, match="Setting TestOwner.test_instance is forbidden!"):
-            owner.test_instance = CommonTestClass(100)
+        with pytest.raises(AttributeError, match="Setting `Fixed` parameter TestOwner.test_instance is forbidden!"):
+            owner.test_instance = CommonTestClass()
+
+    def test_readonly_lambda(self):
+        class TestOwner:
+            test_instance = Fixed(lambda _: CommonTestClass())
+
+        owner = TestOwner()
+        with pytest.raises(AttributeError, match="Setting `Fixed` parameter TestOwner.test_instance is forbidden!"):
+            owner.test_instance = CommonTestClass()
+
+    def test_function_to_eval(self):
+        eval_str = ipylab.common.module_obj_to_import_string(test_last_updated_dict)
+        obj = eval(eval_str, {"import_item": ipylab.common.import_item})  # noqa: S307
+        assert obj is test_last_updated_dict

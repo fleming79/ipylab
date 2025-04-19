@@ -6,8 +6,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import typing
-from asyncio import Task
-from typing import TYPE_CHECKING, Any, NotRequired, TypedDict, override
+from typing import TYPE_CHECKING, Any, NotRequired, Self, TypedDict
 
 from IPython.core import completer as IPC  # noqa: N812
 from IPython.utils.tokenutil import token_at_cursor
@@ -16,6 +15,7 @@ from ipywidgets.widgets.trait_types import InstanceDict
 from ipywidgets.widgets.widget_description import DescriptionStyle
 from ipywidgets.widgets.widget_string import _String
 from traitlets import Callable, Container, Dict, Instance, Int, Unicode, default, observe
+from typing_extensions import override
 
 import ipylab
 from ipylab.common import Fixed, LastUpdatedDict
@@ -42,6 +42,7 @@ mime_types = (
 
 class IpylabCompleter(IPC.IPCompleter):
     code_editor: Instance[CodeEditor] = Instance("ipylab.CodeEditor")
+    app = Fixed(lambda _: ipylab.App())
     if TYPE_CHECKING:
         shell: InteractiveShell  # Set in IPV.IPCompleter.__init__
         namespace: LastUpdatedDict
@@ -61,7 +62,7 @@ class IpylabCompleter(IPC.IPCompleter):
         ]
 
     def update_namespace(self):
-        self.namespace = ipylab.app.get_namespace(self.code_editor.namespace_id)
+        self.namespace = self.app.get_namespace(self.code_editor.namespace_id)
 
     def do_complete(self, code: str, cursor_pos: int):
         """Completions provided by IPython completer, using Jedi for different namespaces."""
@@ -152,7 +153,7 @@ class IpylabCompleter(IPC.IPCompleter):
             if wait or inspect.iscoroutine(result):
                 result = await result
             if not self.code_editor.namespace_id:
-                ipylab.app.shell.add_objects_to_ipython_namespace(ns)
+                self.app.shell.add_objects_to_ipython_namespace(ns)
         except SyntaxError:
             exec(code, ns, ns)  # noqa: S102
             return next(reversed(ns.values()))
@@ -208,16 +209,14 @@ class CodeEditor(Ipylab, _String):
     placeholder = None  # Presently not available
 
     value = Unicode()
-    _update_task: None | Task = None
     _setting_value = False
-
-    completer = Fixed(
-        IpylabCompleter,
-        code_editor=lambda c: c,
-        shell=lambda c: getattr(getattr(c.comm, "kernel", None), "shell", None),
-        dynamic=["code_editor", "shell"],
+    completer: Fixed[Self, IpylabCompleter] = Fixed(
+        lambda c: IpylabCompleter(
+            code_editor=c["owner"],
+            shell=getattr(getattr(c["owner"].comm, "kernel", None), "shell", None),
+            dynamic=["code_editor", "shell"],
+        ),
     )
-
     namespace_id = Unicode("")
     evaluate: Container[typing.Callable[[str], typing.Coroutine]] = Callable()  # type: ignore
     load_value: Container[typing.Callable[[str], None]] = Callable()  # type: ignore
@@ -230,7 +229,7 @@ class CodeEditor(Ipylab, _String):
             "evaluate": ["Shift Enter"],
             "undo": ["Ctrl Z"],
             "redo": ["Ctrl Shift Z"],
-        } | ipylab.plugin_manager.hook.default_editor_key_bindings(app=ipylab.app, obj=self)
+        }
 
     @default("evaluate")
     def _default_evaluate(self):
@@ -242,22 +241,19 @@ class CodeEditor(Ipylab, _String):
 
     @observe("value")
     def _observe_value(self, _):
-        if not self._setting_value and not self._update_task:
+        if not self._setting_value:
             # We use throttling to ensure there isn't a backlog of changes to synchronise.
             # When the value is set in Python, we the shared model in the frontend should exactly reflect it.
             async def send_value():
-                try:
-                    while True:
-                        value = self.value
-                        await self.operation("setValue", {"value": value})
-                        self._sync = self._sync + 1
-                        await asyncio.sleep(self.update_throttle_ms / 1e3)
-                        if self.value == value:
-                            return
-                finally:
-                    self._update_task = None
+                while True:
+                    value = self.value
+                    await self.operation("setValue", {"value": value})
+                    self._sync = self._sync + 1
+                    await asyncio.sleep(self.update_throttle_ms / 1e3)
+                    if self.value == value:
+                        return
 
-            self._update_task = self.to_task(send_value(), "Send value to frontend")
+            self.start_coro(send_value())
 
     @override
     async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list):
@@ -270,8 +266,6 @@ class CodeEditor(Ipylab, _String):
                 await self.evaluate(payload["code"])
                 return True
             case "setValue":
-                if self._update_task:
-                    await self._update_task
                 # Only set the value when a valid sync is provided
                 # sync is done
                 if payload["sync"] == self._sync:

@@ -3,21 +3,26 @@
 
 from __future__ import annotations
 
-import asyncio
-from typing import TYPE_CHECKING
+from typing import ClassVar, NotRequired, TypedDict, Unpack
 
-from ipywidgets import Box, DOMWidget, Layout, TypedTuple, register, widget_serialization
+import anyio
+from ipywidgets import Box, DOMWidget, Layout, TypedTuple, Widget, register, widget_serialization
 from ipywidgets.widgets.trait_types import InstanceDict
 from traitlets import Container, Dict, Instance, Tuple, Unicode, observe
 
-import ipylab
 import ipylab._frontend as _fe
-from ipylab.common import Area, InsertMode
-from ipylab.connection import ShellConnection
+from ipylab.common import Area, HasApp, InsertMode, autorun
+from ipylab.connection import Connection, ShellConnection
 from ipylab.ipylab import WidgetBase
 
-if TYPE_CHECKING:
-    from asyncio import Task
+
+class AddToShellType(TypedDict):
+    area: NotRequired[Area]
+    activate: NotRequired[bool]
+    mode: NotRequired[InsertMode]
+    rank: NotRequired[int | None]
+    ref: NotRequired[ShellConnection | None]
+    options: NotRequired[dict | None]
 
 
 @register
@@ -44,39 +49,17 @@ class Title(WidgetBase):
 
 
 @register
-class Panel(Box):
+class Panel(HasApp, WidgetBase, Box):
     _model_name = Unicode("PanelModel").tag(sync=True)
     _view_name = Unicode("PanelView").tag(sync=True)
-    _model_module = Unicode(_fe.module_name, read_only=True).tag(sync=True)
-    _model_module_version = Unicode(_fe.module_version, read_only=True).tag(sync=True)
-    _view_module = Unicode(_fe.module_name, read_only=True).tag(sync=True)
-    _view_module_version = Unicode(_fe.module_version, read_only=True).tag(sync=True)
     title: Instance[Title] = InstanceDict(Title, ()).tag(sync=True, **widget_serialization)
 
-    connections: Container[tuple[ShellConnection, ...]] = TypedTuple(trait=Instance(ShellConnection))
+    connections: Container[tuple[Connection, ...]] = TypedTuple(trait=Instance(Connection))
+    add_to_shell_defaults: ClassVar = AddToShellType(mode=InsertMode.tab_after)
 
-    def add_to_shell(
-        self,
-        *,
-        area: Area = Area.main,
-        activate: bool = True,
-        mode: InsertMode = InsertMode.tab_after,
-        rank: int | None = None,
-        ref: ShellConnection | None = None,
-        options: dict | None = None,
-        **kwgs,
-    ) -> Task[ShellConnection]:
+    async def add_to_shell(self, **kwgs: Unpack[AddToShellType]) -> ShellConnection:
         """Add this panel to the shell."""
-        return ipylab.app.shell.add(
-            self,
-            area=area,
-            mode=mode,
-            activate=activate,
-            rank=rank,
-            ref=ref,
-            options=options,
-            **kwgs,
-        )
+        return await self.app.shell.add(self, **self.add_to_shell_defaults | kwgs)
 
 
 @register
@@ -87,28 +70,24 @@ class SplitPanel(Panel):
     layout = InstanceDict(Layout, kw={"width": "100%", "height": "100%", "overflow": "hidden"}).tag(
         sync=True, **widget_serialization
     )
-    _force_update_in_progress = False
 
     # ============== Start temp fix =============
     # Below here is added as a temporary fix to address issue https://github.com/jtpio/ipylab/issues/129
 
     @observe("children", "connections")
     def _observer(self, _):
-        self._rerender()
+        self._toggle_orientation(children=self.children)
 
-    def _rerender(self):
+    @autorun
+    async def _toggle_orientation(self, children: tuple[Widget, ...]):
         """Toggle the orientation to cause lumino_widget.parent to re-render content."""
-
-        async def force_refresh(children):
-            if children != self.children:
-                return
-            await asyncio.sleep(0.1)
-            orientation = self.orientation
-            self.orientation = "horizontal" if orientation == "vertical" else "vertical"
-            await asyncio.sleep(0.001)
-            self.orientation = orientation
-
-        return ipylab.app.to_task(force_refresh(self.children))
+        if children != self.children:
+            return
+        await anyio.sleep(0.1)
+        orientation = self.orientation
+        self.orientation = "horizontal" if orientation == "vertical" else "vertical"
+        await anyio.sleep(0.001)
+        self.orientation = orientation
 
     # ============== End temp fix =============
 
@@ -136,4 +115,6 @@ class ResizeBox(Box):
     _view_module = Unicode(_fe.module_name, read_only=True).tag(sync=True)
     _view_module_version = Unicode(_fe.module_version, read_only=True).tag(sync=True)
 
-    size: Container[tuple[int, int]] = Tuple(readonly=True, help="(clientWidth, clientHeight) in pixels").tag(sync=True)
+    size: Container[tuple[int, int]] = Tuple(read_only=True, help="(clientWidth, clientHeight) in pixels").tag(
+        sync=True
+    )

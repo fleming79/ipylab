@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from ipylab import menu
+from ipylab import common, log, menu
 from ipylab._frontend import module_version as __version__
 from ipylab.code_editor import CodeEditor
 from ipylab.common import Area, Fixed, InsertMode, Obj, Transform, hookimpl, pack, to_selector
@@ -16,15 +16,16 @@ from ipylab.widgets import Icon, Panel, SplitPanel
 
 __all__ = [
     "__version__",
+    "common",
     "CodeEditor",
     "Connection",
+    "Fixed",
     "ShellConnection",
     "SimpleOutput",
     "Panel",
     "SplitPanel",
     "Icon",
     "Area",
-    "Fixed",
     "NotificationType",
     "NotifyAction",
     "InsertMode",
@@ -35,6 +36,7 @@ __all__ = [
     "Ipylab",
     "App",
     "Obj",
+    "log",
     "menu",
     "JupyterFrontEnd",
     "to_selector",
@@ -61,4 +63,3 @@ def _get_plugin_manager():
 
 plugin_manager = _get_plugin_manager()
 del _get_plugin_manager
-app = App()

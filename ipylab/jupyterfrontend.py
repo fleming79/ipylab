@@ -3,22 +3,24 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import functools
 import inspect
-from typing import TYPE_CHECKING, Any, Unpack, override
+from typing import TYPE_CHECKING, Any, Self, Unpack, final
 
 from ipywidgets import Widget, register
 from traitlets import Bool, Container, Dict, Instance, Unicode, UseEnum, default, observe
+from typing_extensions import override
 
 import ipylab
 from ipylab import Ipylab
 from ipylab.commands import APP_COMMANDS_NAME, CommandPalette, CommandRegistry
-from ipylab.common import Fixed, IpylabKwgs, LastUpdatedDict, Obj, to_selector
+from ipylab.common import Fixed, IpylabKwgs, LastUpdatedDict, Obj, Singular, to_selector
 from ipylab.dialog import Dialog
 from ipylab.ipylab import IpylabBase
 from ipylab.launcher import Launcher
-from ipylab.log import IpylabLogFormatter, IpylabLogHandler, LogLevel
+from ipylab.log import IpylabLogHandler, LogLevel
 from ipylab.menu import ContextMenu, MainMenu
 from ipylab.notification import NotificationManager
 from ipylab.sessions import SessionManager
@@ -29,14 +31,14 @@ if TYPE_CHECKING:
     from typing import ClassVar
 
 
+@final
 @register
-class App(Ipylab):
+class App(Singular, Ipylab):
     """A connection to the 'app' in the frontend.
 
     A singleton (per kernel) not to be subclassed or closed.
     """
 
-    SINGLE = True
     DEFAULT_COMMANDS: ClassVar = {"Open console", "Show log viewer"}
     _model_name = Unicode("JupyterFrontEndModel").tag(sync=True)
     ipylab_base = IpylabBase(Obj.IpylabModel, "app").tag(sync=True)
@@ -47,32 +49,30 @@ class App(Ipylab):
     shell = Fixed(Shell)
     dialog = Fixed(Dialog)
     notification = Fixed(NotificationManager)
-    commands = Fixed(CommandRegistry, name=APP_COMMANDS_NAME)
+    commands = Fixed(lambda _: CommandRegistry(name=APP_COMMANDS_NAME))
     launcher = Fixed(Launcher)
     main_menu = Fixed(MainMenu)
     command_pallet = Fixed(CommandPalette)
-    context_menu = Fixed(ContextMenu, commands=lambda app: app.commands, dynamic=["commands"])
+    context_menu: Fixed[Self, ContextMenu] = Fixed(lambda c: ContextMenu(commands=c["owner"].commands))
     sessions = Fixed(SessionManager)
 
-    logging_handler: Instance[IpylabLogHandler | None] = Instance(IpylabLogHandler, allow_none=True)  # type: ignore
+    logging_handler: Fixed[Self, IpylabLogHandler] = Fixed(
+        lambda c: ipylab.plugin_manager.hook.get_logging_handler(app=c["owner"]),
+        created=lambda c: c["owner"].shell.log_viewer,
+    )
     log_level = UseEnum(LogLevel, LogLevel.ERROR)
+    asyncio_loop: Instance[asyncio.AbstractEventLoop | None] = Instance(asyncio.AbstractEventLoop, allow_none=True)  # type: ignore
 
     namespaces: Container[dict[str, LastUpdatedDict]] = Dict(read_only=True)  # type: ignore
 
-    @classmethod
     @override
-    def _single_key(cls, kwgs: dict):
-        return "app"
+    def close(self, *, force=False):
+        if force:
+            super().close()
 
-    def close(self):
-        "Cannot close"
-
-    @default("logging_handler")
-    def _default_logging_handler(self):
-        fmt = "%(color)s%(level_symbol)s %(asctime)s.%(msecs)d %(name)s %(owner_rep)s: %(message)s %(reset)s\n"
-        handler = IpylabLogHandler(self.log_level)
-        handler.setFormatter(IpylabLogFormatter(fmt=fmt, style="%", datefmt="%H:%M:%S"))
-        return handler
+    @default("asyncio_loop")
+    def _default_asyncio_loop(self):
+        return ipylab.plugin_manager.hook.get_asyncio_event_loop(app=self)
 
     @observe("_ready", "log_level")
     def _app_observe_ready(self, change):
@@ -81,16 +81,21 @@ class App(Ipylab):
             self._selector = to_selector(self._vpath)
             ipylab.plugin_manager.hook.autostart._call_history.clear()  # type: ignore  # noqa: SLF001
             try:
+                if not ipylab.plugin_manager.hook.autostart_once._call_history:  # noqa: SLF001
+                    ipylab.plugin_manager.hook.autostart_once.call_historic(
+                        kwargs={"app": self}, result_callback=self._autostart_callback
+                    )
                 ipylab.plugin_manager.hook.autostart.call_historic(
                     kwargs={"app": self}, result_callback=self._autostart_callback
                 )
-            except Exception:
-                self.log.exception("Error with autostart")
+            except Exception as e:
+                self.log.exception("Error with autostart", exc_info=e)
         if self.logging_handler:
             self.logging_handler.setLevel(self.log_level)
 
     def _autostart_callback(self, result):
-        self.ensure_run(result)
+        if inspect.iscoroutine(result):
+            self.start_coro(result)
 
     @property
     def repr_info(self):
@@ -137,7 +142,7 @@ class App(Ipylab):
         return self._selector
 
     @override
-    async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list) -> Any:
+    async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list):
         match operation:
             case "evaluate":
                 return await self._evaluate(payload, buffers)
@@ -151,9 +156,9 @@ class App(Ipylab):
 
         return await super()._do_operation_for_frontend(operation, payload, buffers)
 
-    def shutdown_kernel(self, vpath: str | None = None):
+    async def shutdown_kernel(self, vpath: str | None = None):
         "Shutdown the kernel"
-        return self.operation("shutdownKernel", {"vpath": vpath})
+        await self.operation("shutdownKernel", {"vpath": vpath})
 
     def start_iyplab_python_kernel(self, *, restart=False):
         "Start the 'ipylab' Python kernel."
@@ -169,7 +174,7 @@ class App(Ipylab):
         `default_namespace_objects`.
 
         Note:
-            To remove a namespace call `ipylab.app.namespaces.pop(<namespace_id>)`.
+            To remove a namespace call `app.namespaces.pop(<namespace_id>)`.
 
         The default namespace `""` will also load objects from `shell.user_ns` if
         the kernel is an ipykernel (the default kernel provided in Jupyterlab).
@@ -198,46 +203,59 @@ class App(Ipylab):
 
         A call to this method should originate from a call to `evaluate` from
         app in another kernel. The call is sent as a message via the frontend."""
-        evaluate = options["evaluate"]
-        if isinstance(evaluate, str):
-            evaluate = (evaluate,)
-        namespace_id = options.get("namespace_id", "")
-        ns = self.get_namespace(namespace_id, buffers=buffers)
-        for row in evaluate:
-            name, expression = ("payload", row) if isinstance(row, str) else row
-            try:
-                result = eval(expression, ns)  # noqa: S307
-            except SyntaxError:
-                exec(expression, ns)  # noqa: S102
-                result = next(reversed(ns.values()))  # Requires: LastUpdatedDict
-            if not name:
-                continue
-            while callable(result) or inspect.isawaitable(result):
-                if callable(result):
-                    kwgs = {}
-                    for p in inspect.signature(result).parameters:
-                        if p in options:
-                            kwgs[p] = options[p]
-                        elif p in ns:
-                            kwgs[p] = ns[p]
-                    # We use a partial so that we can evaluate with the same namespace.
-                    ns["_partial_call"] = functools.partial(result, **kwgs)
-                    result = eval("_partial_call()", ns)  # type: ignore # noqa: S307
-                    ns.pop("_partial_call")
-                if inspect.isawaitable(result):
-                    result = await result
-            if name:
-                ns[name] = result
-        buffers = ns.pop("buffers", [])
-        payload = ns.pop("payload", None)
-        if payload is not None:
-            ns["_call_count"] = n = ns.get("_call_count", 0) + 1
-            ns[f"payload_{n}"] = payload
-        if namespace_id == "":
-            self.shell.add_objects_to_ipython_namespace(ns)
-        return {"payload": payload, "buffers": buffers}
+        try:
+            evaluate = options["evaluate"]
+            if isinstance(evaluate, str):
+                evaluate = (evaluate,)
+            namespace_id = options.get("namespace_id", "")
+            ns = self.get_namespace(namespace_id, buffers=buffers)
+            for row in evaluate:
+                name, expression = ("payload", row) if isinstance(row, str) else row
+                if expression.startswith("import_item(dottedname="):
+                    result = eval(expression, {"import_item": ipylab.common.import_item})  # noqa: S307
+                else:
+                    try:
+                        source = compile(expression, "-- Evaluate --", "eval")
+                    except SyntaxError:
+                        source = compile(expression, "-- Expression --", "exec")
+                        exec(source, ns)  # noqa: S102
+                        result = next(reversed(ns.values()))  # Requires: LastUpdatedDict
+                    else:
+                        result = eval(source, ns)  # noqa: S307
+                if not name:
+                    continue
+                while callable(result) or inspect.isawaitable(result):
+                    if callable(result):
+                        kwgs = {}
+                        for p in inspect.signature(result).parameters:
+                            if p in options:
+                                kwgs[p] = options[p]
+                            elif p in ns:
+                                kwgs[p] = ns[p]
+                        # We use a partial so that we can evaluate with the same namespace.
+                        ns["_partial_call"] = functools.partial(result, **kwgs)
+                        source = compile("_partial_call()", "-- Result call --", "eval")
+                        result = eval(source, ns)  # type: ignore # noqa: S307
+                        ns.pop("_partial_call")
+                    if inspect.isawaitable(result):
+                        result = await result
+                if name:
+                    ns[name] = result
+            buffers = ns.pop("buffers", [])
+            payload = ns.pop("payload", None)
+            if payload is not None:
+                ns["_call_count"] = n = ns.get("_call_count", 0) + 1
+                ns[f"payload_{n}"] = payload
+            if namespace_id == "":
+                self.shell.add_objects_to_ipython_namespace(ns)
+        except BaseException as e:
+            if isinstance(e, NameError):
+                e.add_note("Tip: Check for missing an imports?")
+            raise
+        else:
+            return {"payload": payload, "buffers": buffers}
 
-    def evaluate(
+    async def evaluate(
         self,
         evaluate: str | inspect._SourceObjectType | Iterable[str | tuple[str, str | inspect._SourceObjectType]],
         *,
@@ -298,7 +316,7 @@ class App(Ipylab):
         simple:
         ``` python
         task = app.evaluate(
-            "ipylab.app.shell.open_console",
+            "app.shell.open_console",
             vpath="test",
             kwgs={"mode": ipylab.InsertMode.split_right, "activate": False},
         )
@@ -321,8 +339,9 @@ class App(Ipylab):
         # Task result should be a ShellConnection
         ```
         """
-        kwgs = (kwgs or {}) | {"evaluate": evaluate, "vpath": vpath, "namespace_id": namespace_id}
-        return self.operation("evaluate", kwgs, **kwargs)
+        await self.ready()
+        kwgs = (kwgs or {}) | {"evaluate": evaluate, "vpath": vpath or self.vpath, "namespace_id": namespace_id}
+        return await self.operation("evaluate", kwgs=kwgs, **kwargs)
 
 
 JupyterFrontEnd = App

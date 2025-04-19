@@ -36,12 +36,12 @@
 
 .ipylab-SimpleOutput {
   box-sizing: border-box;
-  display: inline block;
+  flex-direction: column;
   overflow: auto;
 }
 .ipylab-ResizeBox {
   box-sizing: border-box;
-  display: inline block;
+  display: inline-block;
   resize: both;
   overflow: hidden;
 }

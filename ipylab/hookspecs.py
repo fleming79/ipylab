@@ -10,22 +10,31 @@ import pluggy
 hookspec = pluggy.HookspecMarker("ipylab")
 
 if TYPE_CHECKING:
+    import asyncio
     from collections.abc import Awaitable
 
     import ipylab
+    from ipylab.log import IpylabLogHandler
 
 
 @hookspec(firstresult=True)
-def launch_jupyterlab():
+def launch_ipylab():
     """A hook called to start Jupyterlab.
 
     This is called by with the shell command `ipylab`.
     """
 
 
-@hookspec()
-async def ready(obj: ipylab.Ipylab) -> None | Awaitable[None]:
-    """A hook that is called by `obj` when it is ready."""
+@hookspec(historic=True)
+async def autostart_once(app: ipylab.App) -> None | Awaitable[None]:
+    """A hook that is called when the `app` is ready for the first time.
+
+    Historic
+    --------
+
+    This plugin is historic so will be called when a plugin is registered if the
+    app is already ready.
+    """
 
 
 @hookspec(historic=True)
@@ -46,7 +55,7 @@ def default_namespace_objects(namespace_id: str, app: ipylab.App) -> dict[str, A
 
 
 @hookspec(firstresult=True)
-def vpath_getter(app: ipylab.App, kwgs: dict) -> Awaitable[str] | str:  # type: ignore
+async def vpath_getter(app: ipylab.App, kwgs: dict) -> str:  # type: ignore
     """A hook called during `app.shell.add` when `evaluate` is code and `vpath`
     is passed as a dict.
 
@@ -56,5 +65,10 @@ def vpath_getter(app: ipylab.App, kwgs: dict) -> Awaitable[str] | str:  # type: 
 
 
 @hookspec(firstresult=True)
-def default_editor_key_bindings(app: ipylab.App, obj: ipylab.CodeEditor):
-    """Get the key bindings to use for the editor."""
+def get_asyncio_event_loop(app: ipylab.App) -> asyncio.AbstractEventLoop:  # type: ignore
+    "Get the asyncio event loop."
+
+
+@hookspec(firstresult=True)
+def get_logging_handler(app: ipylab.App) -> IpylabLogHandler:  # type: ignore
+    "Get the asyncio event loop."

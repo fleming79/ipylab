@@ -122,8 +122,9 @@ export class JupyterFrontEndModel extends IpylabModel {
       // Relies on per-kernel widget manager.
       const getManager = (KernelWidgetManager as any).getManager;
       const widget_manager: KernelWidgetManager = await getManager(kernel);
+      const code = 'import ipylab;ipylab.App()';
       if (!Private.jfems.has(kernel.id)) {
-        widget_manager.kernel.requestExecute({ code: 'import ipylab' }, true);
+        widget_manager.kernel.requestExecute({ code }, true);
       }
     }
     return await new Promise((resolve, reject) => {

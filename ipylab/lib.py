@@ -9,16 +9,16 @@ import ipywidgets
 
 import ipylab
 from ipylab.common import hookimpl
+from ipylab.log import IpylabLogFormatter, IpylabLogHandler
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable
 
     from ipylab import App
-    from ipylab.ipylab import Ipylab
 
 
 @hookimpl
-def launch_jupyterlab():
+def launch_ipylab():
     import sys
 
     from jupyterlab.labapp import LabApp
@@ -41,20 +41,33 @@ async def autostart(app: ipylab.App) -> None | Awaitable[None]:
 
 
 @hookimpl
-def vpath_getter(app: App, kwgs: dict) -> Awaitable[str] | str:
-    return app.dialog.get_text(**kwgs)
+async def autostart_once(app: ipylab.App) -> None:
+    pass
 
 
 @hookimpl
-def ready(obj: Ipylab):
-    "Pass through"
+async def vpath_getter(app: App, kwgs: dict) -> str:
+    return await app.dialog.get_text(**kwgs)
 
 
 @hookimpl
-def default_editor_key_bindings(app: ipylab.App, obj: ipylab.CodeEditor):  # noqa: ARG001
-    return {}
-
-
-@hookimpl
-def default_namespace_objects(namespace_id: str, app: ipylab.App):
+def default_namespace_objects(namespace_id: str, app: ipylab.App) -> dict:
     return {"ipylab": ipylab, "ipw": ipywidgets, "app": app, "namespace_id": namespace_id}
+
+
+@hookimpl
+def get_asyncio_event_loop(app: ipylab.App):
+    try:
+        return app.comm.kernel.asyncio_event_loop  # type: ignore
+    except AttributeError:
+        import asyncio
+
+        return asyncio.get_running_loop()
+
+
+@hookimpl
+def get_logging_handler(app: ipylab.App) -> IpylabLogHandler:
+    fmt = "%(color)s%(level_symbol)s %(asctime)s.%(msecs)d %(name)s %(owner_rep)s: %(message)s %(reset)s\n"
+    handler = IpylabLogHandler(app.log_level)
+    handler.setFormatter(IpylabLogFormatter(fmt=fmt, style="%", datefmt="%H:%M:%S"))
+    return handler

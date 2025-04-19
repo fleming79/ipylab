@@ -10,7 +10,7 @@ build-backend = "hatchling.build"
 name = "ipylab"
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 classifiers = [
   "Framework :: Jupyter",
   "Framework :: Jupyter :: JupyterLab",
@@ -20,30 +20,34 @@ classifiers = [
   "License :: OSI Approved :: BSD License",
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
 ]
 
 dependencies = [
+  "anyio",
   "jupyterlab>=4.3",
   "ipywidgets>=8.1.5",
   "ipython>=8.32",
   "jupyterlab_widgets>=3.0.11",
   "pluggy~=1.5",
+  "typing_extensions",
+  "traitlets @ {root:uri}/pkg/traitlets-5.14.3-py3-none-any.whl",
+  "ipykernel @ {root:uri}/pkg/ipykernel-7.0.0a1-py3-none-any.whl",
+  "widgetsnbextension @ {root:uri}/pkg/widgetsnbextension-4.0.13-py3-none-any.whl",
+  "jupyterlab_widgets @ {root:uri}/pkg/jupyterlab_widgets-3.0.13-py3-none-any.whl",
+  "ipywidgets @ {root:uri}/pkg/ipywidgets-8.1.5-py3-none-any.whl",
 ]
 dynamic = ["version", "description", "authors", "urls", "keywords"]
 
 [project.optional-dependencies]
 dev = ["hatch", "ruff", "pre-commit"]
 test = ["pytest", "anyio", "pytest-cov", "pytest-mock"]
-per-kernel-widget-manager = [
-  "widgetsnbextension @ {root:uri}/pkg/widgetsnbextension-4.0.13-py3-none-any.whl",
-  "jupyterlab_widgets @ {root:uri}/pkg/jupyterlab_widgets-3.0.13-py3-none-any.whl",
-  "ipywidgets @ {root:uri}/pkg/ipywidgets-8.1.5-py3-none-any.whl",
-]
+examples = ['bqlot', "matplotlib", 'numpy', 'ipympl']
 
 [project.scripts]
-ipylab = "ipylab:plugin_manager.hook.launch_jupyterlab"
+ipylab = "ipylab:plugin_manager.hook.launch_ipylab"
 
 [tool.hatch.version]
 source = "nodejs"
@@ -114,3 +118,7 @@ docstring-code-format = true
 
 [tool.ruff.lint.per-file-ignores]
 "tests*" = ['ARG002', 'SLF001', 'S101', 'PLR2004']
+
+[tool.pyright]
+include = ["ipylab", 'examples', 'tests']
+typeCheckingMode = 'standard'

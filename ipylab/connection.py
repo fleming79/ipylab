@@ -4,22 +4,22 @@
 from __future__ import annotations
 
 import uuid
-import weakref
-from typing import TYPE_CHECKING, Any, ClassVar, override
+from typing import TYPE_CHECKING, ClassVar
 
 from ipywidgets import Widget, register
-from traitlets import Bool, Dict, Instance, Unicode, observe
+from traitlets import Bool, Dict, Instance, Unicode
+from typing_extensions import override
 
+from ipylab.common import Area, Singular
 from ipylab.ipylab import Ipylab
 
 if TYPE_CHECKING:
-    from asyncio import Task
-    from collections.abc import Generator
-    from typing import Literal, Self, overload
+    from collections.abc import Hashable
+    from typing import Self
 
 
 @register
-class Connection(Ipylab):
+class Connection(Singular, Ipylab):
     """This class provides a connection to an object in the frontend.
 
     `Connection` and subclasses of `Connection` are used extensiviely in ipylab
@@ -46,7 +46,6 @@ class Connection(Ipylab):
     _SEP = "|"
     prefix: ClassVar = f"{_PREFIX}Connection{_SEP}"
 
-    _connections: weakref.WeakValueDictionary[str, Self] = weakref.WeakValueDictionary()
     _model_name = Unicode("ConnectionModel").tag(sync=True)
     cid = Unicode(read_only=True, help="connection id").tag(sync=True)
     _dispose = Bool(read_only=True).tag(sync=True)
@@ -54,28 +53,30 @@ class Connection(Ipylab):
 
     auto_dispose = Bool(False, read_only=True, help="Dispose of the object in frontend when closed.").tag(sync=True)
 
+    @override
+    @classmethod
+    def get_single_key(cls, cid: str, **kwgs) -> Hashable:
+        return cid
+
+    @classmethod
+    def exists(cls, cid: str) -> bool:
+        return cid in cls._singular_instances
+
+    @classmethod
+    def close_if_exists(cls, cid: str):
+        if inst := cls._singular_instances.pop(cid, None):
+            inst.close()
+
     def __init_subclass__(cls, **kwargs) -> None:
         cls.prefix = f"{cls._PREFIX}{cls.__name__}{cls._SEP}"
         cls._CLASS_DEFINITIONS[cls.prefix.strip(cls._SEP)] = cls
         super().__init_subclass__(**kwargs)
-
-    def __new__(cls, cid: str, **kwgs):
-        inst = cls._connections.get(cid)
-        if not inst:
-            cls = cls._CLASS_DEFINITIONS[cid.split(cls._SEP, maxsplit=1)[0]]
-            cls._connections[cid] = inst = super().__new__(cls, **kwgs)
-        return inst
 
     def __init__(self, cid: str, **kwgs):
         super().__init__(cid=cid, **kwgs)
 
     def __str__(self):
         return self.cid
-
-    @property
-    @override
-    def repr_info(self):
-        return {"cid": self.cid}
 
     @classmethod
     def to_cid(cls, *args: str) -> str:
@@ -90,18 +91,12 @@ class Connection(Ipylab):
             args = (str(uuid.uuid4()),)
         return cls.prefix + cls._SEP.join(args)
 
-    @classmethod
-    def get_instances(cls) -> Generator[Self, Any, None]:
-        "Get all instances of this class (including subclasses)."
-        for item in cls._connections.values():
-            if isinstance(item, cls):
-                yield item
+    @property
+    @override
+    def repr_info(self):
+        return {"cid": self.cid}
 
-    @observe("comm")
-    def _connection_observe_comm(self, _):
-        if not self.comm:
-            self._connections.pop(self.cid, None)
-
+    @override
     def close(self, *, dispose=True):
         """Permanently close the widget.
 
@@ -110,31 +105,20 @@ class Connection(Ipylab):
         self.set_trait("auto_dispose", dispose)
         super().close()
 
-    if TYPE_CHECKING:
-
-        @overload
-        @classmethod
-        def get_existing_connection(cls, cid: str, *, quiet: Literal[False]) -> Self: ...
-        @overload
-        @classmethod
-        def get_existing_connection(cls, cid: str, *, quiet: Literal[True]) -> Self | None: ...
-        @overload
-        @classmethod
-        def get_existing_connection(cls, cid: str) -> Self: ...
-
     @classmethod
-    def get_existing_connection(cls, cid: str, *, quiet=False):
-        """Get an existing connection.
+    def get_connection(cls, cid: str) -> Self:
+        """Get a connection object from a connection id.
 
-        quiet: bool
-            True: Raise a value error if the connection does not exist.
-            False: Return None.
+        The connection id is a string that identifies the connection.
+        It is composed of the connection type and the connection name, separated by a separator.
+        The connection type is the name of the class that implements the connection.
+        The connection name is a unique name for the connection.
+
+        :param cid: The connection id.
+        :return: The connection object.
         """
-        conn = cls._connections.get(cid)
-        if not conn and not quiet:
-            msg = f"A connection does not exist with '{cid=}'"
-            raise ValueError(msg)
-        return conn
+        cls_ = cls._CLASS_DEFINITIONS[cid.split(cls._SEP, maxsplit=1)[0]]
+        return cls_(cid)
 
 
 Connection._CLASS_DEFINITIONS[Connection.prefix.strip(Connection._SEP)] = Connection  # noqa: SLF001
@@ -165,11 +149,16 @@ class ShellConnection(Connection):
         # Losing strong references doesn't mean the widget should be closed.
         self.close(dispose=False)
 
-    def activate(self):
+    async def activate(self):
         "Activate the connected widget in the shell."
 
-        return self.operation("activate")
+        ids = await self.app.shell.list_widget_ids()
+        if self.cid in ids[Area.left]:
+            await self.app.shell.expand_left()
+        elif self.cid in ids[Area.right]:
+            await self.app.shell.expand_right()
+        return await self.operation("activate")
 
-    def get_session(self) -> Task[dict]:
+    async def get_session(self) -> dict:
         """Get the session of the connected widget."""
-        return self.operation("getSession")
+        return await self.operation("getSession")

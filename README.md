@@ -87,9 +87,7 @@ These versions enable:
 - Viewing widgets from kernels inside from other kernels.
 
 ```bash
-# For per-kernel-widget-manager support (Install modified version of ipywidgets, jupyterlab_widgets & widgetsnbextension)
-
-pip install --no-binary --force-reinstall ipylab[per-kernel-widget-manager]
+pip install --no-binary --force-reinstall ipylab
 ```
 
 ## Running the examples locally
@@ -115,13 +113,13 @@ jupyter lab
 
 ```bash
 # create a new conda environment
-mamba create -n ipylab -c conda-forge nodejs python=3.11 -y
+conda create -n ipylab -c conda-forge nodejs python=3.11 -y
 
 # activate the environment
 conda activate ipylab
 
 # install the Python package
-pip install -e .[dev,per-kernel-widget-manager,test] # (with per-kernel-widget-manager)
+pip install -e .[dev,test,examples]
 
 # link the extension files
 jupyter labextension develop . --overwrite
@@ -142,6 +140,10 @@ jlpm lint
 #or
 jlpm lint:check
 
+# Pyright
+
+pip install pyright[nodejs]
+pyright
 ```
 
 ### VS code debugging

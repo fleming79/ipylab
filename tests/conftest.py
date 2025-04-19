@@ -15,6 +15,7 @@ async def anyio_backend_autouse(anyio_backend):
 
 @pytest.fixture
 async def app(mocker):
-    app = ipylab.app
+    app = ipylab.App()
+    app._trait_values.pop("asyncio_loop", None)
     mocker.patch.object(app, "ready")
     return app
