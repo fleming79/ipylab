@@ -16,7 +16,6 @@ from enum import StrEnum
 from types import CoroutineType
 from typing import (
     TYPE_CHECKING,
-    Any,
     ClassVar,
     Concatenate,
     Generic,
@@ -438,10 +437,10 @@ class Fixed(Generic[S, T]):
         self.created = created
         self.instances = weakref.WeakKeyDictionary()
 
-    def __set_name__(self, owner_cls, name: str):
+    def __set_name__(self, owner_cls: type[S], name: str):
         self.name = name
 
-    def __get__(self, obj: Any, objtype=None) -> T:
+    def __get__(self, obj: S, objtype: type[S] | None = None) -> T:
         if obj is None:
             return self  # type: ignore
         try:
@@ -458,7 +457,8 @@ class Fixed(Generic[S, T]):
                         log.exception(msg, extra={"obj": self.created})
             return instance  # type: ignore
 
-    def __set__(self, obj, value):
+    def __set__(self, obj: S, value: Self):
+        # Note: above we use `Self` for the `value` type hint to give a useful typing error
         msg = f"Setting `Fixed` parameter {obj.__class__.__name__}.{self.name} is forbidden!"
         raise AttributeError(msg)
 

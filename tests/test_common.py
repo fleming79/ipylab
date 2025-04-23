@@ -252,19 +252,11 @@ class TestFixed:
 
     def test_readonly_forbidden_set(self):
         class TestOwner:
-            test_instance = Fixed(CommonTestClass)
+            test_instance = Fixed[Self, CommonTestClass](CommonTestClass)
 
         owner = TestOwner()
         with pytest.raises(AttributeError, match="Setting `Fixed` parameter TestOwner.test_instance is forbidden!"):
-            owner.test_instance = CommonTestClass()
-
-    def test_readonly_lambda(self):
-        class TestOwner:
-            test_instance = Fixed(lambda _: CommonTestClass())
-
-        owner = TestOwner()
-        with pytest.raises(AttributeError, match="Setting `Fixed` parameter TestOwner.test_instance is forbidden!"):
-            owner.test_instance = CommonTestClass()
+            owner.test_instance = CommonTestClass()  # type: ignore Note: This type should be ignored because it is a fixed value. Removing indicates a problem.
 
     def test_function_to_eval(self):
         eval_str = ipylab.common.module_obj_to_import_string(test_last_updated_dict)
