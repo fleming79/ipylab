@@ -38,6 +38,7 @@
   box-sizing: border-box;
   flex-direction: column;
   overflow: auto;
+  display: flex;
 }
 .ipylab-ResizeBox {
   box-sizing: border-box;
