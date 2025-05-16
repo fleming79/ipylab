@@ -4,9 +4,10 @@
 from __future__ import annotations
 
 import collections
+import contextlib
 from typing import TYPE_CHECKING, Self
 
-from IPython.display import Markdown
+from IPython.display import HTML as IPD_HTML
 from ipywidgets import HTML, BoundedIntText, Button, Checkbox, Combobox, Dropdown, HBox, Select, VBox
 from traitlets import directional_link, link, observe
 from typing_extensions import override
@@ -140,16 +141,26 @@ class LogViewer(Panel):
     @autorun
     async def _notify_exception(self, record: logging.LogRecord):
         "Create a notification that an error occurred."
+        try:
+            message = f"{record.exc_info[0].__name__} {record.msg} [{self.app.vpath}]"  # type: ignore
+        except Exception:
+            message = f"{record.levelname.capitalize()} [{self.app.vpath}]"
         await self.app.notification.notify(
-            message=f"vpath:'{self.app.vpath}' Error: {record.msg}",
+            message=message,
             type=ipylab.NotificationType.error,
             actions=[
                 ipylab.NotifyAction(
-                    label="📄",
+                    label="👀",
                     caption="Show exception.",
                     callback=lambda: self._show_error(record=record),
                     keep_open=True,
-                )
+                ),
+                ipylab.NotifyAction(
+                    label="✗",
+                    caption="Dismiss notification",
+                    callback=lambda: None,
+                    keep_open=False,
+                ),
             ],
         )
 
@@ -168,21 +179,25 @@ class LogViewer(Panel):
     @autorun
     async def _show_error(self, record: logging.LogRecord):
         out = SimpleOutput().push(
-            Markdown(f"vpath='{self.app.vpath}': **{record.levelname.capitalize()}**:\n\n{record.message}")
+            IPD_HTML(
+                f'<b><font color="red"></h3>{record.levelname.capitalize()}</b>&emsp;vpath={self.app.vpath}<br>{record.msg}</font>'
+            )
         )
-        try:
+        with contextlib.suppress(Exception):
             out.push(record.output)  # type: ignore
-        except Exception:
-            out.push(record.message)
+
         objects = {
             "record": record,
             "owner": (owner := getattr(record, "owner", None)) and owner(),
             "obj": getattr(record, "obj", None),
         }
-        b = Button(description="Send to console", tooltip="Send record, owner and obj to the console.")
+        b = Button(description="Send to console", tooltip="Send `record`, `owner` and `obj` to the console")
         b.on_click(lambda _: self.app.shell.start_coro(self.app.shell.open_console(objects=objects)))
-        out.push(b)
-        await self.app.shell.add(out, mode=InsertMode.split_right)
+        p = Panel([out, b])
+        p.title.label = record.levelname.capitalize()
+        p.title.caption = self.app.vpath
+        p.title.icon = Icon(name="ipylab-test_tube", svgstr=SVGSTR_TEST_TUBE)
+        await self.app.shell.add(p, mode=InsertMode.split_right)
 
     @autorun
     async def _show_send_dialog(self, b: Button):
