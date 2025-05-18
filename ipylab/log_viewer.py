@@ -142,7 +142,7 @@ class LogViewer(Panel):
     async def _notify_exception(self, record: logging.LogRecord):
         "Create a notification that an error occurred."
         try:
-            message = f"{record.exc_info[0].__name__} {record.msg} [{self.app.vpath}]"  # type: ignore
+            message = f'{record.exc_info[0].__name__} {record.msg} [vpath="{self.app.vpath}"]'  # type: ignore
         except Exception:
             message = f"{record.levelname.capitalize()} [{self.app.vpath}]"
         await self.app.notification.notify(
@@ -193,7 +193,8 @@ class LogViewer(Panel):
         }
         b = Button(description="Send to console", tooltip="Send `record`, `owner` and `obj` to the console")
         b.on_click(lambda _: self.app.shell.start_coro(self.app.shell.open_console(objects=objects)))
-        p = Panel([out, b])
+        out.push(b)
+        p = Panel([out])
         p.title.label = record.levelname.capitalize()
         p.title.caption = self.app.vpath
         p.title.icon = Icon(name="ipylab-test_tube", svgstr=SVGSTR_TEST_TUBE)
