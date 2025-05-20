@@ -239,8 +239,8 @@ class CodeEditor(Ipylab, _String):
         return lambda value: self.set_trait("value", value)
 
     @observe("value")
-    def _observe_value(self, _):
-        if not self._setting_value:
+    def _observe_value(self, change):
+        if self._setting_value != change["new"]:
             # We use throttling to ensure there isn't a backlog of changes to synchronise.
             # When the value is set in Python, we the shared model in the frontend should exactly reflect it.
             async def send_value():
@@ -250,7 +250,7 @@ class CodeEditor(Ipylab, _String):
                     self._sync = self._sync + 1
                     await asyncio.sleep(self.update_throttle_ms / 1e3)
                     if self.value == value:
-                        return
+                        break
 
             self.start_coro(send_value())
 
@@ -268,7 +268,7 @@ class CodeEditor(Ipylab, _String):
                 # Only set the value when a valid sync is provided
                 # sync is done
                 if payload["sync"] == self._sync:
-                    self._setting_value = True
+                    self._setting_value = payload["value"]
                     try:
                         self.load_value(payload["value"])
                     finally:
