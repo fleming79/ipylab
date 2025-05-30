@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import traitlets
 from anyio import Event, create_memory_object_stream
-from ipywidgets import Widget, register
+from ipywidgets import CallbackDispatcher, Widget, register
 from traitlets import Bool, Container, Dict, Instance, List, TraitType, Unicode, observe
 
 import ipylab._frontend as _fe
@@ -88,6 +88,7 @@ class Ipylab(HasApp, WidgetBase):
     _comm = None
     _ipylab_init_complete = False
     _pending_operations: Dict[str, MemoryObjectSendStream] = Dict()
+    signal = Instance(CallbackDispatcher, ())
 
     @property
     def repr_info(self) -> dict[str, Any] | str:
@@ -147,6 +148,8 @@ class Ipylab(HasApp, WidgetBase):
                 self._do_operation_for_fe(True, c["ipylab_FE"], c["operation"], c["payload"], buffers)
             elif "closed" in c:
                 self.close()
+            elif "signal" in c:
+                self.signal(c["signal"])
             else:
                 raise NotImplementedError(msg)  # noqa: TRY301
         except Exception as e:

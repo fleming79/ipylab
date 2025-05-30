@@ -154,6 +154,15 @@ export class IpylabModel extends DOMWidgetModel {
   }
 
   /**
+   * Sends a signal to the Python backend.
+   *
+   * @param args - The arguments to send with the signal. Must be a JSON-serializable value.
+   */
+  sendSignal(args: JSONValue) {
+    this.ipylabSend({ signal: args });
+  }
+
+  /**
    * Schedule an operation to be performed in Python.
    * This is a mirror of `Ipylab.operation` in Python.
    *
@@ -528,7 +537,6 @@ export class IpylabModel extends DOMWidgetModel {
     }
     return widget;
   }
-
 
   /**
    * Converts a value to an object, handling special cases for strings starting with 'IPY_MODEL_'.

@@ -209,6 +209,10 @@ export class CodeEditorView extends StringView {
     // Set up a completer.
 
     if (!this.handler) {
+      const listener = (sender: any, args: CodeEditor.EdgeLocation) => {
+        this.model.sendSignal({ edgeRequested: args });
+      };
+      this.editorWidget.editor.edgeRequested.connect(listener);
       const editor = this.editorWidget.editor;
       const model = new CompleterModel();
       // const completer = new Completer({ editor, model });
