@@ -214,6 +214,7 @@ class CodeEditor(Ipylab, _String):
         lambda c: IpylabCompleter(
             code_editor=c["owner"],
             shell=getattr(getattr(c["owner"].comm, "kernel", None), "shell", None),
+            namespace=c["owner"].app.get_namespace(c["owner"].namespace_id),
         ),
     )
     namespace_id = Unicode("")
