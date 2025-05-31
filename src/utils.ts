@@ -158,7 +158,7 @@ export function listProperties({
     omitHidden
   })) {
     const obj_ = obj[name];
-    const type_: string = typeof obj_;
+    let type_: string = typeof obj_;
     let val: any = name;
     /*eslint no-fallthrough: ["error", { "commentPattern": "break[\\s\\w]*omitted" }]*/
     switch (type_) {
@@ -173,22 +173,19 @@ export function listProperties({
         break;
       case 'object':
         if (obj_ instanceof Promise) {
-          out[name] = 'promise';
-          break;
+          val = name;
+          type_ = 'promise';
         } else if (obj_ instanceof Signal) {
-          out[name] = 'signal';
-          break;
-        } else if (depth <= 1) {
-          out[name] = 'object';
+          type_ = 'signal';
+        } else if (depth > 1) {
+          out[name] = listProperties({
+            obj: obj_,
+            type,
+            depth: depth - 1,
+            omitHidden
+          });
           break;
         }
-        val = {};
-        val[name] = listProperties({
-          obj: obj_,
-          type,
-          depth: depth - 1,
-          omitHidden
-        });
       // note: break is omitted intentionally
       default:
         if (!out[`<${type_}s>`]) {
