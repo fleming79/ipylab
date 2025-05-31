@@ -173,21 +173,23 @@ export function listProperties({
         break;
       case 'object':
         if (obj_ instanceof Promise) {
-          type_ = 'Promise';
+          out[name] = 'promise';
           break;
         } else if (obj_ instanceof Signal) {
-          type_ = 'Signal';
+          out[name] = 'signal';
+          break;
+        } else if (depth <= 1) {
+          out[name] = 'object';
+          break;
         }
-        if (depth > 1) {
-          val = {};
-          val[name] = listProperties({
-            obj: obj_,
-            type,
-            depth: 1,
-            omitHidden
-          });
-        }
-      // caution: break is omitted intentionally
+        val = {};
+        val[name] = listProperties({
+          obj: obj_,
+          type,
+          depth: depth - 1,
+          omitHidden
+        });
+      // note: break is omitted intentionally
       default:
         if (!out[`<${type_}s>`]) {
           out[`<${type_}s>`] = [val];

@@ -324,7 +324,13 @@ class Transform(StrEnum):
                 mappings = typing.cast(TransformDictAdvanced, transform)["mappings"]
                 return {key: await cls.transform_payload(mappings[key], payload[key]) for key in mappings}  # type: ignore
             case Transform.connection | Transform.auto if isinstance(payload, dict) and (cid := payload.get("cid")):
-                return await ipylab.Connection.get_connection(cid).ready()
+                try:
+                    conn = ipylab.Connection.get_connection(cid)
+                except KeyError:
+                    if transform_ == Transform.connection:
+                        raise
+                else:
+                    return await conn.ready()
         return payload
 
 

@@ -85,7 +85,10 @@ export class IpylabModel extends DOMWidgetModel {
   async ipylabInit(base: any = null) {
     if (!base) {
       let subpath;
-      [base, subpath] = this.toBaseAndSubpath(this.get('ipylab_base'), 'this');
+      [base, subpath] = await this.toBaseAndSubpath(
+        this.get('ipylab_base'),
+        'this'
+      );
       base = getNestedProperty({ obj: base, subpath, nullIfMissing: true });
       if (!base) {
         this.ipylabSend({
@@ -208,14 +211,14 @@ export class IpylabModel extends DOMWidgetModel {
    * Perform a generic operation and return the result.
    */
   async genericOperation(payload: any): Promise<any> {
-    payload.obj = this.getBase(payload.basename);
+    payload.obj = await this.getBase(payload.basename);
     switch (payload.genericOperation) {
       case 'executeMethod':
         return await executeMethod(payload);
       case 'getProperty':
         return await getNestedProperty(payload);
       case 'listProperties':
-        payload.obj = getNestedProperty(payload);
+        payload.obj = await getNestedProperty(payload);
         return listProperties(payload);
       case 'setProperty':
         return setNestedProperty(payload);
@@ -375,7 +378,7 @@ export class IpylabModel extends DOMWidgetModel {
         let base, value;
         value = getNestedProperty({ obj, subpath });
         if (value) {
-          [base, value] = this.toBaseAndSubpath(value);
+          [base, value] = await this.toBaseAndSubpath(value);
           value = await IpylabModel.toObject(base, value);
           setNestedProperty({ obj, subpath, value });
         }
@@ -393,21 +396,22 @@ export class IpylabModel extends DOMWidgetModel {
    * @param defaultBasename The default basename to use if the value is a string. Defaults to 'base'.
    * @returns A tuple containing the base (obtained from `this.getBase` using the basename) and the subpath.
    */
-  private toBaseAndSubpath(
+  private async toBaseAndSubpath(
     value: string | Array<string>,
     defaultBasename = 'base'
-  ): [any, string] {
+  ): Promise<[any, string]> {
     let basename = defaultBasename;
     if (value instanceof Array) {
       [basename, value] = value;
     }
-    return [this.getBase(basename), value ?? ''];
+    const base = await this.getBase(basename);
+    return [base, value ?? ''];
   }
 
   /**
    * Get the object referenced by basename.
    */
-  private getBase(basename: string) {
+  private async getBase(basename: string) {
     switch (basename) {
       case 'this':
         return this;
@@ -418,7 +422,7 @@ export class IpylabModel extends DOMWidgetModel {
       case 'MainMenu':
         return MainMenu;
       default:
-        throw new Error(`Invalid basename: "${basename}"`);
+        return await IpylabModel.toObject(this, basename);
     }
   }
 
