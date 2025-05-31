@@ -76,7 +76,7 @@
   ],
   "compounds": [
     {
-      "name": "Debug IPylab with firefox",
+      "name": "Debug IPylab with Firefox",
       "configurations": ["Ipylab", "IPylab frontend with Firefox"]
     },
     {

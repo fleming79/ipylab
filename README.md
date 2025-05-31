@@ -128,6 +128,9 @@ jupyter labextension develop . --overwrite
 jlpm clean
 jlpm build
 
+# At this point you can run and debug. vscode configs are provided for Firefox and Chrome.
+# "Debug Ipylab with Firefox | Chrome"
+
 # pre-commit (optional)
 pip install pre-commit
 pre-commit run
