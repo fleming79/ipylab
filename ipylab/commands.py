@@ -51,8 +51,8 @@ class KeybindingConnection(InfoConnection):
 
     @override
     @classmethod
-    def to_cid(cls, command: CommandConnection):  # type: ignore
-        return super().to_cid(str(command), str(uuid.uuid4()))
+    def to_id(cls, command: CommandConnection):  # type: ignore
+        return super().to_id(str(command), str(uuid.uuid4()))
 
 
 class CommandConnection(InfoConnection):
@@ -68,8 +68,8 @@ class CommandConnection(InfoConnection):
 
     @override
     @classmethod
-    def to_cid(cls, command_registry: str, vpath: str, name: str):  # type: ignore
-        return super().to_cid(command_registry, vpath, name)
+    def to_id(cls, command_registry: str, vpath: str, name: str):  # type: ignore
+        return super().to_id(command_registry, vpath, name)
 
     @property
     def repr_info(self):
@@ -83,7 +83,7 @@ class CommandConnection(InfoConnection):
 
         config: CommandOptions = await self.update_property("config", kwgs)  # type: ignore
         if emit:
-            await self.commands.execute_method("commandChanged.emit", ({"id": self.cid},))
+            await self.commands.execute_method("commandChanged.emit", ({"id": self.connection_id},))
         return config
 
     async def add_key_binding(
@@ -97,9 +97,9 @@ class CommandConnection(InfoConnection):
             "selector": selector or self.app.selector,
             "command": str(self),
         }
-        cid = KeybindingConnection.to_cid(self)
-        KeybindingConnection.close_if_exists(cid)
-        transform: TransformType = {"transform": Transform.connection, "cid": cid}
+        connection_id = KeybindingConnection.to_id(self)
+        KeybindingConnection.close_if_exists(connection_id)
+        transform: TransformType = {"transform": Transform.connection, "connection_id": connection_id}
         kb: KeybindingConnection = await self.commands.execute_method("addKeyBinding", (args,), transform=transform)
         kb.add_to_tuple(self, "key_bindings")
         kb.info = args
@@ -115,8 +115,8 @@ class CommandPalletItemConnection(InfoConnection):
 
     @override
     @classmethod
-    def to_cid(cls, command: CommandConnection, category: str):  # type: ignore
-        return super().to_cid(str(command), category)
+    def to_id(cls, command: CommandConnection, category: str):  # type: ignore
+        return super().to_id(str(command), category)
 
 
 class CommandPalette(Singular, Ipylab):
@@ -166,10 +166,10 @@ class CommandPalette(Singular, Ipylab):
         if str(command) not in self.app.commands.all_commands:
             msg = f"{command=} is not registered in app command registry app.commands!"
             raise RuntimeError(msg)
-        cid = CommandPalletItemConnection.to_cid(command, category)
-        CommandPalletItemConnection.close_if_exists(cid)
+        connection_id = CommandPalletItemConnection.to_id(command, category)
+        CommandPalletItemConnection.close_if_exists(connection_id)
         info = {"args": args, "category": category, "command": str(command), "rank": rank}
-        transform: TransformType = {"transform": Transform.connection, "cid": cid}
+        transform: TransformType = {"transform": Transform.connection, "connection_id": connection_id}
         cpc: CommandPalletItemConnection = await self.execute_method("addItem", (info,), transform=transform)
         self.close_with_self(cpc)
         cpc.add_to_tuple(self, "connections")
@@ -218,8 +218,8 @@ class CommandRegistry(Singular, Ipylab):
         kwgs = {}
         for n, p in inspect.signature(cmd).parameters.items():
             if n == "ref":
-                cid = payload.get("cid")
-                kwgs[n] = ShellConnection(cid) if cid else None
+                connection_id = payload.get("connection_id")
+                kwgs[n] = ShellConnection(connection_id) if connection_id else None
             elif n in args:
                 kwgs[n] = args[n]
             elif n in ns:
@@ -255,16 +255,16 @@ class CommandRegistry(Singular, Ipylab):
     ) -> CommandConnection:
         """Add a python command that can be executed by Jupyterlab.
 
-        The `cid` of the CommnandConnection is used as the `id` in the App
+        The `connection_id` of the CommnandConnection is used as the `id` in the App
         command registry.
 
-        The `cid` is constructed from:
+        The `connection_id` is constructed from:
 
         1. registry name: The name of this command registry [Jupyterlab]
         2. vpath: The virtual 'path' of the app.
         3. name: The name of the command to lookup locally.
 
-        If a cid (id) already exists, the existing CommandConnection will be closed prior
+        If a connection_id (id) already exists, the existing CommandConnection will be closed prior
         to adding the new command.
 
         name: str
@@ -281,11 +281,11 @@ class CommandRegistry(Singular, Ipylab):
 
         await self.ready()
         app = await self.app.ready()
-        cid = CommandConnection.to_cid(self.name, app.vpath, name)
-        CommandConnection.close_if_exists(cid)
+        connection_id = CommandConnection.to_id(self.name, app.vpath, name)
+        CommandConnection.close_if_exists(connection_id)
         kwgs = kwgs | {
-            "id": cid,
-            "cid": cid,
+            "id": connection_id,
+            "connection_id": connection_id,
             "caption": caption,
             "label": label or name,
             "iconClass": icon_class,
@@ -294,7 +294,7 @@ class CommandRegistry(Singular, Ipylab):
         cc: CommandConnection = await self.operation(
             "addCommand",
             kwgs,
-            transform={"transform": Transform.connection, "cid": cid},
+            transform={"transform": Transform.connection, "connection_id": connection_id},
             toObject=["icon"] if isinstance(icon, Icon) else [],
         )
         self.close_with_self(cc)
@@ -327,7 +327,7 @@ class CommandRegistry(Singular, Ipylab):
         app = await self.app.ready()
         id_ = str(command_id)
         if id_ not in self.all_commands:
-            id_ = CommandConnection.to_cid(self.name, app.vpath, id_)
+            id_ = CommandConnection.to_id(self.name, app.vpath, id_)
             if id_ not in self.all_commands:
                 msg = f"Command '{command_id}' not registered!"
                 raise ValueError(msg)
@@ -336,15 +336,15 @@ class CommandRegistry(Singular, Ipylab):
     async def create_menu(self, label: str, rank: int = 500) -> MenuConnection:
         "Make a new menu that can be used where a menu is required."
         await self.ready()
-        cid = ipylab.menu.MenuConnection.to_cid()
-        ipylab.menu.MenuConnection.close_if_exists(cid)
-        options = {"id": cid, "label": label, "rank": int(rank)}
+        connection_id = ipylab.menu.MenuConnection.to_id()
+        ipylab.menu.MenuConnection.close_if_exists(connection_id)
+        options = {"id": connection_id, "label": label, "rank": int(rank)}
         mc: MenuConnection = await self.execute_method(
             "generateMenu",
             (f"{pack(self)}.base", options, (Obj.this, "translator")),
             obj=Obj.MainMenu,
             toObject=["args[0]", "args[2]"],
-            transform={"transform": Transform.connection, "cid": cid},
+            transform={"transform": Transform.connection, "connection_id": connection_id},
         )
         self.close_with_self(mc)
         mc.info = options

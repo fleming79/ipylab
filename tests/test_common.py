@@ -59,12 +59,12 @@ class TestTransformValidate:
     def test_validate_connection_transform(self):
         transform: TransformDictConnection = {
             "transform": Transform.connection,
-            "cid": "ipylab-Connection",
+            "connection_id": "ipylab-Connection",
         }
         result = Transform.validate(transform)
         assert isinstance(result, dict)
         assert result["transform"] == Transform.connection
-        assert result.get("cid") == "ipylab-Connection"
+        assert result.get("connection_id") == "ipylab-Connection"
 
     def test_validate_advanced_transform(self):
         transform: TransformDictAdvanced = {
@@ -76,7 +76,7 @@ class TestTransformValidate:
                 },
                 "path2": {
                     "transform": Transform.connection,
-                    "cid": "ipylab-Connection",
+                    "connection_id": "ipylab-Connection",
                 },
             },
         }
@@ -97,9 +97,11 @@ class TestTransformValidate:
     def test_validate_invalid_connection_transform(self):
         transform: TransformDictConnection = {
             "transform": Transform.connection,
-            "cid": "invalid_cid",
+            "connection_id": "invalid_cid",
         }
-        with pytest.raises(ValueError, match="'cid' should start with 'ipylab-' but got cid='invalid_cid'"):
+        with pytest.raises(
+            ValueError, match="'connection_id' should start with 'ipylab-' but got connection_id='invalid_cid'"
+        ):
             Transform.validate(transform)
 
     def test_validate_invalid_advanced_transform(self):
@@ -137,13 +139,13 @@ class TestTransformPayload:
                 },
                 "key2": {
                     "transform": Transform.connection,
-                    "cid": "ipylab-Connection",
+                    "connection_id": "ipylab-Connection",
                 },
             },
         }
         payload = {
             "key1": {"id": "test_id"},
-            "key2": {"cid": "ipylab-Connection"},
+            "key2": {"connection_id": "ipylab-Connection"},
         }
         result = await Transform.transform_payload(transform, payload)
         assert isinstance(result, dict)
@@ -153,15 +155,15 @@ class TestTransformPayload:
     async def test_transform_payload_connection(self, mock_connection):
         transform: TransformDictConnection = {
             "transform": Transform.connection,
-            "cid": "ipylab-Connection",
+            "connection_id": "ipylab-Connection",
         }
-        payload = {"cid": "ipylab-Connection"}
+        payload = {"connection_id": "ipylab-Connection"}
         result = await Transform.transform_payload(transform, payload)
         assert isinstance(result, Connection)
 
     async def test_transform_payload_auto(self, mock_connection):
         transform = Transform.auto
-        payload = {"cid": "ipylab-Connection"}
+        payload = {"connection_id": "ipylab-Connection"}
         result = await Transform.transform_payload(transform, payload)
         assert isinstance(result, Connection)
 

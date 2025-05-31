@@ -95,7 +95,7 @@ export class ShellModel extends IpylabModel {
    * code as 'evalute'. The evaluated code MUST return a widget with a view
    * to be valid.
    *
-   * @param args An object with area, options, cid, id, vpath & evaluate.
+   * @param args An object with area, options, connection_id, id, vpath & evaluate.
    */
 
   private static async addToShell(args: any): Promise<Widget> {
@@ -113,18 +113,19 @@ export class ShellModel extends IpylabModel {
         throw e;
       }
     }
-    args.cid =
-      args.cid || ShellModel.ConnectionModel.new_cid('ShellConnection');
+    args.connection_id =
+      args.connection_id ||
+      ShellModel.ConnectionModel.new_cid('ShellConnection');
     if (args.asMainArea && !(widget instanceof MainAreaWidget)) {
       widget.addClass('ipylab-MainArea');
       const w = (widget = new MainAreaWidget({ content: widget }));
       w.toolbar.dispose();
       w.contentHeader.dispose();
-      w.id = args.cid;
+      w.id = args.connection_id;
     }
-    ShellModel.ConnectionModel.registerConnection(args.cid, widget);
+    ShellModel.ConnectionModel.registerConnection(args.connection_id, widget);
 
-    widget.id = widget.id || args.cid || UUID.uuid4();
+    widget.id = widget.id || args.connection_id || UUID.uuid4();
     ShellModel.app.shell.add(widget as any, args.area || 'main', args.options);
 
     // Register widgets originating from IpyWidgets

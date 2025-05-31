@@ -109,7 +109,7 @@ const extension: JupyterFrontEndPlugin<void> = {
         void restorer.restore(exports.IpylabModel.tracker, {
           command: CommandIDs.restore,
           args: widget => (widget as any).ipylabSettings,
-          name: widget => (widget as any).ipylabSettings.cid,
+          name: widget => (widget as any).ipylabSettings.connection_id,
           when
         });
       }

@@ -36,9 +36,9 @@ class Launcher(Singular, Ipylab):
         if str(cmd) not in commands.all_commands:
             msg = f"{cmd=} is not registered in app command registry app.commands!"
             raise RuntimeError(msg)
-        cid = LauncherConnection.to_cid(cmd, category)
+        connection_id = LauncherConnection.to_id(cmd, category)
         args = {"command": str(cmd), "category": category, "rank": rank, "args": args}
-        transform: TransformType = {"transform": Transform.connection, "cid": cid}
+        transform: TransformType = {"transform": Transform.connection, "connection_id": connection_id}
         lc: LauncherConnection = await self.execute_method("add", (args,), transform=transform)
         cmd.close_with_self(lc)
         lc.add_to_tuple(self, "connections")

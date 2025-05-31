@@ -86,7 +86,7 @@ class RankedMenu(Ipylab):
         mic: MenuItemConnection = await self.execute_method(
             subpath="addItem",
             args=(info,),
-            transform={"transform": Transform.connection, "cid": MenuItemConnection.to_cid()},
+            transform={"transform": Transform.connection, "connection_id": MenuItemConnection.to_id()},
             toObject=to_object,
         )
         self.close_with_self(mic)

@@ -92,10 +92,10 @@ class NotificationManager(Singular, Ipylab):
     @override
     async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list):
         """Overload this function as required."""
-        action = ActionConnection(payload["cid"])
+        action = ActionConnection(payload["connection_id"])
         match operation:
             case "action_callback":
-                action = ActionConnection(payload["cid"])
+                action = ActionConnection(payload["connection_id"])
                 await action.ready()
                 callback = action.callback
                 result = callback()
@@ -136,11 +136,11 @@ class NotificationManager(Singular, Ipylab):
         actions_ = [await self._ensure_action(v) for v in actions]
         if actions_:
             options["actions"] = actions_  # type: ignore
-        cid = NotificationConnection.to_cid()
+        connection_id = NotificationConnection.to_id()
         notification: NotificationConnection = await self.operation(
             operation="notification",
             kwgs=kwgs,
-            transform={"transform": Transform.connection, "cid": cid},
+            transform={"transform": Transform.connection, "connection_id": connection_id},
             toObject=[f"options.actions[{i}]" for i in range(len(actions_))] if actions_ else [],
         )
         notification.add_to_tuple(self, "connections")
@@ -158,9 +158,15 @@ class NotificationManager(Singular, Ipylab):
     ) -> ActionConnection:
         "Create an action to use in a notification."
         await self.ready()
-        cid = ActionConnection.to_cid()
-        kwgs = {"label": label, "displayType": display_type, "keep_open": keep_open, "caption": caption, "cid": cid}
-        transform: TransformType = {"transform": Transform.connection, "cid": cid}
+        connection_id = ActionConnection.to_id()
+        kwgs = {
+            "label": label,
+            "displayType": display_type,
+            "keep_open": keep_open,
+            "caption": caption,
+            "connection_id": connection_id,
+        }
+        transform: TransformType = {"transform": Transform.connection, "connection_id": connection_id}
         ac: ActionConnection = await self.operation("createAction", kwgs, transform=transform)
         self.close_with_self(ac)
         ac.callback = callback

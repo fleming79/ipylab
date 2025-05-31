@@ -263,7 +263,7 @@ class Transform(StrEnum):
 
     transform = {
         "transform": Transform.connection,
-        "cid": "ID TO USE FOR CONNECTION",
+        "connection_id": "ID TO USE FOR CONNECTION",
     }
 
     `advanced`
@@ -293,11 +293,13 @@ class Transform(StrEnum):
                         raise TypeError
                     return TransformDictFunction(transform=Transform.function, code=code)
                 case cls.connection:
-                    cid = transform.get("cid")
-                    if cid and not cid.startswith(ipylab.Connection._PREFIX):  # noqa: SLF001
-                        msg = f"'cid' should start with '{ipylab.Connection._PREFIX}' but got {cid=}"  # noqa: SLF001
+                    connection_id = transform.get("connection_id")
+                    if connection_id and not connection_id.startswith(ipylab.Connection._PREFIX):  # noqa: SLF001
+                        msg = (
+                            f"'connection_id' should start with '{ipylab.Connection._PREFIX}' but got {connection_id=}"  # noqa: SLF001
+                        )
                         raise ValueError(msg)
-                    return TransformDictConnection(transform=Transform.connection, cid=cid)
+                    return TransformDictConnection(transform=Transform.connection, connection_id=connection_id)
                 case cls.advanced:
                     mappings = {}
                     transform_ = TransformDictAdvanced(transform=Transform.advanced, mappings=mappings)
@@ -323,9 +325,11 @@ class Transform(StrEnum):
             case Transform.advanced:
                 mappings = typing.cast(TransformDictAdvanced, transform)["mappings"]
                 return {key: await cls.transform_payload(mappings[key], payload[key]) for key in mappings}  # type: ignore
-            case Transform.connection | Transform.auto if isinstance(payload, dict) and (cid := payload.get("cid")):
+            case Transform.connection | Transform.auto if isinstance(payload, dict) and (
+                connection_id := payload.get("connection_id")
+            ):
                 try:
-                    conn = ipylab.Connection.get_connection(cid)
+                    conn = ipylab.Connection.get_connection(connection_id)
                 except KeyError:
                     if transform_ == Transform.connection:
                         raise
@@ -346,7 +350,7 @@ class TransformDictAdvanced(TypedDict):
 
 class TransformDictConnection(TypedDict):
     transform: Literal[Transform.connection]
-    cid: NotRequired[str | None]
+    connection_id: NotRequired[str | None]
 
 
 TransformType = Transform | TransformDictAdvanced | TransformDictFunction | TransformDictConnection

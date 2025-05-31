@@ -56,8 +56,8 @@ class Shell(Singular, Ipylab):
 
         If the widget is already in the shell, it may be moved or activated.
 
-        To multiple instances of the same widget in the shell provide a new cid
-        with `cid=ShellConnection.to_cid()`.
+        To multiple instances of the same widget in the shell provide a new connection_id
+        with `connection_id=ShellConnection.to_id()`.
 
         Parameters
         ---------
@@ -110,18 +110,18 @@ class Shell(Singular, Ipylab):
         if "asMainArea" not in args:
             args["asMainArea"] = area in [Area.left, Area.main, Area.right, Area.down]
         if isinstance(obj, ShellConnection):
-            if "cid" in args and args["cid"] != obj.cid:
-                msg = f"The provided {args['cid']=} does not match {obj.cid=}"
+            if "connection_id" in args and args["connection_id"] != obj.connection_id:
+                msg = f"The provided {args['connection_id']=} does not match {obj.connection_id=}"
                 raise RuntimeError(msg)
-            args["cid"] = obj.cid
+            args["connection_id"] = obj.connection_id
         elif isinstance(obj, Widget):
             if not obj._view_name:  # noqa: SLF001
                 msg = f"This widget does not have a view {obj}"
                 raise RuntimeError(msg)
-            if not args.get("cid") and reversed(self.connections):
+            if not args.get("connection_id") and reversed(self.connections):
                 for c in self.connections:
                     if c.widget is obj:
-                        args["cid"] = c.cid
+                        args["connection_id"] = c.connection_id
                         break
             args["ipy_model"] = obj.model_id
         else:
@@ -188,7 +188,7 @@ class Shell(Singular, Ipylab):
             ref_ = await self.connect_to_widget(ref_)
         objects_ = {"ref": ref_} | (objects or {})
         args = {"path": app.vpath, "insertMode": InsertMode(mode), "activate": activate, "ref": f"{pack(ref_)}.id"}
-        tf: TransformType = {"transform": Transform.connection, "cid": ConsoleConnection.to_cid(app.vpath)}
+        tf: TransformType = {"transform": Transform.connection, "connection_id": ConsoleConnection.to_id(app.vpath)}
         cc: ConsoleConnection = await app.commands.execute("console:open", args, toObject=["args[ref]"], transform=tf)
         self.console = cc
         cc.add_to_tuple(self, "connections")

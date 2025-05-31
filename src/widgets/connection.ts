@@ -8,7 +8,7 @@ import { IObservableDisposable } from '@lumino/disposable';
 import { Widget } from '@lumino/widgets';
 
 /**
- * ConnectionModel provides a connection to an object using a unique 'cid'.
+ * ConnectionModel provides a connection to an object using a unique 'connection_id'.
  *
  * The object to be referenced must first be registered static method
  * `ConnectionModel.registerConnection`.
@@ -22,7 +22,7 @@ export class ConnectionModel extends IpylabModel {
   }
 
   async ipylabInit(base: any = null) {
-    this.cid_ = this.get('cid');
+    this.connection_id = this.get('connection_id');
     base = await this.getObject();
     if (!base) {
       this.close();
@@ -38,8 +38,8 @@ export class ConnectionModel extends IpylabModel {
   }
 
   close(comm_closed = false): Promise<void> {
-    Private.pending.get(this.cid_)?.reject('closing');
-    Private.pending.delete(this.cid_);
+    Private.pending.get(this.connection_id)?.reject('closing');
+    Private.pending.delete(this.connection_id);
     this.base?.disposed?.disconnect(this._base_disposed, this);
     if ((this.base as any)?.ipylabDisposeOnClose ?? this.get('auto_dispose')) {
       this.set('auto_dispose', false);
@@ -50,19 +50,19 @@ export class ConnectionModel extends IpylabModel {
 
   async getObject(): Promise<IObservableDisposable> {
     // This is async for overloading
-    return Private.connections.get(this.cid_);
+    return Private.connections.get(this.connection_id);
   }
 
   /**
    * Keep a reference to an object so it can be found from the backend.
-   * Also keeps a reverse mapping for the last registered cid of the object
+   * Also keeps a reverse mapping for the last registered connection_id of the object
    * see: `IpylabModel.get_cid`
 
    * @param obj
    */
-  static registerConnection(cid: string, obj: any) {
-    if (!cid) {
-      throw new Error('`cid` not provided!');
+  static registerConnection(connection_id: string, obj: any) {
+    if (!connection_id) {
+      throw new Error('`connection_id` not provided!');
     }
     if (typeof obj !== 'object') {
       throw new Error(`An object is required but got a '${typeof obj}'`);
@@ -73,19 +73,24 @@ export class ConnectionModel extends IpylabModel {
     if (obj?.isDisposed) {
       throw new Error('object is disposed');
     }
-    if (Private.connections.has(cid) && Private.connections.get(cid) !== obj) {
-      throw new Error(`Another object is already registered for cid: ${cid}`);
+    if (
+      Private.connections.has(connection_id) &&
+      Private.connections.get(connection_id) !== obj
+    ) {
+      throw new Error(
+        `Another object is already registered for connection_id: ${connection_id}`
+      );
     }
     ConnectionModel.ensureObservableDisposable(obj);
     obj.disposed.connect(() => {
-      Private.connections.delete(cid);
+      Private.connections.delete(connection_id);
       Private.connections_rev.delete(obj);
     });
-    Private.connections.set(cid, obj);
-    Private.connections_rev.set(obj, cid);
-    if (Private.pending.has(cid)) {
-      Private.pending.get(cid).resolve(null);
-      Private.pending.delete(cid);
+    Private.connections.set(connection_id, obj);
+    Private.connections_rev.set(obj, connection_id);
+    if (Private.pending.has(connection_id)) {
+      Private.pending.get(connection_id).resolve(null);
+      Private.pending.delete(connection_id);
     }
     return obj;
   }
@@ -137,14 +142,16 @@ export class ConnectionModel extends IpylabModel {
         ConnectionModel.ShellModel.getLuminoWidgetFromShell(obj.id)
           ? 'ShellConnection'
           : 'Connection';
-      const cid = ConnectionModel.new_cid(cls);
-      ConnectionModel.registerConnection(cid, obj);
+      const connection_id = ConnectionModel.new_cid(cls);
+      ConnectionModel.registerConnection(connection_id, obj);
     }
     return Private.connections_rev.get(obj);
   }
 
-  static getConnection(cid: string): IObservableDisposable | undefined {
-    return Private.connections.get(cid);
+  static getConnection(
+    connection_id: string
+  ): IObservableDisposable | undefined {
+    return Private.connections.get(connection_id);
   }
 
   /**
@@ -165,8 +172,8 @@ export class ConnectionModel extends IpylabModel {
     return `${_PREFIX}${cls}${_SEP}${UUID.uuid4()}`;
   }
 
-  // 'cid' is used by BackboneJS so we use cid_ here.
-  cid_: string;
+  // 'connection_id' is used by BackboneJS so we use connection_id here.
+  connection_id: string;
   readonly isConnectionModel = true;
 }
 
@@ -183,19 +190,19 @@ export class ShellConnectionModel extends ConnectionModel {
 
   async getObject() {
     if (
-      !Private.connections.has(this.cid_) &&
-      !Private.pending.has(this.cid_)
+      !Private.connections.has(this.connection_id) &&
+      !Private.pending.has(this.connection_id)
     ) {
       const pending = new PromiseDelegate<null>();
-      Private.pending.set(this.cid_, pending);
+      Private.pending.set(this.connection_id, pending);
       IpylabModel.tracker.restored.then(() => {
-        if (!Private.connections.has(this.cid_)) {
+        if (!Private.connections.has(this.connection_id)) {
           setTimeout(() => pending.resolve(null), 10000);
         }
       });
     }
-    await Private.pending.get(this.cid_)?.promise;
-    return Private.connections.get(this.cid_);
+    await Private.pending.get(this.connection_id)?.promise;
+    return Private.connections.get(this.connection_id);
   }
 
   async operation(op: string, payload: any): Promise<any> {

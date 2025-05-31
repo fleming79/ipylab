@@ -148,7 +148,10 @@ export class IpylabModel extends DOMWidgetModel {
     } catch {
       if (content.transform === 'auto') {
         content.payload = {
-          cid: IpylabModel.ConnectionModel.get_cid(content.payload, true)
+          connection_id: IpylabModel.ConnectionModel.get_cid(
+            content.payload,
+            true
+          )
         };
       }
       content = toJSONsubstituteCylic(content);
@@ -443,7 +446,9 @@ export class IpylabModel extends DOMWidgetModel {
     switch (transform) {
       case 'auto':
         if (obj?.dispose) {
-          return { cid: IpylabModel.ConnectionModel.get_cid(obj, true) };
+          return {
+            connection_id: IpylabModel.ConnectionModel.get_cid(obj, true)
+          };
         }
         if (typeof obj?.iterator === 'function') {
           return Array.from(obj);
@@ -452,10 +457,15 @@ export class IpylabModel extends DOMWidgetModel {
       case 'null':
         return null;
       case 'connection':
-        if (args.cid) {
-          IpylabModel.ConnectionModel.registerConnection(args.cid, obj);
+        if (args.connection_id) {
+          IpylabModel.ConnectionModel.registerConnection(
+            args.connection_id,
+            obj
+          );
         }
-        return { cid: IpylabModel.ConnectionModel.get_cid(obj, true) };
+        return {
+          connection_id: IpylabModel.ConnectionModel.get_cid(obj, true)
+        };
       case 'advanced':
         // expects args.mappings = {key:transform}
         result = new Object();
@@ -508,13 +518,17 @@ export class IpylabModel extends DOMWidgetModel {
    * @returns
    */
   static async toLuminoWidget({
-    cid = '',
+    connection_id = '',
     id = '',
     ipy_model = ''
-  }: { cid?: string; id?: string; ipy_model?: string } = {}): Promise<Widget> {
+  }: {
+    connection_id?: string;
+    id?: string;
+    ipy_model?: string;
+  } = {}): Promise<Widget> {
     let widget: Widget;
 
-    widget = IpylabModel.ConnectionModel.getConnection(cid) as Widget;
+    widget = IpylabModel.ConnectionModel.getConnection(connection_id) as Widget;
     if (widget instanceof Widget) {
       return widget;
     }
@@ -536,7 +550,7 @@ export class IpylabModel extends DOMWidgetModel {
     }
     if (!(widget instanceof Widget)) {
       throw new Error(
-        `Unable to create a luminoWidget cid='${cid}' id='${id}' ipy_model='${ipy_model}`
+        `Unable to create a luminoWidget connection_id='${connection_id}' id='${id}' ipy_model='${ipy_model}`
       );
     }
     return widget;

@@ -57,8 +57,10 @@ class Panel(HasApp, WidgetBase, Box):
     connections: Container[tuple[Connection, ...]] = TypedTuple(trait=Instance(Connection))
     add_to_shell_defaults: ClassVar = AddToShellType(mode=InsertMode.tab_after)
 
-    async def add_to_shell(self, **kwgs: Unpack[AddToShellType]) -> ShellConnection:
+    async def add_to_shell(self, *, connection_id="", **kwgs: Unpack[AddToShellType]) -> ShellConnection:
         """Add this panel to the shell."""
+        if connection_id:
+            kwgs["connection_id"] = connection_id  # type: ignore
         return await self.app.shell.add(self, **self.add_to_shell_defaults | kwgs)
 
 

@@ -31,7 +31,7 @@ class Connection(Singular, Ipylab):
 
     Each subclass of `Connection` is designated a `prefix` derived from the subclass
     name. Creating a new object will create an instance of the correct class
-    according to the `cid`. Only one instance of an object will exist per `cid`
+    according to the `connection_id`. Only one instance of an object will exist per `connection_id`
     in a kernel.
 
     Closing a connection will also disposed of the object in the frontend by
@@ -47,7 +47,7 @@ class Connection(Singular, Ipylab):
     prefix: ClassVar = f"{_PREFIX}Connection{_SEP}"
 
     _model_name = Unicode("ConnectionModel").tag(sync=True)
-    cid = Unicode(read_only=True, help="connection id").tag(sync=True)
+    connection_id = Unicode(read_only=True, help="connection id").tag(sync=True)
     _dispose = Bool(read_only=True).tag(sync=True)
     ipylab_base = None
 
@@ -55,16 +55,16 @@ class Connection(Singular, Ipylab):
 
     @override
     @classmethod
-    def get_single_key(cls, cid: str, **kwgs) -> Hashable:
-        return cid
+    def get_single_key(cls, connection_id: str, **kwgs) -> Hashable:
+        return connection_id
 
     @classmethod
-    def exists(cls, cid: str) -> bool:
-        return cid in cls._singular_instances
+    def exists(cls, connection_id: str) -> bool:
+        return connection_id in cls._singular_instances
 
     @classmethod
-    def close_if_exists(cls, cid: str):
-        if inst := cls._singular_instances.pop(cid, None):
+    def close_if_exists(cls, connection_id: str):
+        if inst := cls._singular_instances.pop(connection_id, None):
             inst.close()
 
     def __init_subclass__(cls, **kwargs) -> None:
@@ -72,19 +72,19 @@ class Connection(Singular, Ipylab):
         cls._CLASS_DEFINITIONS[cls.prefix.strip(cls._SEP)] = cls
         super().__init_subclass__(**kwargs)
 
-    def __init__(self, cid: str, **kwgs):
-        super().__init__(cid=cid, **kwgs)
+    def __init__(self, connection_id: str, **kwgs):
+        super().__init__(connection_id=connection_id, **kwgs)
 
     def __str__(self):
-        return self.cid
+        return self.connection_id
 
     @classmethod
-    def to_cid(cls, *args: str) -> str:
-        """Generate a cid."""
+    def to_id(cls, *args: str) -> str:
+        """Generate a connection_id."""
         args = tuple(aa for a in args if (aa := a.strip()))
         if args and args[0].startswith(cls.prefix):
             if len(args) != 1:
-                msg = "Extending a cid with extra args is not allowed!"
+                msg = "Extending a connection_id with extra args is not allowed!"
                 raise ValueError(msg)
             return args[0]
         if not args:
@@ -94,7 +94,7 @@ class Connection(Singular, Ipylab):
     @property
     @override
     def repr_info(self):
-        return {"cid": self.cid}
+        return {"connection_id": self.connection_id}
 
     @override
     def close(self, *, dispose=True):
@@ -106,7 +106,7 @@ class Connection(Singular, Ipylab):
         super().close()
 
     @classmethod
-    def get_connection(cls, cid: str) -> Self:
+    def get_connection(cls, connection_id: str) -> Self:
         """Get a connection object from a connection id.
 
         The connection id is a string that identifies the connection.
@@ -114,11 +114,11 @@ class Connection(Singular, Ipylab):
         The connection type is the name of the class that implements the connection.
         The connection name is a unique name for the connection.
 
-        :param cid: The connection id.
+        :param connection_id: The connection id.
         :return: The connection object.
         """
-        cls_ = cls._CLASS_DEFINITIONS[cid.split(cls._SEP, maxsplit=1)[0]]
-        return cls_(cid)
+        cls_ = cls._CLASS_DEFINITIONS[connection_id.split(cls._SEP, maxsplit=1)[0]]
+        return cls_(connection_id)
 
 
 Connection._CLASS_DEFINITIONS[Connection.prefix.strip(Connection._SEP)] = Connection  # noqa: SLF001
@@ -133,7 +133,7 @@ class InfoConnection(Connection):
     @property
     @override
     def repr_info(self):
-        return {"cid": self.cid, "info": self.info}
+        return {"connection_id": self.connection_id, "info": self.info}
 
 
 class ShellConnection(Connection):
@@ -153,9 +153,9 @@ class ShellConnection(Connection):
         "Activate the connected widget in the shell."
 
         ids = await self.app.shell.list_widget_ids()
-        if self.cid in ids[Area.left]:
+        if self.connection_id in ids[Area.left]:
             await self.app.shell.expand_left()
-        elif self.cid in ids[Area.right]:
+        elif self.connection_id in ids[Area.right]:
             await self.app.shell.expand_right()
         return await self.operation("activate")
 

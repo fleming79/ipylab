@@ -89,8 +89,10 @@ export class CommandRegistryModel extends IpylabModel {
       describedBy: () => options.describedBy ?? '',
       execute: async (args: any) => {
         const w1 = IpylabModel.app.shell.currentWidget;
-        const cid = w1 ? IpylabModel.ConnectionModel.get_cid(w1, true) : '';
-        const payload = { id, args, cid };
+        const connection_id = w1
+          ? IpylabModel.ConnectionModel.get_cid(w1, true)
+          : '';
+        const payload = { id, args, connection_id };
         return await this.scheduleOperation('execute', payload, 'object');
       },
       icon: icon,

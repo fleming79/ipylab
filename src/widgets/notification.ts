@@ -39,12 +39,16 @@ export class NotificationManagerModel extends IpylabModel {
 
   createAction(payload: any) {
     const action = { ...payload } as any;
-    const cid = action.cid;
+    const connection_id = action.connection_id;
     action.callback = (event: MouseEvent) => {
       if (action.keep_open) {
         event.preventDefault();
       }
-      return this.scheduleOperation('action_callback', { cid }, 'auto');
+      return this.scheduleOperation(
+        'action_callback',
+        { connection_id },
+        'auto'
+      );
     };
     return action;
   }

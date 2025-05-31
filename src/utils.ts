@@ -158,7 +158,7 @@ export function listProperties({
     omitHidden
   })) {
     const obj_ = obj[name];
-    let type_: string = typeof obj_;
+    const type_: string = typeof obj_;
     let val: any = name;
     /*eslint no-fallthrough: ["error", { "commentPattern": "break[\\s\\w]*omitted" }]*/
     switch (type_) {
