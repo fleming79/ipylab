@@ -206,11 +206,11 @@ class CommandRegistry(Singular, Ipylab):
         return await super()._do_operation_for_frontend(operation, payload, buffers)
 
     async def _execute_for_frontend(self, payload: dict, buffers: list):
-        cmd_cid = payload["id"]
-        if not CommandConnection.exists(cmd_cid):
-            msg = f'Invalid command "{cmd_cid}"'
+        cmd_id = payload["id"]
+        if not CommandConnection.exists(cmd_id):
+            msg = f'Invalid command "{cmd_id}"'
             raise TypeError(msg)
-        conn = await CommandConnection(cmd_cid).ready()
+        conn = await CommandConnection(cmd_id).ready()
         cmd = conn.python_command
         args = conn.args | (payload.get("args") or {})
 

@@ -160,7 +160,7 @@ export class IpylabModel extends DOMWidgetModel {
     } catch {
       if (content.transform === 'auto') {
         content.payload = {
-          connection_id: IpylabModel.ConnectionModel.get_cid(
+          connection_id: IpylabModel.ConnectionModel.get_id(
             content.payload,
             true
           )
@@ -521,7 +521,7 @@ export class IpylabModel extends DOMWidgetModel {
       case 'auto':
         if (obj?.dispose) {
           return {
-            connection_id: IpylabModel.ConnectionModel.get_cid(obj, true)
+            connection_id: IpylabModel.ConnectionModel.get_id(obj, true)
           };
         }
         if (typeof obj?.iterator === 'function') {
@@ -538,7 +538,7 @@ export class IpylabModel extends DOMWidgetModel {
           );
         }
         return {
-          connection_id: IpylabModel.ConnectionModel.get_cid(obj, true)
+          connection_id: IpylabModel.ConnectionModel.get_id(obj, true)
         };
       case 'advanced':
         // expects args.mappings = {key:transform}

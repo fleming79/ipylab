@@ -115,7 +115,7 @@ export class ShellModel extends IpylabModel {
     }
     args.connection_id =
       args.connection_id ||
-      ShellModel.ConnectionModel.new_cid('ShellConnection');
+      ShellModel.ConnectionModel.new_id('ShellConnection');
     if (args.asMainArea && !(widget instanceof MainAreaWidget)) {
       widget.addClass('ipylab-MainArea');
       const w = (widget = new MainAreaWidget({ content: widget }));

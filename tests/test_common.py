@@ -97,10 +97,10 @@ class TestTransformValidate:
     def test_validate_invalid_connection_transform(self):
         transform: TransformDictConnection = {
             "transform": Transform.connection,
-            "connection_id": "invalid_cid",
+            "connection_id": "--invalid--",
         }
         with pytest.raises(
-            ValueError, match="'connection_id' should start with 'ipylab-' but got connection_id='invalid_cid'"
+            ValueError, match="'connection_id' should start with 'ipylab-' but got connection_id='--invalid--'"
         ):
             Transform.validate(transform)
 

@@ -56,7 +56,7 @@ export class ConnectionModel extends IpylabModel {
   /**
    * Keep a reference to an object so it can be found from the backend.
    * Also keeps a reverse mapping for the last registered connection_id of the object
-   * see: `IpylabModel.get_cid`
+   * see: `IpylabModel.get_id`
 
    * @param obj
    */
@@ -134,7 +134,7 @@ export class ConnectionModel extends IpylabModel {
     });
   }
 
-  static get_cid(obj: any, register = false): string | null {
+  static get_id(obj: any, register = false): string | null {
     if (register && !Private.connections_rev.has(obj)) {
       const cls =
         obj instanceof Widget &&
@@ -142,7 +142,7 @@ export class ConnectionModel extends IpylabModel {
         ConnectionModel.ShellModel.getLuminoWidgetFromShell(obj.id)
           ? 'ShellConnection'
           : 'Connection';
-      const connection_id = ConnectionModel.new_cid(cls);
+      const connection_id = ConnectionModel.new_id(cls);
       ConnectionModel.registerConnection(connection_id, obj);
     }
     return Private.connections_rev.get(obj);
@@ -165,7 +165,7 @@ export class ConnectionModel extends IpylabModel {
     return (widget as any)?.sessionContext?.session?.model ?? {};
   }
 
-  static new_cid(cls: string): string {
+  static new_id(cls: string): string {
     const _PREFIX = 'ipylab-';
     const _SEP = '|';
 
