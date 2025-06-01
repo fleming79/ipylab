@@ -141,17 +141,26 @@ class Ipylab(HasApp, WidgetBase):
                 getattr(self, k).clear()
 
     def _on_custom_msg(self, _, msg: dict, buffers: list):
-        content = msg.get("ipylab")
-        if not content:
+        """Handle incoming custom messages.
+
+        This method is called when a custom message is received from the frontend.
+        It parses the message content and performs actions based on the message type.
+
+        Args:
+            _: The socket object (not used).
+            msg (dict): The message dictionary received from the frontend.
+            buffers (list): A list of binary buffers associated with the message.
+        """
+        if not (content := msg.get("ipylab")):
             return
         try:
             match json.loads(content):
                 case {"ipylab_PY": str(key), "error": str(error), **payload}:
                     self._set_result(key=key, error=error, payload=payload)
                 case {"ipylab_PY": str(key), **rest}:
-                    self._set_result(key=key, error=None, payload=rest)
+                    self._set_result(key=key, error=None, payload=rest.get("payload"))
                 case {"ipylab_FE": str(key), "operation": operation, "payload": payload}:
-                    self._do_operation_for_fe(True, key, operation, payload, buffers)
+                    self._do_operation_for_fe(key=key, operation=operation, payload=payload, buffers=buffers)
                 case {"closed": closed} if closed:
                     self.close()
                 case {"signal": {"dottedname": dottedname, "args": args}}:
@@ -162,7 +171,7 @@ class Ipylab(HasApp, WidgetBase):
             self.log.exception("Message processing error", obj=msg, exc_info=e)
 
     @autorun
-    async def _set_result(self, key: str, *, error: str | None, payload: Any):
+    async def _set_result(self, key: str, error: str | None, payload: Any):
         # We use autorun to ensure this code is run in the main event loop
         send_stream = self._pending_operations.pop(key)
         if error is not None:
@@ -222,8 +231,8 @@ class Ipylab(HasApp, WidgetBase):
     async def ready(self) -> Self:
         """Wait for the instance to be ready.
 
-        If this is not the main application instance, it waits for the
-        main application instance to be ready first.
+        Returns:
+            Self: The instance itself, after it is ready.
         """
         self._check_closed()
         if not self._ready:

@@ -48,12 +48,14 @@ class SimpleOutput(Ipylab, DOMWidget):
         except AttributeError:
             return None
 
-    def _pack_outputs(self, outputs: tuple[dict[str, str] | Widget | str | TextDisplayObject | Any, ...]):
+    def _pack_outputs(
+        self, outputs: tuple[dict[str, str] | Widget | str | TextDisplayObject | Any, ...], *, stream_text=False
+    ):
         fmt = self.format
         for output in outputs:
             if isinstance(output, dict) and "output_type" in output:
                 yield output
-            elif isinstance(output, str):
+            elif stream_text and isinstance(output, str):
                 yield {"output_type": "stream", "name": "stdout", "text": output}
             elif fmt:
                 data, metadata = fmt(output)
@@ -63,10 +65,12 @@ class SimpleOutput(Ipylab, DOMWidget):
             else:
                 yield {"output_type": "display_data", "data": repr(output)}
 
-    def push(self, *outputs: dict[str, str] | Widget | str | TextDisplayObject | Any, clear=False) -> Self:
+    def push(
+        self, *outputs: dict[str, str] | Widget | str | TextDisplayObject | Any, clear=False, stream_text=False
+    ) -> Self:
         """Add one or more items to the output.
 
-        Consecutive `streams` of the same type are placed in the same 'output' up to `max_outputs`.
+        Consecutive `streams` of the same type are placed in the same 'output' up to `max_continuous_streams`.
         Outputs passed as dicts with a key "output_type" are assumed to be correctly packed as `repr_mime` data.
 
         Parameters
@@ -75,9 +79,11 @@ class SimpleOutput(Ipylab, DOMWidget):
             Items to be displayed.
         clear : bool
             Clear existing outputs prior to adding the outputs.
+        stream_text : bool
+            If True, treat string outputs as stdout streams.
         """
 
-        items = list(self._pack_outputs(outputs))
+        items = list(self._pack_outputs(outputs, stream_text=stream_text))
         if items or clear:
             self.send({"add": items, "clear": clear})
         return self
