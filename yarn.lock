@@ -1844,6 +1844,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/react@npm:^19.1.6":
+  version: 19.1.6
+  resolution: "@types/react@npm:19.1.6"
+  dependencies:
+    csstype: ^3.0.2
+  checksum: 7f4d2e5fd0c1afa6aef956e551c982a59c3ccf37cf30b877300306dcae87e0c4bf7b28b54676b1783f4ca92e730af6fb7a4c1b7f6df27ba14579aa1617a58b09
+  languageName: node
+  linkType: hard
+
 "@types/semver@npm:^7.5.0":
   version: 7.7.0
   resolution: "@types/semver@npm:7.7.0"
@@ -4324,7 +4333,7 @@ __metadata:
     "@types/expect.js": ^0.3.29
     "@types/json-schema": ^7.0.11
     "@types/node": ^18.7.8
-    "@types/react": ^18.0.26
+    "@types/react": ^19.1.6
     "@typescript-eslint/eslint-plugin": ^6.1.0
     "@typescript-eslint/parser": ^6.1.0
     css-loader: ^7.1.2
