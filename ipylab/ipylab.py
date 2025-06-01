@@ -463,22 +463,28 @@ class Ipylab(HasApp, WidgetBase):
         self.set_trait("_signal_dottednames", tuple(sorted(dottednames)))
 
     async def list_signals(self, depth=3):
-        """List the nested signals.
+        """List the nested signals associated with the base in the frontend.
 
-        The list of dotted names can be used
+        See also:
+        * `register_signal_callback`
+        * `list_view_signals`
         """
         properties = await self.list_properties(depth=depth)
-        return list(self._list_signals(properties))
+        return sorted(self._list_signals(properties))
 
     async def list_view_signals(self, depth=3):
-        """List the nested signals belonging to the view.
+        """List the nested signals belonging to a view of this object.
 
         Notes:
-        * This only applies to widgets that have a view
+        * This only applies to widgets that have a view.
         * To list the signals in a view, at least one view of the object must be live.
+
+        See also:
+        * `register_signal_callback`
+        * `list_signals`
         """
         if not (views := (await self.list_properties("views")).get("<promises>")):
             msg = f"No views found for {self}"
             raise ValueError(msg)
         properties = await self.list_properties(f"views[{views[0]}]", depth=depth)
-        return list(self._list_signals(properties, prefix="views"))
+        return sorted(set(self._list_signals(properties, prefix="views")))
