@@ -118,17 +118,7 @@ def autorun(f: Callable[Concatenate[B, P], CoroutineType[None, None, R]]):
     return inner
 
 
-if TYPE_CHECKING:
-
-    @overload
-    def pack(obj: Widget) -> str: ...
-    @overload
-    def pack(obj: inspect._SourceObjectType) -> str: ...  # Technically only modules and functions.
-    @overload
-    def pack(obj: T) -> T: ...
-
-
-def pack(obj):
+def pack(obj: Widget | inspect._SourceObjectType):
     """Pack obj in a format usable in the frontend.
 
     Only widgets and source are packed, all other objects are passed without
@@ -354,6 +344,12 @@ class TransformDictConnection(TypedDict):
 
 
 TransformType = Transform | TransformDictAdvanced | TransformDictFunction | TransformDictConnection
+
+
+class SignalCallbackData(TypedDict, Generic[L]):
+    dottedname: str
+    args: dict | str | float | int
+    owner: L
 
 
 class IpylabKwgs(TypedDict):

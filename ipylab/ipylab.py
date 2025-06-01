@@ -11,11 +11,11 @@ from typing import TYPE_CHECKING, Any, cast
 
 import traitlets
 from anyio import Event, create_memory_object_stream
-from ipywidgets import CallbackDispatcher, Widget, register
-from traitlets import Bool, Container, Dict, Instance, List, TraitType, Unicode, observe
+from ipywidgets import TypedTuple, Widget, register
+from traitlets import Bool, Container, Dict, Instance, Int, List, TraitType, Unicode, observe
 
 import ipylab._frontend as _fe
-from ipylab.common import HasApp, IpylabKwgs, Obj, Transform, TransformType, autorun, pack
+from ipylab.common import HasApp, IpylabKwgs, Obj, SignalCallbackData, Transform, TransformType, autorun, pack
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -83,12 +83,14 @@ class Ipylab(HasApp, WidgetBase):
     _python_class = Unicode().tag(sync=True)
     ipylab_base = IpylabBase(Obj.this, "").tag(sync=True)
     _ready = Bool(read_only=True, help="Set to by frontend when ready").tag(sync=True)
+    _view_count = Int().tag(sync=True)
     _on_ready_callbacks: Container[list[Callable[[Self], None | CoroutineType]]] = List(trait=traitlets.Callable())
     _ready_event = Instance(Event, ())
     _comm = None
     _ipylab_init_complete = False
     _pending_operations: Dict[str, MemoryObjectSendStream] = Dict()
-    signal = Instance(CallbackDispatcher, ())
+    _signal_dottednames = TypedTuple().tag(sync=True)
+    _signal_callbacks: Dict[str, list[Callable[[SignalCallbackData], None | CoroutineType]]] = Dict()
 
     @property
     def repr_info(self) -> dict[str, Any] | str:
@@ -134,43 +136,47 @@ class Ipylab(HasApp, WidgetBase):
         if self.comm:
             self._ipylab_send({"close": True})
         super().close()
-        self._on_ready_callbacks.clear()
+        for k in ["_on_ready_callbacks", "_signal_callbacks"]:
+            if self.trait_has_value(k):
+                getattr(self, k).clear()
 
     def _on_custom_msg(self, _, msg: dict, buffers: list):
         content = msg.get("ipylab")
         if not content:
             return
         try:
-            c: dict[str, Any] = json.loads(content)
-            if "ipylab_PY" in c:
-                self._set_result(content=c)
-            elif "ipylab_FE" in c:
-                self._do_operation_for_fe(True, c["ipylab_FE"], c["operation"], c["payload"], buffers)
-            elif "closed" in c:
-                self.close()
-            elif "signal" in c:
-                self.signal(c["signal"])
-            else:
-                raise NotImplementedError(msg)  # noqa: TRY301
+            match json.loads(content):
+                case {"ipylab_PY": str(key), "error": str(error), **payload}:
+                    self._set_result(key=key, error=error, payload=payload)
+                case {"ipylab_PY": str(key), **rest}:
+                    self._set_result(key=key, error=None, payload=rest)
+                case {"ipylab_FE": str(key), "operation": operation, "payload": payload}:
+                    self._do_operation_for_fe(True, key, operation, payload, buffers)
+                case {"closed": closed} if closed:
+                    self.close()
+                case {"signal": {"dottedname": dottedname, "args": args}}:
+                    self._notify_signal(data=SignalCallbackData(owner=self, dottedname=dottedname, args=args))
+                case _ as data:
+                    self.log.error("Unhandled custom message", obj=data)
         except Exception as e:
             self.log.exception("Message processing error", obj=msg, exc_info=e)
 
     @autorun
-    async def _set_result(self, content: dict[str, Any]):
-        send_stream = self._pending_operations.pop(content["ipylab_PY"])
-        if error := content.get("error"):
-            e = IpylabFrontendError(error)
-            e.add_note(f"{content=}")
-            value = e
-        else:
-            value = content.get("payload")
-        await send_stream.send(value)
+    async def _set_result(self, key: str, *, error: str | None, payload: Any):
+        # We use autorun to ensure this code is run in the main event loop
+        send_stream = self._pending_operations.pop(key)
+        if error is not None:
+            error_ = IpylabFrontendError(error)
+            error_.add_note(f"{payload=}")
+            payload = error_
+        send_stream.send_nowait(payload)
 
     @autorun
-    async def _do_operation_for_fe(self, ipylab_FE: str, operation: str, payload: dict, buffers: list | None):
+    async def _do_operation_for_fe(self, key: str, operation: str, payload: dict, buffers: list | None):
         """Handle operation requests from the frontend and reply with a result."""
+        # We use autorun to ensure this code is run in the main event loop
         await self.ready()
-        content: dict[str, Any] = {"ipylab_FE": ipylab_FE}
+        content: dict[str, Any] = {"ipylab_FE": key}
         buffers = []
         try:
             result = await self._do_operation_for_frontend(operation, payload, buffers)
@@ -185,6 +191,18 @@ class Ipylab(HasApp, WidgetBase):
             self.log.exception("Frontend operation", obj={"operation": operation, "payload": payload}, exc_info=e)
         finally:
             self._ipylab_send(content, buffers)
+
+    @autorun
+    async def _notify_signal(self, data: SignalCallbackData):
+        # We use autorun to ensure this code is run in the main event loop
+        if callbacks := self._signal_callbacks.get(data["dottedname"]):
+            for callback in callbacks:
+                try:
+                    result = callback(data)
+                    if inspect.iscoroutine(result):
+                        await result
+                except Exception as e:
+                    self.log.exception("Signal callback", obj={"callback": callback, "data": data}, exc_info=e)
 
     async def _obj_operation(self, base: Obj, subpath: str, operation: str, kwgs, kwargs: IpylabKwgs):
         await self.ready()
@@ -388,3 +406,68 @@ class Ipylab(HasApp, WidgetBase):
         """
         kwgs = {"depth": depth, "omitHidden": skip_hidden}
         return await self._obj_operation(obj, subpath, "listProperties", kwgs, kwargs)
+
+    @classmethod
+    def _list_signals(cls, obj, *, prefix=""):
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                if k == "<signals>":
+                    for signal in v:
+                        yield f"{prefix}.{signal}"
+                elif isinstance(v, dict):
+                    yield from cls._list_signals(v, prefix=f"{prefix}.{k}".strip("."))
+
+    def register_signal_callback(
+        self, dottedname: str, callback: Callable[[SignalCallbackData], None | CoroutineType], *, remove=False
+    ):
+        """Registers a callback function to be executed when a specific signal is emitted.
+
+        The signal is identified by its dotted name (e.g., 'shell.activeChanged').
+        The callback function will receive a `SignalCallbackData` object as its argument,
+        containing information about the signal.
+
+        Callbacks are executed in the order in which they are registered, if the callback is a coroutine
+        it will be awaited directly after it is called.
+
+        To find a list of available signals used the methods `list_signals` and `list_view_signals`.
+
+        Args:
+            dottedname: The dotted name of the signal to listen for.
+            callback: The callable to execute when the signal is emitted.
+                      It should accept a `SignalCallbackData` object as its argument.
+                      It can be a regular function or a coroutine.
+            remove: If True, remove the callback from the list of callbacks for the signal.
+                    If False (default), add the callback to the list.
+        """
+        if not (callbacks := self._signal_callbacks.get(dottedname)):
+            self._signal_callbacks[dottedname] = callbacks = []
+        if remove:
+            if callback in callbacks:
+                callbacks.remove(callback)
+        elif callback not in callbacks:
+            callbacks.append(callback)
+        dottednames = {*self._signal_dottednames, dottedname}
+        if not callbacks:
+            dottednames.discard(dottedname)
+        self.set_trait("_signal_dottednames", tuple(sorted(dottednames)))
+
+    async def list_signals(self, depth=3):
+        """List the nested signals.
+
+        The list of dotted names can be used
+        """
+        properties = await self.list_properties(depth=depth)
+        return list(self._list_signals(properties))
+
+    async def list_view_signals(self, depth=3):
+        """List the nested signals belonging to the view.
+
+        Notes:
+        * This only applies to widgets that have a view
+        * To list the signals in a view, at least one view of the object must be live.
+        """
+        if not (views := (await self.list_properties("views")).get("<promises>")):
+            msg = f"No views found for {self}"
+            raise ValueError(msg)
+        properties = await self.list_properties(f"views[{views[0]}]", depth=depth)
+        return list(self._list_signals(properties, prefix="views"))

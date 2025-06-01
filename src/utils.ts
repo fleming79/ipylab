@@ -1,6 +1,7 @@
 // Copyright (c) ipylab contributors
 // Distributed under the terms of the Modified BSD License.
 
+import { UUID } from '@lumino/coreutils';
 import { Signal } from '@lumino/signaling';
 
 /**
@@ -269,4 +270,17 @@ function _replacer(key: string, value: any) {
       'This is a simplified representation because it contains circular references.';
     return out;
   }
+}
+
+const _uniqueIDs = new WeakMap<
+  Record<string, unknown> | Array<unknown>,
+  string
+>();
+export function uniqueId(
+  obj: Record<string, unknown> | Array<unknown>
+): string {
+  if (!_uniqueIDs.has(obj)) {
+    _uniqueIDs.set(obj, UUID.uuid4());
+  }
+  return _uniqueIDs.get(obj);
 }

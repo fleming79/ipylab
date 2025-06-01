@@ -9,6 +9,7 @@ import {
   Notification,
   WidgetTracker
 } from '@jupyterlab/apputils';
+import { IEditorServices } from '@jupyterlab/codeeditor';
 import { IDefaultFileBrowser } from '@jupyterlab/filebrowser';
 import { ILauncher } from '@jupyterlab/launcher';
 import { IMainMenu, MainMenu } from '@jupyterlab/mainmenu';
@@ -17,6 +18,7 @@ import { Kernel, Session } from '@jupyterlab/services';
 import { IKernelConnection } from '@jupyterlab/services/lib/kernel/kernel';
 import { ITranslator } from '@jupyterlab/translation';
 import { JSONValue, PromiseDelegate, UUID } from '@lumino/coreutils';
+import { Signal } from '@lumino/signaling';
 import { Widget } from '@lumino/widgets';
 import {
   executeMethod,
@@ -25,13 +27,13 @@ import {
   setNestedProperty,
   toFunction,
   toJSONsubstituteCylic,
-  updateProperty
+  updateProperty,
+  uniqueId
 } from '../utils';
 import { MODULE_NAME, MODULE_VERSION } from '../version';
 import type { ConnectionModel } from './connection';
 import type { JupyterFrontEndModel } from './frontend';
 import type { ShellModel } from './shell';
-import { IEditorServices } from '@jupyterlab/codeeditor';
 
 /**
  * Base model for Ipylab.
@@ -50,7 +52,9 @@ export class IpylabModel extends DOMWidgetModel {
       _model_module_version: MODULE_VERSION,
       _view_name: null,
       _view_module: null,
-      _view_module_version: MODULE_VERSION
+      _view_module_version: MODULE_VERSION,
+      _view_count: 0,
+      _signal_dottednames: []
     };
   }
 
@@ -102,6 +106,11 @@ export class IpylabModel extends DOMWidgetModel {
       writable: false,
       configurable: true
     });
+    this.listenTo(this, 'change:_signal_dottednames', this.update_signals);
+    this.listenTo(this, 'change:_view_count', this.update_signals);
+    if (this.get('_signal_dottednames')?.length) {
+      this.update_signals();
+    }
     this.setReady();
   }
 
@@ -122,6 +131,9 @@ export class IpylabModel extends DOMWidgetModel {
     this._pendingOperations.forEach(opDone => opDone.reject('Closed'));
     this._pendingOperations.clear();
     comm_closed = comm_closed || !this.commAvailable;
+    this.set('_signal_dottednames', []);
+    this.stopListening(this, 'change:_signal_dottednames', this.update_signals);
+    this.stopListening(this, 'change:_view_count', this.update_signals);
     if (!comm_closed) {
       this.ipylabSend({ closed: true });
     }
@@ -157,6 +169,68 @@ export class IpylabModel extends DOMWidgetModel {
       content = toJSONsubstituteCylic(content);
     }
     this.send({ ipylab: content }, callbacks, buffers);
+  }
+
+  /**
+   * Updates the signal connections based on the
+   * `_signal_dottednames` trait.
+   *
+   * This method iterates through the dotted names of signals,
+   * connects them to the corresponding objects (either views or the
+   * base object), and manages the connection/disconnection of signals
+   * to avoid memory leaks.
+   *
+   * It supports signals belonging to views by iterating over the views
+   * and connecting the signal to each view. It also handles signals
+   * belonging to the base object directly.
+   *
+   * The method maintains a set of active signal keys and disconnects
+   * any previously connected signals that are no longer in the set of
+   * active signals.
+   */
+  async update_signals() {
+    const dottednames: Array<string> = this.get('_signal_dottednames');
+    if (!dottednames.length && !this._signalDisconnectors.size) {
+      return;
+    }
+    const keys = new Set();
+    const views = this.views;
+    for (const dottedname of dottednames) {
+      // Support signals belonging to views
+      if (views && dottedname.startsWith('views.')) {
+        for (const id of Object.getOwnPropertyNames(views)) {
+          const view = await this.views[id];
+          keys.add(this._connectSignal(view, dottedname));
+        }
+      } else {
+        keys.add(this._connectSignal(this.base, dottedname));
+      }
+    }
+    // Check for old signals to disconnect
+    this._signalDisconnectors.forEach((value, key) => {
+      if (!keys.has(key)) {
+        value();
+        this._signalDisconnectors.delete(key);
+      }
+    });
+  }
+
+  private _connectSignal(obj: any, dottedname: string) {
+    const key: string = uniqueId(obj) + dottedname;
+    if (!this._signalDisconnectors.has(key)) {
+      const subpath = dottedname.startsWith('views.')
+        ? dottedname.slice(6)
+        : dottedname;
+      const signal = getNestedProperty({ obj, subpath, nullIfMissing: true });
+      if (signal instanceof Signal) {
+        const slot = (sender: any, args: any) => {
+          this.sendSignal({ dottedname, args });
+        };
+        this._signalDisconnectors.set(key, () => signal.disconnect(slot));
+        signal.connect(slot);
+      }
+    }
+    return key;
   }
 
   /**
@@ -614,7 +688,7 @@ export class IpylabModel extends DOMWidgetModel {
   static get sessionManager(): Session.IManager {
     return IpylabModel.app.serviceManager.sessions;
   }
-
+  private _signalDisconnectors = new Map<string, () => boolean>();
   widget_manager: KernelWidgetManager;
   private _pendingOperations = new Map<string, PromiseDelegate<any>>();
   readonly base: any;
