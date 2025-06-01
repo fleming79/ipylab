@@ -1802,21 +1802,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/node@npm:*":
+"@types/node@npm:*, @types/node@npm:^22.15.29":
   version: 22.15.29
   resolution: "@types/node@npm:22.15.29"
   dependencies:
     undici-types: ~6.21.0
   checksum: 201aabe3614d68fdf84f3255e2380381180de26ecdfd091f8809bf46fd2a41e73b2df4d94780c2054597f3c203d1c9d378359c21c551fb4eef8b12406698d6c9
-  languageName: node
-  linkType: hard
-
-"@types/node@npm:^18.7.8":
-  version: 18.19.110
-  resolution: "@types/node@npm:18.19.110"
-  dependencies:
-    undici-types: ~5.26.4
-  checksum: 21df1474bda95c5e4c7ea746b369a8050185aea6c7f281c27ec7bc0cb404266f6e9680fc3cdd6d02d5da92183283bc479947e9c9dc7eaf33839d17c2c648aceb
   languageName: node
   linkType: hard
 
@@ -4332,7 +4323,7 @@ __metadata:
     "@lumino/widgets": ^2.5.0
     "@types/expect.js": ^0.3.29
     "@types/json-schema": ^7.0.11
-    "@types/node": ^18.7.8
+    "@types/node": ^22.15.29
     "@types/react": ^19.1.6
     "@typescript-eslint/eslint-plugin": ^6.1.0
     "@typescript-eslint/parser": ^6.1.0
@@ -7196,13 +7187,6 @@ __metadata:
   version: 1.13.7
   resolution: "underscore@npm:1.13.7"
   checksum: 174b011af29e4fbe2c70eb2baa8bfab0d0336cf2f5654f364484967bc6264a86224d0134b9176e4235c8cceae00d11839f0fd4824268de04b11c78aca1241684
-  languageName: node
-  linkType: hard
-
-"undici-types@npm:~5.26.4":
-  version: 5.26.5
-  resolution: "undici-types@npm:5.26.5"
-  checksum: 3192ef6f3fd5df652f2dc1cd782b49d6ff14dc98e5dced492aa8a8c65425227da5da6aafe22523c67f035a272c599bb89cfe803c1db6311e44bed3042fc25487
   languageName: node
   linkType: hard
 
