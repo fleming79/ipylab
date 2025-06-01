@@ -206,7 +206,8 @@
         "node_modules",
         "dist",
         "coverage",
-        "**/*.d.ts"
+        "**/*.d.ts",
+        "package-lock.json"
     ],
     "prettier": {
         "singleQuote": true,
@@ -215,7 +216,10 @@
         "endOfLine": "auto",
         "overrides": [
             {
-                "files": "package.json",
+                "files": [
+                    "package.json",
+                    "package-lock.json"
+                ],
                 "options": {
                     "tabWidth": 4
                 }
