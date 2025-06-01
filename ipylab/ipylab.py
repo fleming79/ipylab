@@ -172,10 +172,11 @@ class Ipylab(HasApp, WidgetBase):
                     self._do_operation_for_fe(key=key, operation=operation, payload=payload, buffers=buffers)
                 case {"closed": closed} if closed:
                     self.close()
-                case {"signal": {"dottedname": dottedname, "args": args}}:
-                    self._notify_signal(data=SignalCallbackData(owner=self, dottedname=dottedname, args=args))
+                case {"signal": {"dottedname": dottedname, **rest}}:
+                    data = SignalCallbackData(owner=self, dottedname=dottedname, args=rest.get("args"))
+                    self._notify_signal(data=data)
                 case _ as data:
-                    self.log.error("Unhandled custom message", obj=data)
+                    self.log.error(f"Unhandled custom message {data=}", obj=data)  # noqa: G004
         except Exception as e:
             self.log.exception("Message processing error", obj=msg, exc_info=e)
 
@@ -408,7 +409,7 @@ class Ipylab(HasApp, WidgetBase):
         Args:
             subpath (str, optional): Subpath to the object. Defaults to "".
             obj (Obj, optional): Object to list properties from. Defaults to Obj.base.
-            depth (int, optional): Depth of the listing. Defaults to 3.
+            depth (int, optional): Depth of the inheritance introspection on the object in the front. Defaults to 3.
             skip_hidden (bool, optional): Whether to skip hidden properties. Defaults to True.
             **kwargs (Unpack[IpylabKwgs]): Additional keyword arguments.
 
@@ -424,7 +425,7 @@ class Ipylab(HasApp, WidgetBase):
             for k, v in obj.items():
                 if k == "<signals>":
                     for signal in v:
-                        yield f"{prefix}.{signal}"
+                        yield f"{prefix}.{signal}".strip(".")
                 elif isinstance(v, dict):
                     yield from cls._list_signals(v, prefix=f"{prefix}.{k}".strip("."))
 
@@ -470,7 +471,7 @@ class Ipylab(HasApp, WidgetBase):
         * `list_view_signals`
         """
         properties = await self.list_properties(depth=depth)
-        return sorted(self._list_signals(properties))
+        return list(self._list_signals(properties))
 
     async def list_view_signals(self, depth=3):
         """List the nested signals belonging to a view of this object.
@@ -487,4 +488,4 @@ class Ipylab(HasApp, WidgetBase):
             msg = f"No views found for {self}"
             raise ValueError(msg)
         properties = await self.list_properties(f"views[{views[0]}]", depth=depth)
-        return sorted(set(self._list_signals(properties, prefix="views")))
+        return list(dict.fromkeys(self._list_signals(properties, prefix="views")))

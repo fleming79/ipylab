@@ -348,7 +348,7 @@ TransformType = Transform | TransformDictAdvanced | TransformDictFunction | Tran
 
 class SignalCallbackData(TypedDict, Generic[L]):
     dottedname: str
-    args: dict | str | float | int
+    args: dict | str | float | int | None
     owner: L
 
 
