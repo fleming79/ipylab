@@ -13,6 +13,7 @@ import traitlets
 from anyio import Event, create_memory_object_stream
 from ipywidgets import TypedTuple, Widget, register
 from traitlets import Bool, Container, Dict, Instance, Int, List, TraitType, Unicode, observe
+from typing_extensions import override
 
 import ipylab._frontend as _fe
 from ipylab.common import HasApp, IpylabKwgs, Obj, SignalCallbackData, Transform, TransformType, autorun, pack
@@ -132,6 +133,7 @@ class Ipylab(HasApp, WidgetBase):
             for cb in self._on_ready_callbacks:
                 self._call_ready_callback(cb)
 
+    @override
     def close(self):
         if self.comm:
             self._ipylab_send({"close": True})
@@ -139,6 +141,13 @@ class Ipylab(HasApp, WidgetBase):
         for k in ["_on_ready_callbacks", "_signal_callbacks"]:
             if self.trait_has_value(k):
                 getattr(self, k).clear()
+
+    def _ipylab_send(self, content, buffers: list | None = None):
+        try:
+            self.send({"ipylab": json.dumps(content, default=pack)}, buffers)
+        except Exception as e:
+            self.log.exception("Send error", obj=content, exc_info=e)
+            raise
 
     def _on_custom_msg(self, _, msg: dict, buffers: list):
         """Handle incoming custom messages.
@@ -266,13 +275,6 @@ class Ipylab(HasApp, WidgetBase):
                 self._call_ready_callback(callback)
         elif callback in self._on_ready_callbacks:
             self._on_ready_callbacks.remove(callback)
-
-    def _ipylab_send(self, content, buffers: list | None = None):
-        try:
-            self.send({"ipylab": json.dumps(content, default=pack)}, buffers)
-        except Exception as e:
-            self.log.exception("Send error", obj=content, exc_info=e)
-            raise
 
     async def operation(
         self,
