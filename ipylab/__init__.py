@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from ipylab import common, log, menu
+from ipylab import common, log, menu, simple_output, widgets
 from ipylab._frontend import module_version as __version__
 from ipylab.code_editor import CodeEditor
 from ipylab.common import Area, Fixed, InsertMode, Obj, Transform, hookimpl, pack, to_selector
@@ -40,6 +40,8 @@ __all__ = [
     "menu",
     "JupyterFrontEnd",
     "to_selector",
+    "widgets",
+    "simple_output",
 ]
 
 
