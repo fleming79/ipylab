@@ -28,7 +28,7 @@ jobs:
         python -m pip install "jupyterlab>=4,<5" hatch
     - name: Build pypi distributions
       run: |
-        hatch build
+        hatch build -t sdist
     - name: Build npm distributions
       run: |
         npm pack
@@ -54,6 +54,8 @@ jobs:
         include:
           - python: '3.11'
             dist: 'ipylab*.tar.gz'
+          - python: '3.13'
+            dist: 'ipylab*.tar.gz'
           - os: windows
             py_cmd: python
             pip_cmd: python -m pip
@@ -73,9 +75,6 @@ jobs:
         with:
           name: dist ${{ github.run_number }}
           path: ./dist
-      - name: Install the prerequisites
-        run: |
-          ${{ matrix.pip_cmd }} install --upgrade pip wheel jupyterlab~=4.0
       - name: Install the package
         run: |
           cd dist

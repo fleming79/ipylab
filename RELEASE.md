@@ -33,13 +33,14 @@ You could also clean up the local git repository:
 git clean -dfX
 ```
 
-To create a Python source package (`.tar.gz`) and the binary package (`.whl`) in the `dist/` directory, do:
+To create a Python source package (`.tar.gz`) in the `dist/` directory, do:
 
 ```bash
-hatch build
+hatch build -t sdist
 ```
 
-> `python setup.py sdist bdist_wheel` is deprecated and will not work for this package.
+> We build the source distribution only so that the patched dependencies are bundled.
+> This can be reversed when the downstream packages support the required additional functionality.
 
 Then to upload the package to PyPI, do:
 

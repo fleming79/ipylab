@@ -21,7 +21,7 @@ jobs:
       - name: Build the extension
         run: |
           set -eux
-          pip install .[dev,test]
+          pip install -e .[dev,test]
 
           jupyter labextension list
           jupyter labextension list 2>&1 | grep -ie "ipylab.*OK"
@@ -32,7 +32,7 @@ jobs:
         run: |
           set -eux
 
-          hatch build
+          hatch build -t sdist
           pip uninstall -y "ipylab" jupyterlab
 
       - name: Upload extension packages

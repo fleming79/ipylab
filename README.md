@@ -1,11 +1,11 @@
 # ipylab
 
-![Github Actions Status](https://github.com/jtpio/ipylab/workflows/Build/badge.svg)
+<!-- ![Github Actions Status](https://github.com/jtpio/ipylab/workflows/Build/badge.svg)
 [![JupyterLite](https://jupyterlite.rtfd.io/en/latest/_static/badge-launch.svg)](https://ipylab.readthedocs.io/en/latest/lite/lab)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/jtpio/ipylab/main?urlpath=lab/tree/examples/widgets.ipynb)
 [![Conda Version](https://img.shields.io/conda/vn/conda-forge/ipylab.svg)](https://anaconda.org/conda-forge/ipylab)
 [![pypi](https://img.shields.io/pypi/v/ipylab.svg)](https://pypi.python.org/pypi/ipylab)
-[![npm](https://img.shields.io/npm/v/ipylab.svg)](https://www.npmjs.com/package/ipylab)
+[![npm](https://img.shields.io/npm/v/ipylab.svg)](https://www.npmjs.com/package/ipylab) -->
 
 Control JupyterLab from Python notebooks.
 
@@ -17,7 +17,7 @@ The goal is to provide access to most of the JupyterLab environment from the Pyt
 - Open a workspace with a specific layout
 - Listen to JupyterLab signals (notebook opened, console closed) and trigger Python callbacks
 
-## Try it online
+<!-- ## Try it online
 
 Try it in your browser with Binder:
 
@@ -25,7 +25,7 @@ Try it in your browser with Binder:
 
 Or with [JupyterLite](https://github.com/jupyterlite/jupyterlite):
 
-[![JupyterLite](https://jupyterlite.rtfd.io/en/latest/_static/badge-launch.svg)](https://ipylab.readthedocs.io/en/latest/lite/lab)
+[![JupyterLite](https://jupyterlite.rtfd.io/en/latest/_static/badge-launch.svg)](https://ipylab.readthedocs.io/en/latest/lite/lab) -->
 
 ## Examples
 
@@ -45,49 +45,33 @@ Or with [JupyterLite](https://github.com/jupyterlite/jupyterlite):
 
 ![ipytree-example](https://user-images.githubusercontent.com/591645/80026006-b8bb1d80-84e1-11ea-87cc-86495186b938.gif)
 
-### Compatibility with RetroLab
-
-A subset of the features can be used in RetroLab:
-
-![retrolab-example](https://user-images.githubusercontent.com/591645/141700044-3c39661a-8a9a-4e6b-a031-03724e0df25b.gif)
 
 ## Installation
 
-You can install using `pip`:
+Use pip to install from source.
 
-```bash
-pip install ipylab
+Download [source](https://github.com/fleming79/ipylab/releases/download/v2.0.0b5/ipylab-2.0.0b5.tar.gz).
+
+``` bash
+pip install ipylab-2.0.0b5.tar.gz # Update version as required.
 ```
 
-Or with `mamba` / `conda`:
 
-```bash
-mamba install -c conda-forge ipylab
-```
+## Dependencies
 
-### Per kernel widget manager
+The following dependencies are provided as wheels in the pkg directory which include patches to
+improved the functionality.
 
-The current behaviour of IpyWidgets requires a Notebook or Console to create the
-Widget. Once the Notebook or Console Panel is closed, the widget comms is closed
-making the widget unavailable.
+| Name                                               | Pull request                                            | Status                      | Modification        |
+| -------------------------------------------------- | ------------------------------------------------------- | --------------------------- | ------------------- |
+| traitlets                                          | [#918](https://github.com/ipython/traitlets/pull/918)   | Accepted - pending release  | Improved type hints |
+| ipykernel      | [#1384](https://github.com/ipython/ipykernel/pull/1384) | Waiting review   |  Based on Anyio version of kernel, modified to execute cells inside a task making it possible to await coroutines inside cells (eg notebook and console cells). |
+| ipywidgets, jupyterlab-widgets, widgetsnbextension | [#3922](https://github.com/jupyter-widgets/ipywidgets/pull/3922) + [#3921](https://github.com/jupyter-widgets/ipywidgets/pull/3921) | Pending review | Provides for widgets comms without needing a notebook or console to be open. Plus fixes for proper garbage collection and widget tooltips |
 
-This [Pull Request](https://github.com/jupyter-widgets/ipywidgets/pull/3922) modifies
-the widget manager so widgets can be created without requiring a Notebook or Console
-to be open.
+Use the source distribution to ensure the dependencies are bundled.
 
-Wheels in the `/pkg/` folder were built using this [source](https://github.com/fleming79/ipywidgets/tree/weakref-and-per-kernel-widget-manager)
-combining [Per-kernel-widget-manager](https://github.com/jupyter-widgets/ipywidgets/pull/3922)
-and [weakref](https://github.com/fleming79/ipywidgets/tree/weakref).
-
-These versions enable:
-
-- Widget restoration when the page is reloaded.
-- Starting new kernels and opening widgets from those kernels.
-- autostart plugins - Run code when Jupyterlab is started.
-- Viewing widgets from kernels inside from other kernels.
-
-```bash
-pip install --no-binary --force-reinstall ipylab
+``` bash
+hatch build -t sdist
 ```
 
 ## Running the examples locally
