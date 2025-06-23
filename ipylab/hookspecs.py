@@ -10,7 +10,6 @@ import pluggy
 hookspec = pluggy.HookspecMarker("ipylab")
 
 if TYPE_CHECKING:
-    import asyncio
     from collections.abc import Awaitable
 
     import ipylab
@@ -62,11 +61,6 @@ async def vpath_getter(app: ipylab.App, kwgs: dict) -> str:  # type: ignore
     This hook provides for dynamic determination of the vpath/kernel to use when
     adding 'evaluate' code to the shell. The default behaviour is prompt the user
     for a path."""
-
-
-@hookspec(firstresult=True)
-def get_asyncio_event_loop(app: ipylab.App) -> asyncio.AbstractEventLoop:  # type: ignore
-    "Get the asyncio event loop."
 
 
 @hookspec(firstresult=True)

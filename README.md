@@ -65,8 +65,9 @@ improved the functionality.
 | Name                                               | Pull request                                            | Status                      | Modification        |
 | -------------------------------------------------- | ------------------------------------------------------- | --------------------------- | ------------------- |
 | traitlets                                          | [#918](https://github.com/ipython/traitlets/pull/918)   | Accepted - pending release  | Improved type hints |
-| ipykernel      | [#1384](https://github.com/ipython/ipykernel/pull/1384) | Waiting review   |  Based on Anyio version of kernel, modified to execute cells inside a task making it possible to await coroutines inside cells (eg notebook and console cells). |
 | ipywidgets, jupyterlab-widgets, widgetsnbextension | [#3922](https://github.com/jupyter-widgets/ipywidgets/pull/3922) + [#3921](https://github.com/jupyter-widgets/ipywidgets/pull/3921) | Pending review | Provides for widgets comms without needing a notebook or console to be open. Plus fixes for proper garbage collection and widget tooltips |
+| jupyter_client | [#1064](https://github.com/jupyter/jupyter_client/pull/1064)  | Pending review | Faster message serialization |
+| async_kernel | [Not a PR](https://github.com/fleming79/ipykernel/tree/async) | Awaiting feedback from [Ipython / Jupyter developers](https://github.com/ipython/ipykernel/pull/1384) | This kernel is native async. Importantly, execute_requests are run in tasks enabling shell messages to pass whilst execute_requests are being performed. This makes it possible to await async methods in ipylab that rely on custom shell messages.  |
 
 Use the source distribution to ensure the dependencies are bundled.
 
@@ -76,15 +77,14 @@ hatch build -t sdist
 
 ## Running the examples locally
 
-To try out the examples locally, the recommended way is to create a new environment with the dependencies:
+To try out the examples locally you can install with pip:
 
 ```bash
-# create a new conda environment
-conda create -n ipylab-examples -c conda-forge jupyterlab ipylab ipytree bqplot ipywidgets numpy
-conda activate ipylab-examples
 
-# start JupyterLab
-jupyter lab
+# for examples
+pip install ipylab[examples] https://github.com/fleming79/ipylab/releases/download/v2.0.0b5/ipylab-2.0.0b5.tar.gz
+
+ipylab
 ```
 
 ## Under the hood

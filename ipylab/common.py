@@ -595,7 +595,7 @@ class HasApp(HasTraits):
         logs exceptions.
         """
         try:
-            start_soon = self.app.kernel.start_soon  # type: ignore
+            start_soon = self.comm.kernel.start_soon  # type: ignore
         except AttributeError:
             if loop := self.app.asyncio_loop:
                 coro = func(*args)

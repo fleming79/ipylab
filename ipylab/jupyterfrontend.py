@@ -72,7 +72,10 @@ class App(Singular, Ipylab):
 
     @default("asyncio_loop")
     def _default_asyncio_loop(self):
-        return ipylab.plugin_manager.hook.get_asyncio_event_loop(app=self)
+        try:
+            return asyncio.get_running_loop()
+        except Exception:
+            return None
 
     @observe("_ready", "log_level")
     def _app_observe_ready(self, change):

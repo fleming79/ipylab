@@ -56,16 +56,6 @@ def default_namespace_objects(namespace_id: str, app: ipylab.App) -> dict:
 
 
 @hookimpl
-def get_asyncio_event_loop(app: ipylab.App):
-    try:
-        return app.comm.kernel.asyncio_event_loop  # type: ignore
-    except AttributeError:
-        import asyncio
-
-        return asyncio.get_running_loop()
-
-
-@hookimpl
 def get_logging_handler(app: ipylab.App) -> IpylabLogHandler:
     fmt = "%(color)s%(level_symbol)s %(asctime)s.%(msecs)d %(name)s %(owner_rep)s: %(message)s %(reset)s\n"
     handler = IpylabLogHandler(app.log_level)

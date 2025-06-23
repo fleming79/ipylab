@@ -96,7 +96,10 @@ export class JupyterFrontEndModel extends IpylabModel {
    * @param vpath The session path
    * @returns
    */
-  static async getModelByVpath(vpath: string): Promise<JupyterFrontEndModel> {
+  static async getModelByVpath(
+    vpath: string,
+    preferredKernel: string = 'async'
+  ): Promise<JupyterFrontEndModel> {
     if (!vpath || typeof vpath !== 'string') {
       throw new Error(`Invalid vpath ${vpath}`);
     }
@@ -115,7 +118,10 @@ export class JupyterFrontEndModel extends IpylabModel {
           model: model.kernel
         });
       } else {
-        const sessionContext = await JFEM.newSessionContext(vpath);
+        const sessionContext = await JFEM.newSessionContext(
+          vpath,
+          preferredKernel
+        );
         kernel = sessionContext.session.kernel;
       }
       Private.kernelIdToVpath.set(kernel.id, vpath);
@@ -137,10 +143,12 @@ export class JupyterFrontEndModel extends IpylabModel {
       Private.vpathTojfem.get(vpath).promise.then(jfem => {
         if (!jfem.commAvailable) {
           jfem.close();
-          JupyterFrontEndModel.getModelByVpath(vpath).then(jfem => {
-            clearTimeout(timeoutID);
-            resolve(jfem);
-          });
+          JupyterFrontEndModel.getModelByVpath(vpath, preferredKernel).then(
+            jfem => {
+              clearTimeout(timeoutID);
+              resolve(jfem);
+            }
+          );
         } else {
           clearTimeout(timeoutID);
           resolve(jfem);
@@ -155,14 +163,18 @@ export class JupyterFrontEndModel extends IpylabModel {
    * This will automatically starting a new kernel if a session path matching
    * vpath isn't found.
    */
-  static async newSessionContext(vpath: string) {
+  static async newSessionContext(
+    vpath: string,
+    preferredKernel: string = 'async'
+  ) {
     const sessionContext = new SessionContext({
       sessionManager: IpylabModel.sessionManager,
       specsManager: IpylabModel.app.serviceManager.kernelspecs,
       path: vpath,
       name: vpath,
       type: 'console',
-      kernelPreference: { language: 'python' }
+      kernelManager: IpylabModel.app.serviceManager.kernels,
+      kernelPreference: { language: 'python', name: preferredKernel }
     });
     await sessionContext.initialize();
     if (!sessionContext.isReady) {
@@ -224,7 +236,7 @@ export class JupyterFrontEndModel extends IpylabModel {
         await IpylabModel.app.serviceManager.kernels.shutdown(model.kernel.id);
       }
     }
-    await IpylabModel.JFEM.getModelByVpath('ipylab');
+    await IpylabModel.JFEM.getModelByVpath('ipylab', 'async');
   }
 
   kernelId: string;
