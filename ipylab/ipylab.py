@@ -7,10 +7,11 @@ import asyncio
 import inspect
 import json
 import uuid
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 import traitlets
-from anyio import Event, create_memory_object_stream
+from anyio import Event
+from anyioutils import Future
 from ipywidgets import TypedTuple, Widget, register
 from traitlets import Bool, Container, Dict, Instance, Int, List, TraitType, Unicode, observe
 from typing_extensions import override
@@ -23,7 +24,6 @@ if TYPE_CHECKING:
     from types import CoroutineType
     from typing import Self, Unpack
 
-    from anyio.streams.memory import MemoryObjectSendStream
 
 __all__ = ["Ipylab", "IpylabBase", "WidgetBase"]
 
@@ -89,7 +89,7 @@ class Ipylab(HasApp, WidgetBase):
     _ready_event = Instance(Event, ())
     _comm = None
     _ipylab_init_complete = False
-    _pending_operations: Dict[str, MemoryObjectSendStream] = Dict()
+    _pending_operations: Dict[str, Future] = Dict()
     _signal_dottednames = TypedTuple().tag(sync=True)
     _signal_callbacks: Dict[str, list[Callable[[SignalCallbackData], None | CoroutineType]]] = Dict()
 
@@ -180,15 +180,15 @@ class Ipylab(HasApp, WidgetBase):
         except Exception as e:
             self.log.exception("Message processing error", obj=msg, exc_info=e)
 
-    @autorun
-    async def _set_result(self, key: str, error: str | None, payload: Any):
-        # We use autorun to ensure this code is run in the main event loop
-        send_stream = self._pending_operations.pop(key)
+    def _set_result(self, key: str, error: str | None, payload: Any):
+        future = self._pending_operations.pop(key)
         if error is not None:
             error_ = IpylabFrontendError(error)
             error_.add_note(f"{payload=}")
             payload = error_
-        send_stream.send_nowait(payload)
+            future.set_exception(error_)
+        else:
+            future.set_result(payload)
 
     @autorun
     async def _do_operation_for_fe(self, key: str, operation: str, payload: dict, buffers: list | None):
@@ -213,7 +213,6 @@ class Ipylab(HasApp, WidgetBase):
 
     @autorun
     async def _notify_signal(self, data: SignalCallbackData):
-        # We use autorun to ensure this code is run in the main event loop
         if callbacks := self._signal_callbacks.get(data["dottedname"]):
             for callback in callbacks:
                 try:
@@ -320,14 +319,11 @@ class Ipylab(HasApp, WidgetBase):
         if toObject:
             content["toObject"] = toObject
 
-        send_stream, receive_stream = create_memory_object_stream()
-        self._pending_operations[ipylab_PY] = send_stream
+        future = Future()
+        self._pending_operations[ipylab_PY] = future
         self._ipylab_send(content)
-        result = await receive_stream.receive()
-        if isinstance(result, Exception):
-            raise result
-        result = await Transform.transform_payload(content["transform"], result)
-        return cast(Any, result)
+        payload = await future.wait()
+        return await Transform.transform_payload(content["transform"], payload)
 
     async def execute_method(self, subpath: str, args: tuple = (), obj=Obj.base, **kwargs: Unpack[IpylabKwgs]) -> Any:
         """Execute a method on a remote object in the frontend.

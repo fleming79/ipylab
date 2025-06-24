@@ -18,7 +18,7 @@ from traitlets import Callable, Container, Dict, Instance, Int, Unicode, default
 from typing_extensions import override
 
 import ipylab
-from ipylab.common import Fixed, LastUpdatedDict
+from ipylab.common import Fixed, LastUpdatedDict, autorun
 from ipylab.ipylab import Ipylab
 
 if TYPE_CHECKING:
@@ -278,5 +278,6 @@ class CodeEditor(Ipylab, _String):
 
         return await super()._do_operation_for_frontend(operation, payload, buffers)
 
-    def clear_undo_history(self):
-        return self.operation("clearUndoHistory")
+    @autorun
+    async def clear_undo_history(self):
+        await self.operation("clearUndoHistory")

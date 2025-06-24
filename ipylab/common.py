@@ -16,6 +16,7 @@ from enum import StrEnum
 from types import CoroutineType
 from typing import (
     TYPE_CHECKING,
+    Any,
     ClassVar,
     Concatenate,
     Generic,
@@ -308,7 +309,7 @@ class Transform(StrEnum):
         return transform_
 
     @classmethod
-    async def transform_payload(cls, transform: TransformType, payload):
+    async def transform_payload(cls, transform: TransformType, payload) -> Any:
         """Transform the payload according to the transform."""
         transform_ = transform["transform"] if isinstance(transform, dict) else transform
         match transform_:
