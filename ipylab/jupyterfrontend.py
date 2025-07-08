@@ -3,14 +3,13 @@
 
 from __future__ import annotations
 
-import asyncio
 import contextlib
 import functools
 import inspect
 from typing import TYPE_CHECKING, Any, Self, Unpack, final
 
 from ipywidgets import Widget, register
-from traitlets import Bool, Container, Dict, Instance, Unicode, UseEnum, default, observe
+from traitlets import Bool, Container, Dict, Unicode, UseEnum, observe
 from typing_extensions import override
 
 import ipylab
@@ -61,21 +60,12 @@ class App(Singular, Ipylab):
         created=lambda c: c["owner"].shell.log_viewer,
     )
     log_level = UseEnum(LogLevel, LogLevel.ERROR)
-    asyncio_loop: Instance[asyncio.AbstractEventLoop | None] = Instance(asyncio.AbstractEventLoop, allow_none=True)  # type: ignore
-
     namespaces: Container[dict[str, LastUpdatedDict]] = Dict(read_only=True)  # type: ignore
 
     @override
     def close(self, *, force=False):
         if force:
             super().close()
-
-    @default("asyncio_loop")
-    def _default_asyncio_loop(self):
-        try:
-            return asyncio.get_running_loop()
-        except Exception:
-            return None
 
     @observe("_ready", "log_level")
     def _app_observe_ready(self, change):

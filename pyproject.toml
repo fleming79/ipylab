@@ -27,7 +27,6 @@ classifiers = [
 
 dependencies = [
   "anyio",
-  "anyioutils",
   "jupyterlab>=4.3",
   "ipywidgets>=8.1.5",
   "ipython>=8.32",
@@ -36,7 +35,7 @@ dependencies = [
   "typing_extensions",
   "traitlets @ {root:uri}/pkg/traitlets-5.14.3-py3-none-any.whl",
   "jupyter_client @ {root:uri}/pkg/jupyter_client-8.6.3-py3-none-any.whl",
-  "async_kernel @ {root:uri}/pkg/async_kernel-0.1a1-py3-none-any.whl",
+  "async_kernel @ {root:uri}/pkg/async_kernel-0.1b0-py3-none-any.whl",
   "widgetsnbextension @ {root:uri}/pkg/widgetsnbextension-4.0.13-py3-none-any.whl",
   "jupyterlab_widgets @ {root:uri}/pkg/jupyterlab_widgets-3.0.13-py3-none-any.whl",
   "ipywidgets @ {root:uri}/pkg/ipywidgets-8.1.5-py3-none-any.whl",

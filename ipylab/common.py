@@ -8,6 +8,7 @@ import contextlib
 import importlib
 import inspect
 import textwrap
+import threading
 import typing
 import weakref
 from collections import OrderedDict
@@ -35,6 +36,7 @@ from typing import (
 import anyio
 import pluggy
 import traitlets
+from async_kernel.utils import ThreadSafeCaller
 from ipywidgets import TypedTuple, Widget, widget_serialization
 from traitlets import Any as AnyTrait
 from traitlets import Bool, Container, HasTraits, Instance, default, observe
@@ -596,16 +598,9 @@ class HasApp(HasTraits):
         logs exceptions.
         """
         try:
-            start_soon = self.comm.kernel.start_soon  # type: ignore
-        except AttributeError:
-            if loop := self.app.asyncio_loop:
-                coro = func(*args)
-                asyncio.run_coroutine_threadsafe(coro, loop)
-            else:
-                msg = f"We don't have a running loop to run {func}"
-                raise RuntimeError(msg) from None
-        else:
-            start_soon(func, *args)
+            ThreadSafeCaller.get_instance(threading.main_thread()).call_later(func, 0, *args)
+        except RuntimeError:
+            asyncio.get_running_loop().call_soon_threadsafe(func, *args)
 
 
 class _SingularInstances(HasTraits, Generic[T]):
