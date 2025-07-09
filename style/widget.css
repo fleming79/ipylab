@@ -45,5 +45,5 @@
   box-sizing: border-box;
   display: inline-block;
   resize: both;
-  overflow: hidden;
+  overflow: auto;
 }
