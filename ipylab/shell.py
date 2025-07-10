@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import contextlib
 import inspect
-from typing import TYPE_CHECKING, Unpack
+from typing import TYPE_CHECKING, Literal, Unpack
 
+from async_kernel import KernelName
 from ipywidgets import DOMWidget, TypedTuple, Widget
 from traitlets import Container, Instance, Unicode
 
@@ -50,6 +51,7 @@ class Shell(Singular, Ipylab):
         ref: ShellConnection | None = None,
         options: dict | None = None,
         vpath: str | dict[Literal["title"], str] = "",
+        preferred_kernel: KernelName | Literal["python3"] | None = KernelName.asyncio,
         **args,
     ) -> ShellConnection:
         """Add a widget to the shell.
@@ -86,6 +88,8 @@ class Shell(Singular, Ipylab):
             Note:
             The result (payload) of evaluate must be a Widget with a view and
             NOT a ShellConnection.
+        preferred_kernel:
+            The name of the kernel to use if a new kernel is started.
         options:
             Other options not including
 
@@ -134,6 +138,7 @@ class Shell(Singular, Ipylab):
                 val = await val
             vpath = val
         args["vpath"] = vpath
+        args["preferredKernel"] = preferred_kernel
         sc_current = None
         if activate and area == Area.main:
             current_widget_id: str | None = await self.get_property("currentWidget.id")

@@ -70,7 +70,7 @@ export class ShellModel extends IpylabModel {
       return;
     }
 
-    await ShellModel.JFEM.getModelByVpath(args.vpath);
+    await ShellModel.JFEM.getModelByVpath(args.vpath, args.preferredKernel);
     await new Promise(resolve => {
       setTimeout(resolve, 10000);
       ShellModel.addToShell(args).then(resolve, e => {
@@ -107,7 +107,10 @@ export class ShellModel extends IpylabModel {
     } catch (e) {
       if (args.evaluate) {
         // Evaluate code in python to get a panel and then add it to the shell.
-        const jfem = await ShellModel.JFEM.getModelByVpath(args.vpath);
+        const jfem = await ShellModel.JFEM.getModelByVpath(
+          args.vpath,
+          args.preferredKernel
+        );
         return await jfem.scheduleOperation('shell_eval', args, 'object');
       } else {
         throw e;

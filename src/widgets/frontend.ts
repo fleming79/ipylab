@@ -46,9 +46,10 @@ export class JupyterFrontEndModel extends IpylabModel {
   async operation(op: string, payload: any): Promise<any> {
     switch (op) {
       case 'evaluate':
-        return await JFEM.getModelByVpath(payload.vpath).then(jfem =>
-          jfem.scheduleOperation('evaluate', payload, 'object')
-        );
+        return await JFEM.getModelByVpath(
+          payload.vpath,
+          payload.preferredKernel
+        ).then(jfem => jfem.scheduleOperation('evaluate', payload, 'object'));
       case 'startIyplabKernel':
         return await JFEM.startIpylabKernel(payload.restart ?? false);
       case 'shutdownKernel':

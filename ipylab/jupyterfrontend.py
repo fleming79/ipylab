@@ -6,8 +6,10 @@ from __future__ import annotations
 import contextlib
 import functools
 import inspect
-from typing import TYPE_CHECKING, Any, Self, Unpack, final
+import os
+from typing import TYPE_CHECKING, Any, Literal, Self, Unpack, final
 
+from async_kernel import KernelName
 from ipywidgets import Widget, register
 from traitlets import Bool, Container, Dict, Unicode, UseEnum, observe
 from typing_extensions import override
@@ -92,7 +94,7 @@ class App(Singular, Ipylab):
 
     @property
     def repr_info(self):
-        return {"vpath": self._vpath}
+        return {"vpath": self._vpath, "session name": self.session_name}
 
     @property
     def repr_log(self):
@@ -119,6 +121,11 @@ class App(Singular, Ipylab):
             msg = "`vpath` cannot not be accessed until app is ready."
             raise RuntimeError(msg)
         return self._vpath
+
+    @property
+    def session_name(self):
+        "The full path including vpath."
+        return os.environ.get("JPY_SESSION_NAME", "")
 
     @property
     def selector(self):
@@ -254,6 +261,7 @@ class App(Singular, Ipylab):
         *,
         vpath: str,
         namespace_id="",
+        preferred_kernel: KernelName | Literal["python3"] | None = KernelName.asyncio,
         kwgs: None | dict = None,
         **kwargs: Unpack[IpylabKwgs],
     ):
@@ -296,6 +304,8 @@ class App(Singular, Ipylab):
             will be returned.
         vpath:
             The path of kernel session where the evaluation should take place.
+        preferred_kernel:
+            The name of the kernel to use if a new kernel is started.
         namespace_id:
             The namespace where to perform evaluation.
             The default namespace will also update the shell.user_ns after
@@ -333,7 +343,12 @@ class App(Singular, Ipylab):
         ```
         """
         await self.ready()
-        kwgs = (kwgs or {}) | {"evaluate": evaluate, "vpath": vpath or self.vpath, "namespace_id": namespace_id}
+        kwgs = (kwgs or {}) | {
+            "evaluate": evaluate,
+            "vpath": vpath or self.vpath,
+            "preferredKernel": preferred_kernel,
+            "namespace_id": namespace_id,
+        }
         return await self.operation("evaluate", kwgs=kwgs, **kwargs)
 
 
