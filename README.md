@@ -7,7 +7,7 @@
 [![pypi](https://img.shields.io/pypi/v/ipylab.svg)](https://pypi.python.org/pypi/ipylab)
 [![npm](https://img.shields.io/npm/v/ipylab.svg)](https://www.npmjs.com/package/ipylab) -->
 
-Control JupyterLab from Python notebooks.
+Control JupyterLab from Python.
 
 The goal is to provide access to most of the JupyterLab environment from the Python kernel. For example:
 

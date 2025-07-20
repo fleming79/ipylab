@@ -3,11 +3,11 @@
 
 from __future__ import annotations
 
-import asyncio
 import inspect
 import typing
 from typing import TYPE_CHECKING, Any, NotRequired, Self, TypedDict
 
+import anyio
 from IPython.core import completer as IPC  # noqa: N812
 from IPython.utils.tokenutil import token_at_cursor
 from ipywidgets import Layout, register, widget_serialization
@@ -249,7 +249,7 @@ class CodeEditor(Ipylab, _String):
                     value = self.value
                     await self.operation("setValue", {"value": value})
                     self._sync = self._sync + 1
-                    await asyncio.sleep(self.update_throttle_ms / 1e3)
+                    await anyio.sleep(self.update_throttle_ms / 1e3)
                     if self.value == value:
                         break
 

@@ -128,6 +128,7 @@ class Ipylab(HasApp, WidgetBase):
     @observe("_ready")
     def _observe_ready(self, _: dict):
         if self._ready:
+            self.log.debug("ready")
             self._ready_event.set()
             self._ready_event = Event()
             for cb in self._on_ready_callbacks:

@@ -95,6 +95,6 @@ async def test_ready(n, app: ipylab.App):
     # event loops.
     loops.add(asyncio.get_running_loop())
     assert len(loops) == n, "A new event loop should be provided per test."
-    with contextlib.suppress(asyncio.TimeoutError):
-        async with asyncio.timeout(1):
+    with contextlib.suppress(TimeoutError):
+        with anyio.fail_after(1):
             await app.ready()
