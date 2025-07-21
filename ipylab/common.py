@@ -36,7 +36,7 @@ from typing import (
 import anyio
 import pluggy
 import traitlets
-from async_kernel.utils import ThreadSafeCaller
+from async_kernel import ThreadCaller
 from ipywidgets import TypedTuple, Widget, widget_serialization
 from traitlets import Any as AnyTrait
 from traitlets import Bool, Container, HasTraits, Instance, default, observe
@@ -598,7 +598,7 @@ class HasApp(HasTraits):
         logs exceptions.
         """
         try:
-            ThreadSafeCaller.get_instance(threading.main_thread()).call_later(func, 0, *args)
+            ThreadCaller.get_instance(threading.main_thread()).call_later(func, 0, *args)
         except RuntimeError:
             asyncio.get_running_loop().call_soon_threadsafe(func, *args)
 
