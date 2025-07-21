@@ -94,7 +94,7 @@ class Connection(Singular, Ipylab):
     @property
     @override
     def repr_info(self):
-        return {"connection_id": self.connection_id}
+        return repr(self.connection_id)
 
     @override
     def close(self, *, dispose=True):
@@ -129,11 +129,6 @@ class InfoConnection(Connection):
 
     info = Dict(help="info about the item")
     auto_dispose = Bool(True).tag(sync=True)
-
-    @property
-    @override
-    def repr_info(self):
-        return {"connection_id": self.connection_id, "info": self.info}
 
 
 class ShellConnection(Connection):
