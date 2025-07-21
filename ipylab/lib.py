@@ -57,7 +57,7 @@ def default_namespace_objects(namespace_id: str, app: ipylab.App) -> dict:
 
 @hookimpl
 def get_logging_handler(app: ipylab.App) -> IpylabLogHandler:
-    fmt = "%(color)s%(level_symbol)s %(asctime)s.%(msecs)d %(name)s %(owner_rep)s: %(message)s %(reset)s\n"
+    fmt = "%(color)s%(level_symbol)s %(asctime)s.%(msecs)d %(name)s {%(filename)s:%(lineno)d} %(owner_rep)s: %(message)s %(reset)s\n"
     handler = IpylabLogHandler(app.log_level)
     handler.setFormatter(IpylabLogFormatter(fmt=fmt, style="%", datefmt="%H:%M:%S"))
     return handler
