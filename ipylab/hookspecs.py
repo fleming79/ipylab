@@ -65,4 +65,4 @@ async def vpath_getter(app: ipylab.App, kwgs: dict) -> str:  # type: ignore
 
 @hookspec(firstresult=True)
 def get_logging_handler(app: ipylab.App) -> IpylabLogHandler:  # type: ignore
-    "Get the asyncio event loop."
+    "Get the logging handler."

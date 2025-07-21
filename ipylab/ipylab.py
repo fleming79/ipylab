@@ -3,15 +3,15 @@
 
 from __future__ import annotations
 
-import asyncio
 import inspect
 import json
 import uuid
 from typing import TYPE_CHECKING, Any
 
+import anyio
 import traitlets
 from anyio import Event
-from async_kernel.utils import PendingResult
+from async_kernel import PendingResult
 from ipywidgets import TypedTuple, Widget, register
 from traitlets import Bool, Container, Dict, Instance, Int, List, TraitType, Unicode, observe
 from typing_extensions import override
@@ -204,7 +204,7 @@ class Ipylab(HasApp, WidgetBase):
                 buffers = result["buffers"]
                 result = result["payload"]
             content["payload"] = result
-        except asyncio.CancelledError:
+        except anyio.get_cancelled_exc_class():
             content["error"] = "Cancelled"
         except Exception as e:
             content["error"] = f"{e.__class__.__name__}: {e}"
