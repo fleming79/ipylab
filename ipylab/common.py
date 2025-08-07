@@ -580,7 +580,7 @@ class HasApp(HasTraits):
         self._check_closed()
         try:
             Caller.get_instance().taskgroup.start_soon(self._catch_exceptions, coro)
-        except KeyError:
+        except RuntimeError:
             if not (tasks := getattr(self, "_tasks", None)):
                 self._tasks = tasks = set()
             tasks.add(task := asyncio.create_task(self._catch_exceptions(coro)))
