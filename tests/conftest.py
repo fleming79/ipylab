@@ -1,5 +1,5 @@
 import pytest
-from async_kernel import ThreadCaller
+from async_kernel import Caller
 
 import ipylab
 
@@ -16,7 +16,7 @@ async def anyio_backend_autouse(anyio_backend):
 
 @pytest.fixture
 async def app(mocker):
-    async with ThreadCaller():
+    async with Caller(create=True):
         app = ipylab.App()
         mocker.patch.object(app, "ready")
         yield app

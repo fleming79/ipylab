@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 import anyio
 import traitlets
 from anyio import Event
-from async_kernel import PendingResult
+from async_kernel import Future
 from ipywidgets import TypedTuple, Widget, register
 from traitlets import Bool, Container, Dict, Instance, Int, List, TraitType, Unicode, observe
 from typing_extensions import override
@@ -89,7 +89,7 @@ class Ipylab(HasApp, WidgetBase):
     _ready_event = Instance(Event, ())
     _comm = None
     _ipylab_init_complete = False
-    _pending_operations: Dict[str, PendingResult] = Dict()
+    _pending_operations: Dict[str, Future] = Dict()
     _signal_dottednames = TypedTuple().tag(sync=True)
     _signal_callbacks: Dict[str, list[Callable[[SignalCallbackData], None | CoroutineType]]] = Dict()
 
@@ -320,10 +320,10 @@ class Ipylab(HasApp, WidgetBase):
         if toObject:
             content["toObject"] = toObject
 
-        future = PendingResult()
+        future = Future()
         self._pending_operations[ipylab_PY] = future
         self._ipylab_send(content)
-        payload = await future.wait()
+        payload = await future.result()
         return await Transform.transform_payload(content["transform"], payload)
 
     async def execute_method(self, subpath: str, args: tuple = (), obj=Obj.base, **kwargs: Unpack[IpylabKwgs]) -> Any:

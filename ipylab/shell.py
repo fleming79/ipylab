@@ -7,7 +7,7 @@ import contextlib
 import inspect
 from typing import TYPE_CHECKING, Literal, Unpack
 
-from async_kernel import KernelName
+from async_kernel.kernelspec import KernelName
 from ipywidgets import DOMWidget, TypedTuple, Widget
 from traitlets import Container, Instance, Unicode
 
@@ -51,7 +51,7 @@ class Shell(Singular, Ipylab):
         ref: ShellConnection | None = None,
         options: dict | None = None,
         vpath: str | dict[Literal["title"], str] = "",
-        preferred_kernel: KernelName | Literal["python3"] | None = KernelName.asyncio,
+        preferred_kernel: KernelName | Literal["python3"] | str = KernelName.asyncio,  # noqa: PYI051
         **args,
     ) -> ShellConnection:
         """Add a widget to the shell.

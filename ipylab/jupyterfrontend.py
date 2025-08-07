@@ -9,7 +9,7 @@ import inspect
 import os
 from typing import TYPE_CHECKING, Any, Literal, Self, Unpack, final
 
-from async_kernel import KernelName
+from async_kernel.kernelspec import KernelName
 from ipywidgets import Widget, register
 from traitlets import Bool, Container, Dict, Unicode, UseEnum, observe
 from typing_extensions import override
@@ -261,7 +261,7 @@ class App(Singular, Ipylab):
         *,
         vpath: str,
         namespace_id="",
-        preferred_kernel: KernelName | Literal["python3"] | None = KernelName.asyncio,
+        preferred_kernel: KernelName | Literal["python3"] | str = KernelName.asyncio,  # noqa: PYI051
         kwgs: None | dict = None,
         **kwargs: Unpack[IpylabKwgs],
     ):

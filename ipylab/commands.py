@@ -72,7 +72,7 @@ class CommandConnection(InfoConnection):
         return super().to_id(command_registry, vpath, name)
 
     @property
-    def repr_info(self):
+    def repr_info(self):  # type: ignore
         return {"name": self.commands.name} | {"info": self.info}
 
     async def configure(self, *, emit=True, **kwgs: Unpack[CommandOptions]) -> CommandOptions:

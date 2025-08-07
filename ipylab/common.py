@@ -8,7 +8,6 @@ import contextlib
 import importlib
 import inspect
 import textwrap
-import threading
 import typing
 import weakref
 from collections import OrderedDict
@@ -28,7 +27,6 @@ from typing import (
     TypedDict,
     TypeVar,
     TypeVarTuple,
-    Unpack,
     final,
     overload,
 )
@@ -36,7 +34,7 @@ from typing import (
 import anyio
 import pluggy
 import traitlets
-from async_kernel import ThreadCaller
+from async_kernel import Caller
 from ipywidgets import TypedTuple, Widget, widget_serialization
 from traitlets import Any as AnyTrait
 from traitlets import Bool, Container, HasTraits, Instance, default, observe
@@ -556,8 +554,6 @@ class HasApp(HasTraits):
             await aw
         except BaseException as e:
             self.log.exception(f"Calling {aw}", obj={"aw": aw}, exc_info=e)  # noqa: G004
-            if self.app.log_level == ipylab.log.LogLevel.DEBUG:
-                raise
 
     def start_coro(self, coro: CoroutineType[None, None, T]) -> None:
         """Start a coroutine in the main event loop.
@@ -582,25 +578,13 @@ class HasApp(HasTraits):
         """
 
         self._check_closed()
-        self.start_soon(self._catch_exceptions, coro)
-
-    def start_soon(self, func: Callable[[Unpack[PosArgsT]], CoroutineType], *args: Unpack[PosArgsT]):
-        """Start a function soon in the main event loop.
-
-        If the kernel has a start_soon method, use it.
-        Otherwise, if the app has an asyncio loop, run the function in that loop.
-        Otherwise, raise a RuntimeError.
-
-        This is a simple wrapper to ensure the function is called in the main
-        event loop. No error reporting is done.
-
-        Consider using start_coro which performs additional checks and automatically
-        logs exceptions.
-        """
         try:
-            ThreadCaller.get_instance(threading.main_thread()).call_later(func, 0, *args)
-        except RuntimeError:
-            asyncio.get_running_loop().call_soon_threadsafe(func, *args)
+            Caller.get_instance().taskgroup.start_soon(self._catch_exceptions, coro)
+        except KeyError:
+            if not (tasks := getattr(self, "_tasks", None)):
+                self._tasks = tasks = set()
+            tasks.add(task := asyncio.create_task(self._catch_exceptions(coro)))
+            task.add_done_callback(tasks.discard)
 
 
 class _SingularInstances(HasTraits, Generic[T]):
