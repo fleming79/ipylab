@@ -31,7 +31,7 @@
         "--notebook-dir=examples",
         "--no-browser",
         "--IdentityProvider.token=''",
-        "--port=9999"
+        "--port=9990"
       ],
       "cwd": "${workspaceFolder}",
       "justMyCode": false,
@@ -45,7 +45,7 @@
       "type": "firefox",
       "request": "launch",
       "reAttach": true,
-      "url": "http://localhost:9999",
+      "url": "http://localhost:9990",
       "webRoot": "${workspaceFolder}",
       "pathMappings": [
         {
@@ -62,7 +62,7 @@
       "type": "chrome",
       "request": "launch",
       "timeout": 180000,
-      "url": "http://localhost:9999",
+      "url": "http://localhost:9990",
       // set webroot to the parent dir of your project's top level package.json
       "webRoot": "${workspaceFolder}",
       "pathMapping": {
