@@ -47,6 +47,8 @@ if TYPE_CHECKING:
     from types import CoroutineType
     from typing import overload
 
+    from async_kernel.caller import Future
+
     from ipylab.ipylab import Ipylab
     from ipylab.log import IpylabLoggerAdapter
 
@@ -555,7 +557,7 @@ class HasApp(HasTraits):
         except BaseException as e:
             self.log.exception(f"Calling {aw}", obj={"aw": aw}, exc_info=e)  # noqa: G004
 
-    def start_coro(self, coro: CoroutineType[None, None, T]) -> None:
+    def start_coro(self, coro: CoroutineType[None, None, T]) -> Future[T] | asyncio.Task[T]:
         """Start a coroutine in the main event loop.
 
         If the kernel has a `start_soon` method, use it to start the coroutine.
@@ -579,12 +581,13 @@ class HasApp(HasTraits):
 
         self._check_closed()
         try:
-            Caller.get_instance().taskgroup.start_soon(self._catch_exceptions, coro)
+            return Caller.get_instance().call_soon(self._catch_exceptions, coro)  # pyright: ignore[reportReturnType]
         except RuntimeError:
             if not (tasks := getattr(self, "_tasks", None)):
                 self._tasks = tasks = set()
             tasks.add(task := asyncio.create_task(self._catch_exceptions(coro)))
             task.add_done_callback(tasks.discard)
+            return task  # pyright: ignore[reportReturnType]
 
 
 class _SingularInstances(HasTraits, Generic[T]):
