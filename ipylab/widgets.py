@@ -6,12 +6,13 @@ from __future__ import annotations
 from typing import ClassVar, NotRequired, TypedDict, Unpack
 
 import anyio
+from async_kernel import Caller
 from ipywidgets import Box, DOMWidget, Layout, TypedTuple, Widget, register, widget_serialization
 from ipywidgets.widgets.trait_types import InstanceDict
 from traitlets import Container, Dict, Instance, Tuple, Unicode, observe
 
 import ipylab._frontend as _fe
-from ipylab.common import Area, HasApp, InsertMode, autorun
+from ipylab.common import Area, HasApp, InsertMode
 from ipylab.connection import Connection, ShellConnection
 from ipylab.ipylab import WidgetBase
 
@@ -78,14 +79,13 @@ class SplitPanel(Panel):
 
     @observe("children", "connections")
     def _observer(self, _):
-        self._toggle_orientation(children=self.children)
+        Caller().queue_call(self._toggle_orientation, self.children)
 
-    @autorun
     async def _toggle_orientation(self, children: tuple[Widget, ...]):
         """Toggle the orientation to cause lumino_widget.parent to re-render content."""
+        await anyio.sleep(0.1)
         if children != self.children:
             return
-        await anyio.sleep(0.1)
         orientation = self.orientation
         self.orientation = "horizontal" if orientation == "vertical" else "vertical"
         await anyio.sleep(0.001)

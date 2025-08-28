@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import contextlib
 import importlib
 import inspect
@@ -13,12 +12,10 @@ import weakref
 from collections import OrderedDict
 from collections.abc import Callable
 from enum import StrEnum
-from types import CoroutineType
 from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
-    Concatenate,
     Generic,
     Literal,
     NotRequired,
@@ -28,13 +25,11 @@ from typing import (
     TypeVar,
     TypeVarTuple,
     final,
-    overload,
 )
 
 import anyio
 import pluggy
 import traitlets
-from async_kernel import Caller
 from ipywidgets import TypedTuple, Widget, widget_serialization
 from traitlets import Any as AnyTrait
 from traitlets import Bool, Container, HasTraits, Instance, default, observe
@@ -44,10 +39,6 @@ import ipylab
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Hashable
-    from types import CoroutineType
-    from typing import overload
-
-    from async_kernel.caller import Future
 
     from ipylab.ipylab import Ipylab
     from ipylab.log import IpylabLoggerAdapter
@@ -82,43 +73,6 @@ PosArgsT = TypeVarTuple("PosArgsT")
 hookimpl = pluggy.HookimplMarker("ipylab")  # Used for plugins
 
 SVGSTR_TEST_TUBE = '<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 392.493 392.493" xml:space="preserve" fill="#000000"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <polygon style="fill:#FFFFFF;" points="83.2,99.123 169.697,185.62 300.477,185.62 148.687,33.701 "></polygon> <g> <path style="fill:#56ACE0;" d="M21.851,348.917c0,12.024,9.826,21.786,21.786,21.786s21.786-9.826,21.786-21.786 c0-7.111-10.214-25.794-21.786-43.184C32,323.123,21.851,341.806,21.851,348.917z"></path> <path style="fill:#56ACE0;" d="M31.677,218.59c0,6.594,5.301,11.895,11.895,11.895s11.895-5.301,11.895-11.895 c-0.065-3.491-5.042-13.382-11.895-24.113C36.784,205.143,31.741,215.034,31.677,218.59z"></path> </g> <path style="fill:#194F82;" d="M372.622,226.864L164.073,18.315c3.943-4.267,3.879-10.925-0.323-15.063 c-3.62-3.556-10.02-5.042-15.451,0L52.687,98.864c-4.267,4.267-4.267,11.119,0,15.451c4.202,4.202,10.796,4.267,15.063,0.323 l208.549,208.55c25.471,27.345,73.503,25.729,96.259,0C399.127,296.618,399.127,253.499,372.622,226.864z M83.2,99.123 l65.422-65.358l151.919,151.919h-130.78L83.2,99.123z M357.172,307.737c-15.321,16.356-44.8,19.846-65.358,0L191.483,207.406 h130.844l34.844,34.844C375.208,260.351,375.208,289.701,357.172,307.737z"></path> <path style="fill:#FFC10D;" d="M357.172,307.737c18.036-18.036,18.036-47.386,0-65.422l-34.844-34.909H191.483l100.331,100.331 C312.436,327.584,341.851,324.093,357.172,307.737z"></path> <g> <path style="fill:#194F82;" d="M34.844,280.327C29.026,288.149,0,328.295,0,348.917c0,24.048,19.653,43.572,43.636,43.572 s43.572-19.523,43.572-43.572c0-20.622-29.026-60.768-34.844-68.59C48.291,274.767,39.046,274.767,34.844,280.327z M43.636,370.767 c-12.024,0-21.786-9.826-21.786-21.786c0-7.111,10.214-25.794,21.786-43.184c11.572,17.325,21.786,36.008,21.786,43.184 C65.422,360.941,55.661,370.767,43.636,370.767z"></path> <path style="fill:#194F82;" d="M43.636,252.335c18.618,0,33.745-15.127,33.745-33.681c0-15.063-19.071-41.956-24.954-49.842 c-4.073-5.56-13.382-5.56-17.519,0c-5.883,7.887-24.954,34.78-24.954,49.842C9.891,237.272,25.018,252.335,43.636,252.335z M43.636,194.541c6.853,10.731,11.895,20.622,11.895,24.113c0,6.594-5.301,11.895-11.895,11.895s-11.96-5.301-11.96-11.895 C31.741,215.163,36.784,205.272,43.636,194.541z"></path> </g> </g></svg>'
-
-
-def autorun(f: Callable[Concatenate[B, P], CoroutineType[None, None, R]]):
-    """Decorator to automatically start a coroutine when a method is called.
-
-    The decorated method will be called with the same arguments as the original method. But with
-    start prepended.
-    If `start` is True (default), the coroutine will be started automatically using
-    `ipylab.App().start_coro` or `self.start_coro` if the class is an instance of `ipylab.Ipylab`.
-    If `start` is False, the coroutine will be returned without being started.
-
-    Args:
-        f: The coroutine function to decorate.  The first argument must be `self`.
-
-    Returns:
-        The decorated function.
-    """
-    if TYPE_CHECKING:
-
-        @overload
-        def inner(self: B, start: Literal[True], /, *args: P.args, **kwargs: P.kwargs) -> None: ...
-        @overload
-        def inner(
-            self: B, start: Literal[False], /, *args: P.args, **kwargs: P.kwargs
-        ) -> CoroutineType[None, None, R]: ...
-        @overload
-        def inner(self: B, start: Literal[True] = ..., /, *args: P.args, **kwargs: P.kwargs) -> None: ...
-
-    def inner(self: B, start: bool = True, /, *args: P.args, **kwargs: P.kwargs) -> CoroutineType[None, None, R] | None:  # noqa: FBT001, FBT002
-        coro = f(self, *args, **kwargs)
-        if not start:
-            return coro
-        start_coro = self.start_coro if isinstance(self, ipylab.Ipylab) else ipylab.App().start_coro
-        start_coro(coro)
-        return None
-
-    return inner
 
 
 def pack(obj: Widget | inspect._SourceObjectType):
@@ -556,38 +510,6 @@ class HasApp(HasTraits):
             await aw
         except BaseException as e:
             self.log.exception(f"Calling {aw}", obj={"aw": aw}, exc_info=e)  # noqa: G004
-
-    def start_coro(self, coro: CoroutineType[None, None, T]) -> Future[T] | asyncio.Task[T]:
-        """Start a coroutine in the main event loop.
-
-        If the kernel has a `start_soon` method, use it to start the coroutine.
-        Otherwise, if the application has an asyncio loop, use
-        `asyncio.run_coroutine_threadsafe` to start the coroutine in the loop.
-        If neither of these is available, raise a RuntimeError.
-
-        Tip: Use anyio primiatives in the coroutine to ensure it will run in
-        the chosen backend of the kernel.
-
-        Parameters
-        ----------
-        coro : CoroutineType[None, None, T]
-            The coroutine to start.
-
-        Raises
-        ------
-        RuntimeError
-            If there is no running loop to start the task.
-        """
-
-        self._check_closed()
-        try:
-            return Caller.get_instance().call_soon(self._catch_exceptions, coro)  # pyright: ignore[reportReturnType]
-        except RuntimeError:
-            if not (tasks := getattr(self, "_tasks", None)):
-                self._tasks = tasks = set()
-            tasks.add(task := asyncio.create_task(self._catch_exceptions(coro)))
-            task.add_done_callback(tasks.discard)
-            return task  # pyright: ignore[reportReturnType]
 
 
 class _SingularInstances(HasTraits, Generic[T]):

@@ -7,13 +7,14 @@ import collections
 import contextlib
 from typing import TYPE_CHECKING, Self
 
+from async_kernel import Caller
 from IPython.display import HTML as IPD_HTML
 from ipywidgets import HTML, BoundedIntText, Button, Checkbox, Combobox, Dropdown, HBox, Select, VBox
 from traitlets import directional_link, link, observe
 from typing_extensions import override
 
 import ipylab
-from ipylab.common import SVGSTR_TEST_TUBE, Fixed, InsertMode, autorun
+from ipylab.common import SVGSTR_TEST_TUBE, Fixed, InsertMode
 from ipylab.log import LogLevel
 from ipylab.simple_output import AutoScroll, SimpleOutput
 from ipylab.widgets import AddToShellType, Icon, Panel
@@ -136,9 +137,8 @@ class LogViewer(Panel):
         if self.connections:
             self.output.push(record.output)  # type: ignore
         if record.levelno >= LogLevel.ERROR and self.app._ready:  # noqa: SLF001
-            self._notify_exception(True, record)
+            Caller.get_instance().queue_call(self._notify_exception, record)
 
-    @autorun
     async def _notify_exception(self, record: logging.LogRecord):
         "Create a notification that an error occurred."
         try:
@@ -171,12 +171,11 @@ class LogViewer(Panel):
     def _button_on_click(self, b):
         if b is self.button_show_send_dialog:
             b.disabled = True
-            self._show_send_dialog(True, b)
+            Caller.get_instance().call_soon(self._show_send_dialog, b)
         elif b is self.button_clear:
             self._records.clear()
             self.output.push(clear=True)
 
-    @autorun
     async def _show_error(self, record: logging.LogRecord):
         out = SimpleOutput().push(
             IPD_HTML(
@@ -192,7 +191,7 @@ class LogViewer(Panel):
             "obj": getattr(record, "obj", None),
         }
         b = Button(description="Send to console", tooltip="Send `record`, `owner` and `obj` to the console")
-        b.on_click(lambda _: self.app.shell.start_coro(self.app.shell.open_console(objects=objects)))
+        b.on_click(lambda _: Caller.get_instance().call_soon(self.app.shell.open_console, objects=objects))
         out.push(b)
         p = Panel([out])
         p.title.label = record.levelname.capitalize()
@@ -200,7 +199,6 @@ class LogViewer(Panel):
         p.title.icon = Icon(name="ipylab-test_tube", svgstr=SVGSTR_TEST_TUBE)
         await self.app.shell.add(p, mode=InsertMode.split_right)
 
-    @autorun
     async def _show_send_dialog(self, b: Button):
         options = {f"{r.asctime}: {r.msg}": r for r in reversed(self._records)}  # type: ignore
         search = Combobox(

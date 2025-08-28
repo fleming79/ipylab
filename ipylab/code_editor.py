@@ -8,6 +8,7 @@ import typing
 from typing import TYPE_CHECKING, Any, NotRequired, Self, TypedDict
 
 import anyio
+from async_kernel import Caller
 from IPython.core import completer as IPC  # noqa: N812
 from IPython.utils.tokenutil import token_at_cursor
 from ipywidgets import Layout, register, widget_serialization
@@ -18,7 +19,7 @@ from traitlets import Callable, Container, Dict, Instance, Int, Unicode, default
 from typing_extensions import override
 
 import ipylab
-from ipylab.common import Fixed, LastUpdatedDict, autorun
+from ipylab.common import Fixed, LastUpdatedDict
 from ipylab.ipylab import Ipylab
 
 if TYPE_CHECKING:
@@ -244,16 +245,17 @@ class CodeEditor(Ipylab, _String):
         if self._setting_value != change["new"]:
             # We use throttling to ensure there isn't a backlog of changes to synchronise.
             # When the value is set in Python, we the shared model in the frontend should exactly reflect it.
-            async def send_value():
-                while True:
-                    value = self.value
-                    await self.operation("setValue", {"value": value})
-                    self._sync = self._sync + 1
-                    await anyio.sleep(self.update_throttle_ms / 1e3)
-                    if self.value == value:
-                        break
 
-            self.start_coro(send_value())
+            Caller.get_instance().queue_call(self._send_value)
+
+    async def _send_value(self):
+        while True:
+            value = self.value
+            await self.operation("setValue", {"value": value})
+            self._sync = self._sync + 1
+            await anyio.sleep(self.update_throttle_ms / 1e3)
+            if self.value == value:
+                break
 
     @override
     async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list):
@@ -278,6 +280,5 @@ class CodeEditor(Ipylab, _String):
 
         return await super()._do_operation_for_frontend(operation, payload, buffers)
 
-    @autorun
     async def clear_undo_history(self):
         await self.operation("clearUndoHistory")

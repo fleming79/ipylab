@@ -6,18 +6,19 @@ from __future__ import annotations
 import inspect
 import json
 import uuid
+from types import CoroutineType
 from typing import TYPE_CHECKING, Any
 
 import anyio
 import traitlets
 from anyio import Event
-from async_kernel import Future
+from async_kernel import Caller, Future
 from ipywidgets import TypedTuple, Widget, register
 from traitlets import Bool, Container, Dict, Instance, Int, List, TraitType, Unicode, observe
 from typing_extensions import override
 
 import ipylab._frontend as _fe
-from ipylab.common import HasApp, IpylabKwgs, Obj, SignalCallbackData, Transform, TransformType, autorun, pack
+from ipylab.common import HasApp, IpylabKwgs, Obj, SignalCallbackData, Transform, TransformType, pack
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -170,12 +171,14 @@ class Ipylab(HasApp, WidgetBase):
                 case {"ipylab_PY": str(key), **rest}:
                     self._set_result(key=key, error=None, payload=rest.get("payload"))
                 case {"ipylab_FE": str(key), "operation": operation, "payload": payload}:
-                    self._do_operation_for_fe(key=key, operation=operation, payload=payload, buffers=buffers)
+                    Caller.get_instance().call_soon(
+                        self._do_operation_for_fe, key=key, operation=operation, payload=payload, buffers=buffers
+                    )
                 case {"closed": closed} if closed:
                     self.close()
                 case {"signal": {"dottedname": dottedname, **rest}}:
                     data = SignalCallbackData(owner=self, dottedname=dottedname, args=rest.get("args"))
-                    self._notify_signal(data=data)
+                    Caller.get_instance().call_soon(self._notify_signal, data=data)
                 case _ as data:
                     self.log.error(f"Unhandled custom message {data=}", obj=data)  # noqa: G004
         except Exception as e:
@@ -191,10 +194,8 @@ class Ipylab(HasApp, WidgetBase):
         else:
             future.set_result(payload)
 
-    @autorun
     async def _do_operation_for_fe(self, key: str, operation: str, payload: dict, buffers: list | None):
         """Handle operation requests from the frontend and reply with a result."""
-        # We use autorun to ensure this code is run in the main event loop
         await self.ready()
         content: dict[str, Any] = {"ipylab_FE": key}
         buffers = []
@@ -212,12 +213,11 @@ class Ipylab(HasApp, WidgetBase):
         finally:
             self._ipylab_send(content, buffers)
 
-    @autorun
     async def _notify_signal(self, data: SignalCallbackData):
         if callbacks := self._signal_callbacks.get(data["dottedname"]):
             for callback in callbacks:
                 try:
-                    result = callback(data)
+                    result: CoroutineType[Any, Any, Any] | None = callback(data)
                     if inspect.iscoroutine(result):
                         await result
                 except Exception as e:
@@ -236,7 +236,7 @@ class Ipylab(HasApp, WidgetBase):
     def _call_ready_callback(self, callback: Callable[[Self], None | CoroutineType]):
         result = callback(self)
         if inspect.iscoroutine(result):
-            self.start_coro(result)
+            Caller.get_instance().call_soon(result)  # pyright: ignore[reportCallIssue, reportArgumentType]
 
     async def ready(self) -> Self:
         """Wait for the instance to be ready.
