@@ -1,9 +1,6 @@
 # ipylab
 
 <!-- ![Github Actions Status](https://github.com/jtpio/ipylab/workflows/Build/badge.svg)
-[![JupyterLite](https://jupyterlite.rtfd.io/en/latest/_static/badge-launch.svg)](https://ipylab.readthedocs.io/en/latest/lite/lab)
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/jtpio/ipylab/main?urlpath=lab/tree/examples/widgets.ipynb)
-[![Conda Version](https://img.shields.io/conda/vn/conda-forge/ipylab.svg)](https://anaconda.org/conda-forge/ipylab)
 [![pypi](https://img.shields.io/pypi/v/ipylab.svg)](https://pypi.python.org/pypi/ipylab)
 [![npm](https://img.shields.io/npm/v/ipylab.svg)](https://www.npmjs.com/package/ipylab) -->
 
@@ -17,15 +14,6 @@ The goal is to provide access to most of the JupyterLab environment from the Pyt
 - Open a workspace with a specific layout
 - Listen to JupyterLab signals (notebook opened, console closed) and trigger Python callbacks
 
-<!-- ## Try it online
-
-Try it in your browser with Binder:
-
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/jtpio/ipylab/main?urlpath=lab/tree/examples/widgets.ipynb)
-
-Or with [JupyterLite](https://github.com/jupyterlite/jupyterlite):
-
-[![JupyterLite](https://jupyterlite.rtfd.io/en/latest/_static/badge-launch.svg)](https://ipylab.readthedocs.io/en/latest/lite/lab) -->
 
 ## Examples
 
@@ -95,15 +83,28 @@ ipylab
 
 ## Development
 
+The development environment is provided by [uv](https://docs.astral.sh/uv/). 
+
+### Installation from source
+
+If you are working on a pull request, [make a fork] of the project and install from your fork.
+
+```shell
+git clone <repository>
+cd ipylab
+uv venv -p python@311 # or whichever environment you are targeting.
+uv sync
+# Activate the environment
+```
+
+### Frontend (Typescript/Javascript)
+
+If you are making changes to the you also need to have nodejs available. Fortunately
+[nodejs-wheel](https://pypi.org/project/nodejs-wheel/) provides a wheel for this. It can be installed using:
+
 ```bash
-# create a new conda environment
-conda create -n ipylab -c conda-forge nodejs python=3.11 -y
-
-# activate the environment
-conda activate ipylab
-
-# install the Python package
-pip install -e .[dev,test]
+uv sync --group node
+# This will also re-build/re-install. 
 
 # link the extension files
 jupyter labextension develop . --overwrite
@@ -114,10 +115,11 @@ jlpm build
 
 # At this point you can run and debug. vscode configs are provided for Firefox and Chrome.
 # "Debug Ipylab with Firefox | Chrome"
+```
 
+```bash
 # pre-commit (optional)
-pip install pre-commit
-pre-commit run
+pre-commit run 
 
 # or, to install the git hook
 pre-commit install
@@ -127,15 +129,31 @@ jlpm lint
 #or
 jlpm lint:check
 
-# Pyright
+```
+### Upgrade files
 
-pip install pyright[nodejs]
-pyright
+=== "Python files"
+
+    ```bash
+    uv sync -U
+    ```
+
+=== "Frontend"
+
+    TODO
+
+
+### Type checking
+
+Type checking is performed using [basedpyright](https://docs.basedpyright.com/).
+
+```bash
+basedpyright
 ```
 
 ### VS code debugging
 
-A config file is included to debug ipylab with Firefox or Chrome.
+A config file is included to debug `ipylab` with Firefox or Chrome.
 
 ## Related projects
 

@@ -121,7 +121,7 @@ class Connection(Singular, Ipylab):
         return cls_(connection_id)
 
 
-Connection._CLASS_DEFINITIONS[Connection.prefix.strip(Connection._SEP)] = Connection  # noqa: SLF001
+Connection._CLASS_DEFINITIONS[Connection.prefix.strip(Connection._SEP)] = Connection
 
 
 class InfoConnection(Connection):

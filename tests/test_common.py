@@ -5,12 +5,9 @@ from __future__ import annotations
 
 from typing import Self
 
-import pytest
-from traitlets import Unicode
-from typing_extensions import override
-
 import ipylab
 import ipylab.common
+import pytest
 from ipylab.common import (
     Fixed,
     FixedCreated,
@@ -22,6 +19,8 @@ from ipylab.common import (
     TransformDictFunction,
 )
 from ipylab.connection import Connection
+from traitlets import Unicode
+from typing_extensions import override
 
 
 class CommonTestClass:
@@ -262,5 +261,5 @@ class TestFixed:
 
     def test_function_to_eval(self):
         eval_str = ipylab.common.module_obj_to_import_string(test_last_updated_dict)
-        obj = eval(eval_str, {"import_item": ipylab.common.import_item})  # noqa: S307
+        obj = eval(eval_str, {"import_item": ipylab.common.import_item})
         assert obj is test_last_updated_dict

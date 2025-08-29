@@ -9,7 +9,17 @@ from typing import TYPE_CHECKING, Self
 
 from async_kernel import Caller
 from IPython.display import HTML as IPD_HTML
-from ipywidgets import HTML, BoundedIntText, Button, Checkbox, Combobox, Dropdown, HBox, Select, VBox
+from ipywidgets import (
+    HTML,
+    BoundedIntText,
+    Button,
+    Checkbox,
+    Combobox,
+    Dropdown,
+    HBox,
+    Select,
+    VBox,
+)
 from traitlets import directional_link, link, observe
 from typing_extensions import override
 
@@ -53,7 +63,7 @@ class LogViewer(Panel):
             layout={"width": "max-content", "flex": "0 0 auto"},
         ),
         created=lambda c: (
-            c["obj"].observe(c["owner"]._observe_buffer_size, "value"),  # noqa: SLF001
+            c["obj"].observe(c["owner"]._observe_buffer_size, "value"),
             link(
                 source=(c["obj"], "value"),
                 target=(c["owner"].output, "max_outputs"),
@@ -73,7 +83,7 @@ class LogViewer(Panel):
             "which may be of interest for debugging purposes.",
             layout={"width": "auto", "flex": "0 0 auto"},
         ),
-        created=lambda c: c["obj"].on_click(c["owner"]._button_on_click),  # noqa: SLF001
+        created=lambda c: c["obj"].on_click(c["owner"]._button_on_click),
     )
     button_clear = Fixed[Self, Button](
         lambda _: Button(
@@ -81,7 +91,7 @@ class LogViewer(Panel):
             tooltip="Clear log",
             layout={"width": "auto", "flex": "0 0 auto"},
         ),
-        created=lambda c: c["obj"].on_click(c["owner"]._button_on_click),  # noqa: SLF001
+        created=lambda c: c["obj"].on_click(c["owner"]._button_on_click),
     )
     autoscroll_enabled = Fixed(
         lambda _: Checkbox(
@@ -129,14 +139,14 @@ class LogViewer(Panel):
     def _observe_connections(self, _):
         if self.connections and len(self.connections) == 1:
             self.output.push(*(rec.output for rec in self._records), clear=True)  # type: ignore
-        self.info.value = f"<b>Vpath: {self.app._vpath}</b>"  # noqa: SLF001
-        self.title.label = f"Log: {self.app._vpath}"  # noqa: SLF001
+        self.info.value = f"<b>Vpath: {self.app._vpath}</b>"
+        self.title.label = f"Log: {self.app._vpath}"
 
     def _add_record(self, record: logging.LogRecord):
         self._records.append(record)
         if self.connections:
             self.output.push(record.output)  # type: ignore
-        if record.levelno >= LogLevel.ERROR and self.app._ready:  # noqa: SLF001
+        if record.levelno >= LogLevel.ERROR and self.app._ready:
             Caller.get_instance().queue_call(self._notify_exception, record)
 
     async def _notify_exception(self, record: logging.LogRecord):

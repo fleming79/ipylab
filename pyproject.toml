@@ -26,13 +26,12 @@ classifiers = [
 ]
 
 dependencies = [
-  "anyio",
+  "async-kernel",
   "jupyterlab>=4.3",
   "ipywidgets>=8.1.5",
   "ipython>=8.32",
   "jupyterlab_widgets>=3.0.11",
   "pluggy~=1.5",
-  "async_kernel",
   "typing_extensions",
   "traitlets @ {root:uri}/pkg/traitlets-5.14.3-py3-none-any.whl",
   "jupyter_client @ {root:uri}/pkg/jupyter_client-8.6.3-py3-none-any.whl",
@@ -42,13 +41,36 @@ dependencies = [
 ]
 dynamic = ["version", "description", "authors", "urls", "keywords"]
 
-[project.optional-dependencies]
-dev = ["hatch", "ruff", "pre-commit"]
-test = ["pytest", "anyio", "pytest-cov", "pytest-mock"]
-examples = ["matplotlib", 'numpy', 'ipympl']
+
+[dependency-groups]
+docs = [
+  "mkdocs-material",
+  "mike",
+  "mkdocstrings[python]",
+  "mkdocs-jupyter",
+  "mkdocs-open-in-new-tab",
+  "mkdocs-git-revision-date-localized-plugin",
+]
+test = [
+  "pytest",
+  "pre-commit",
+  "pytest-cov",
+  "pytest-timeout",
+  "pytest-mock",
+  "pytest-retry",
+  "pytest>=8.4,<9",
+  "trio",
+  "numpy",
+  "matplotlib",
+  "bqplot"
+]
+node=["nodejs-wheel"]
+dev = ["basedpyright", "ruff", "debugpy", { include-group = "test" }]
+cov = ["coverage[toml]", "pytest-cov", "matplotlib", "trio"]
 
 [project.scripts]
 ipylab = "ipylab:plugin_manager.hook.launch_ipylab"
+
 
 [tool.hatch.version]
 source = "nodejs"
@@ -89,9 +111,6 @@ npm = ["jlpm"]
 source_dir = "src"
 build_dir = "ipylab/labextension"
 
-[tool.hatch.envs.hatch-static-analysis]
-config-path = "ruff_defaults.toml"
-
 [tool.jupyter-releaser.options]
 version_cmd = "hatch version"
 
@@ -103,7 +122,6 @@ before-build-python = ["jlpm clean:all"]
 ignore = ["W002"]
 
 [tool.ruff]
-extend = "ruff_defaults.toml"
 target-version = "py311"
 src = ['docs']
 
@@ -113,13 +131,57 @@ ignore-words-list = 'statics'
 write = true
 
 [tool.ruff.lint]
-ignore = ["BLE001", "N803"]
+extend-select = [
+  "B",    # flake8-bugbear
+  "I",    # isort
+  "F",    # Pyflakes
+  "ARG",  # flake8-unused-arguments
+  "C4",   # flake8-comprehensions
+  "EM",   # flake8-errmsg
+  "ICN",  # flake8-import-conventions
+  "G",    # flake8-logging-format
+  "PERF", # Perflint
+  "PGH",  # pygrep-hooks
+  "PIE",  # flake8-pie
+  "PL",   # pylint
+  "PLR",  # Refactor
+  "PT",   # flake8-pytest-style
+  "PTH",  # flake8-use-pathlib
+  "RET",  # flake8-return
+  "RUF",  # Ruff-specific
+  "SIM",  # flake8-simplify
+  "T20",  # flake8-print
+  "TRY",  # tryceratops
+  "FURB", # Refurb
+  "UP",   # pyupgrade
+  "YTT",  # flake8-2020
+  "EXE",  # flake8-executable
+  "NPY",  # NumPy specific rules
+  "PD",   # pandas-vet
+  "PYI",  # flake8-pyi
+  "TC",   # flake8-type-checking
+]
+ignore = [
+  "PLR",    # Design related pylint codes
+  "B027",   # Allow non-abstract empty methods in abstract base classes
+  "T201",   # `print` found
+  "SIM105", # Use `contextlib.suppress(ValueError)` instead of try-except-pass
+  "RUF012", # Mutable class attributes should be annotated with `typing.ClassVar`
+  "ARG001", # Unused function argument
+  "ARG002", # Unused method argument
+  "PTH123", # `open()` should be replaced by `Path.open()`
+  "UP031",  # Use format specifiers instead of percent format
+  "PT023",  # Use `@pytest.mark.skip` over `@pytest.mark.skip()`
+]
 [tool.ruff.format]
 docstring-code-format = true
 
 [tool.ruff.lint.per-file-ignores]
 "tests*" = ['ARG002', 'SLF001', 'S101', 'PLR2004']
+"*.ipynb" = ["PLC0415"]
+
 
 [tool.pyright]
 include = ["ipylab", 'examples', 'tests']
 typeCheckingMode = 'standard'
+

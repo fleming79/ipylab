@@ -1,7 +1,6 @@
+import ipylab
 import pytest
 from async_kernel import Caller
-
-import ipylab
 
 
 @pytest.fixture(scope="session")

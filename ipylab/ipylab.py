@@ -14,11 +14,29 @@ import traitlets
 from anyio import Event
 from async_kernel import Caller, Future
 from ipywidgets import TypedTuple, Widget, register
-from traitlets import Bool, Container, Dict, Instance, Int, List, TraitType, Unicode, observe
+from traitlets import (
+    Bool,
+    Container,
+    Dict,
+    Instance,
+    Int,
+    List,
+    TraitType,
+    Unicode,
+    observe,
+)
 from typing_extensions import override
 
 import ipylab._frontend as _fe
-from ipylab.common import HasApp, IpylabKwgs, Obj, SignalCallbackData, Transform, TransformType, pack
+from ipylab.common import (
+    HasApp,
+    IpylabKwgs,
+    Obj,
+    SignalCallbackData,
+    Transform,
+    TransformType,
+    pack,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -249,7 +267,7 @@ class Ipylab(HasApp, WidgetBase):
             await self._ready_event.wait()
         return self
 
-    def on_ready(self, callback: Callable[[Self], None | CoroutineType], remove=False):  # noqa: FBT002
+    def on_ready(self, callback: Callable[[Self], None | CoroutineType], remove=False):
         """Register a historic callback to execute when the frontend indicates
         it is ready.
 
@@ -308,7 +326,7 @@ class Ipylab(HasApp, WidgetBase):
         if not operation or not isinstance(operation, str):
             msg = f"Invalid {operation=}"
             raise ValueError(msg)
-        ipylab_PY = str(uuid.uuid4())  # noqa: N806
+        ipylab_PY = str(uuid.uuid4())
         content = {
             "ipylab_PY": ipylab_PY,
             "operation": operation,

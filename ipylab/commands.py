@@ -235,7 +235,7 @@ class CommandRegistry(Singular, Ipylab):
                 msg = f"Required parameter '{n}' missing for {cmd} of {conn}"
                 raise NameError(msg)
         ns["_to_eval"] = functools.partial(cmd, **kwgs)
-        result = eval("_to_eval()", ns)  # noqa: S307
+        result = eval("_to_eval()", ns)
         while inspect.isawaitable(result):
             result = await result
         return result

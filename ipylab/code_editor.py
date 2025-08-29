@@ -9,13 +9,22 @@ from typing import TYPE_CHECKING, Any, NotRequired, Self, TypedDict
 
 import anyio
 from async_kernel import Caller
-from IPython.core import completer as IPC  # noqa: N812
+from IPython.core import completer as IPC
 from IPython.utils.tokenutil import token_at_cursor
 from ipywidgets import Layout, register, widget_serialization
 from ipywidgets.widgets.trait_types import InstanceDict
 from ipywidgets.widgets.widget_description import DescriptionStyle
 from ipywidgets.widgets.widget_string import _String
-from traitlets import Callable, Container, Dict, Instance, Int, Unicode, default, observe
+from traitlets import (
+    Callable,
+    Container,
+    Dict,
+    Instance,
+    Int,
+    Unicode,
+    default,
+    observe,
+)
 from typing_extensions import override
 
 import ipylab
@@ -82,7 +91,7 @@ class IpylabCompleter(IPC.IPCompleter):
                         new_end,
                         code[new_start : c.start] + c.text + code[c.end : new_end],
                         type=c.type,
-                        _origin=c._origin,  # noqa: SLF001
+                        _origin=c._origin,
                         signature=c.signature,
                     )
                     matches.append(comp.text)
@@ -114,9 +123,9 @@ class IpylabCompleter(IPC.IPCompleter):
         self.update_namespace()
         namespaces = ((self.code_editor.namespace_id, self.namespace),)
         with self.shell.builtin_trap:
-            info = self.shell._object_find(oname, namespaces)  # noqa: SLF001
+            info = self.shell._object_find(oname, namespaces)
             if info.found:
-                return self.shell.inspector._get_info(  # noqa: SLF001
+                return self.shell.inspector._get_info(
                     info.obj,
                     oname,
                     info=info,
@@ -150,13 +159,13 @@ class IpylabCompleter(IPC.IPCompleter):
         ns = self.namespace
         wait = code.startswith("await")
         try:
-            result = eval(code.removeprefix("await").strip(), ns)  # noqa: S307
+            result = eval(code.removeprefix("await").strip(), ns)
             if wait or inspect.iscoroutine(result):
                 result = await result
             if not self.code_editor.namespace_id:
                 self.app.shell.add_objects_to_ipython_namespace(ns)
         except SyntaxError:
-            exec(code, ns, ns)  # noqa: S102
+            exec(code, ns, ns)
             return next(reversed(ns.values()))
         else:
             return result

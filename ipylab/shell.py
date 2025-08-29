@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from typing import Literal
 
 
-__all__ = ["Shell", "ConsoleConnection"]
+__all__ = ["ConsoleConnection", "Shell"]
 
 
 class ConsoleConnection(ShellConnection):
@@ -119,7 +119,7 @@ class Shell(Singular, Ipylab):
                 raise RuntimeError(msg)
             args["connection_id"] = obj.connection_id
         elif isinstance(obj, Widget):
-            if not obj._view_name:  # noqa: SLF001
+            if not obj._view_name:
                 msg = f"This widget does not have a view {obj}"
                 raise RuntimeError(msg)
             if not args.get("connection_id") and reversed(self.connections):

@@ -73,11 +73,11 @@ class App(Singular, Ipylab):
     @observe("_ready", "log_level")
     def _app_observe_ready(self, change):
         if change["name"] == "_ready" and self._ready:
-            assert self._vpath, "Vpath should always before '_ready'."  # noqa: S101
+            assert self._vpath, "Vpath should always before '_ready'."
             self._selector = to_selector(self._vpath)
-            ipylab.plugin_manager.hook.autostart._call_history.clear()  # type: ignore  # noqa: SLF001
+            ipylab.plugin_manager.hook.autostart._call_history.clear()  # type: ignore
             try:
-                if not ipylab.plugin_manager.hook.autostart_once._call_history:  # noqa: SLF001
+                if not ipylab.plugin_manager.hook.autostart_once._call_history:
                     ipylab.plugin_manager.hook.autostart_once.call_historic(
                         kwargs={"app": self}, result_callback=self._autostart_callback
                     )
@@ -213,16 +213,16 @@ class App(Singular, Ipylab):
             for row in evaluate:
                 name, expression = ("payload", row) if isinstance(row, str) else row
                 if expression.startswith("import_item(dottedname="):
-                    result = eval(expression, {"import_item": ipylab.common.import_item})  # noqa: S307
+                    result = eval(expression, {"import_item": ipylab.common.import_item})
                 else:
                     try:
                         source = compile(expression, "-- Evaluate --", "eval")
                     except SyntaxError:
                         source = compile(expression, "-- Expression --", "exec")
-                        exec(source, ns)  # noqa: S102
+                        exec(source, ns)
                         result = next(reversed(ns.values()))  # Requires: LastUpdatedDict
                     else:
-                        result = eval(source, ns)  # noqa: S307
+                        result = eval(source, ns)
                 if not name:
                     continue
                 while callable(result) or inspect.isawaitable(result):
@@ -236,7 +236,7 @@ class App(Singular, Ipylab):
                         # We use a partial so that we can evaluate with the same namespace.
                         ns["_partial_call"] = functools.partial(result, **kwgs)
                         source = compile("_partial_call()", "-- Result call --", "eval")
-                        result = eval(source, ns)  # type: ignore # noqa: S307
+                        result = eval(source, ns)  # type: ignore
                         ns.pop("_partial_call")
                     if inspect.isawaitable(result):
                         result = await result

@@ -7,7 +7,15 @@ from typing import ClassVar, NotRequired, TypedDict, Unpack
 
 import anyio
 from async_kernel import Caller
-from ipywidgets import Box, DOMWidget, Layout, TypedTuple, Widget, register, widget_serialization
+from ipywidgets import (
+    Box,
+    DOMWidget,
+    Layout,
+    TypedTuple,
+    Widget,
+    register,
+    widget_serialization,
+)
 from ipywidgets.widgets.trait_types import InstanceDict
 from traitlets import Container, Dict, Instance, Tuple, Unicode, observe
 

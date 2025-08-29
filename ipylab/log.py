@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from collections.abc import MutableMapping
 
 
-__all__ = ["LogLevel", "IpylabLogHandler"]
+__all__ = ["IpylabLogHandler", "LogLevel"]
 
 
 class LogLevel(IntEnum):
@@ -79,7 +79,7 @@ class IpylabLoggerAdapter(logging.LoggerAdapter):
     def __init__(self, name: str, owner: Any) -> None:
         logger = logging.getLogger(name)
         if handler := self.app.logging_handler:
-            handler._add_logger(logger)  # noqa: SLF001
+            handler._add_logger(logger)
         super().__init__(logger)
         self.owner_ref = weakref.ref(owner)
 
@@ -151,7 +151,7 @@ class IpylabLogFormatter(logging.Formatter):
         ref = getattr(record, key, None)
         return ref() if key == "owner" and callable(ref) else ref
 
-    def formatException(self, ei) -> str:  # noqa: N802
+    def formatException(self, ei) -> str:
         if not ei[0]:
             return ""
         if self.app.logging_handler:

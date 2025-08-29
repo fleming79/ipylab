@@ -52,7 +52,7 @@ class NotificationConnection(InfoConnection):
     async def update(
         self,
         message: str,
-        type: NotificationType | None = None,  # noqa: A002
+        type: NotificationType | None = None,
         *,
         auto_close: float | Literal[False] | None = None,
         actions: Iterable[NotifyAction | ActionConnection] = (),
@@ -66,7 +66,7 @@ class NotificationConnection(InfoConnection):
         }
         to_object = ["args.id"]
 
-        actions_ = [await self.app.notification._ensure_action(v) for v in actions]  # noqa: SLF001
+        actions_ = [await self.app.notification._ensure_action(v) for v in actions]
         if actions_:
             args["actions"] = list(map(pack, actions_))  # type: ignore
             to_object.extend(f"options.actions.{i}" for i in range(len(actions_)))
@@ -114,7 +114,7 @@ class NotificationManager(Singular, Ipylab):
     async def notify(
         self,
         message: str,
-        type: NotificationType = NotificationType.default,  # noqa: A002
+        type: NotificationType = NotificationType.default,
         *,
         auto_close: float | Literal[False] | None = None,
         actions: Iterable[NotifyAction | ActionConnection] = (),

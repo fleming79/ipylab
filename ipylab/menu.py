@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from typing import Literal
 
 
-__all__ = ["MenuItemConnection", "MenuConnection", "MainMenu", "ContextMenu"]
+__all__ = ["ContextMenu", "MainMenu", "MenuConnection", "MenuItemConnection"]
 
 
 class MenuItemConnection(InfoConnection):
@@ -41,7 +41,7 @@ class RankedMenu(Ipylab):
         command: str | CommandConnection = "",
         submenu: MenuConnection | None = None,
         rank: float | None = None,
-        type: Literal["command", "submenu", "separator"] = "command",  # noqa: A002
+        type: Literal["command", "submenu", "separator"] = "command",
         args: dict | None = None,
     ) -> MenuItemConnection:
         """Add command, subitem or separator.
@@ -56,7 +56,7 @@ class RankedMenu(Ipylab):
         command: str | CommandConnection,
         submenu: MenuConnection | None,
         rank,
-        type: Literal["command", "submenu", "separator"],  # noqa: A002
+        type: Literal["command", "submenu", "separator"],
         args: dict | None,
         selector=None,
     ):

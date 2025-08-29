@@ -1,7 +1,6 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import anyio
-
 from ipylab.ipylab import Ipylab
 from ipylab.jupyterfrontend import App
 

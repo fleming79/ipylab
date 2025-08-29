@@ -45,19 +45,19 @@ if TYPE_CHECKING:
 
 __all__ = [
     "Area",
-    "Obj",
-    "InsertMode",
-    "Transform",
-    "TransformType",
-    "hookimpl",
-    "pack",
-    "IpylabKwgs",
-    "LastUpdatedDict",
     "Fixed",
     "FixedCreate",
     "FixedCreated",
     "HasApp",
+    "InsertMode",
+    "IpylabKwgs",
+    "LastUpdatedDict",
+    "Obj",
     "Singular",
+    "Transform",
+    "TransformType",
+    "hookimpl",
+    "pack",
 ]
 
 
@@ -241,9 +241,9 @@ class Transform(StrEnum):
                     return TransformDictFunction(transform=Transform.function, code=code)
                 case cls.connection:
                     connection_id = transform.get("connection_id")
-                    if connection_id and not connection_id.startswith(ipylab.Connection._PREFIX):  # noqa: SLF001
+                    if connection_id and not connection_id.startswith(ipylab.Connection._PREFIX):
                         msg = (
-                            f"'connection_id' should start with '{ipylab.Connection._PREFIX}' but got {connection_id=}"  # noqa: SLF001
+                            f"'connection_id' should start with '{ipylab.Connection._PREFIX}' but got {connection_id=}"
                         )
                         raise ValueError(msg)
                     return TransformDictConnection(transform=Transform.connection, connection_id=connection_id)
@@ -270,7 +270,7 @@ class Transform(StrEnum):
         transform_ = transform["transform"] if isinstance(transform, dict) else transform
         match transform_:
             case Transform.advanced:
-                mappings = typing.cast(TransformDictAdvanced, transform)["mappings"]
+                mappings = typing.cast("TransformDictAdvanced", transform)["mappings"]
                 return {key: await cls.transform_payload(mappings[key], payload[key]) for key in mappings}  # type: ignore
             case Transform.connection | Transform.auto if isinstance(payload, dict) and (
                 connection_id := payload.get("connection_id")
@@ -379,7 +379,7 @@ class Fixed(Generic[S, T]):
         True
     """
 
-    __slots__ = ["name", "instances", "create", "created"]
+    __slots__ = ["create", "created", "instances", "name"]
 
     def __init__(
         self,
