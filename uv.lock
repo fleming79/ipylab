@@ -878,6 +878,7 @@ dev = [
     { name = "bqplot" },
     { name = "debugpy" },
     { name = "matplotlib" },
+    { name = "nodejs-wheel" },
     { name = "numpy" },
     { name = "pre-commit" },
     { name = "pytest" },
@@ -895,9 +896,6 @@ docs = [
     { name = "mkdocs-material" },
     { name = "mkdocs-open-in-new-tab" },
     { name = "mkdocstrings", extra = ["python"] },
-]
-node = [
-    { name = "nodejs-wheel" },
 ]
 test = [
     { name = "bqplot" },
@@ -940,6 +938,7 @@ dev = [
     { name = "bqplot" },
     { name = "debugpy" },
     { name = "matplotlib" },
+    { name = "nodejs-wheel" },
     { name = "numpy" },
     { name = "pre-commit" },
     { name = "pytest" },
@@ -959,7 +958,6 @@ docs = [
     { name = "mkdocs-open-in-new-tab" },
     { name = "mkdocstrings", extras = ["python"] },
 ]
-node = [{ name = "nodejs-wheel" }]
 test = [
     { name = "bqplot" },
     { name = "matplotlib" },

@@ -60,7 +60,7 @@ improved the functionality.
 Use the source distribution to ensure the dependencies are bundled.
 
 ``` bash
-hatch build -t sdist
+uv build --sdist
 ```
 
 ## Running the examples locally
@@ -83,7 +83,7 @@ ipylab
 
 ## Development
 
-The development environment is provided by [uv](https://docs.astral.sh/uv/). 
+The development environment is provided by [uv](https://docs.astral.sh/uv/).
 
 ### Installation from source
 
@@ -103,10 +103,12 @@ If you are making changes to the you also need to have nodejs available. Fortuna
 [nodejs-wheel](https://pypi.org/project/nodejs-wheel/) provides a wheel for this. It can be installed using:
 
 ```bash
-uv sync --group node
-# This will also re-build/re-install. 
+# Build / install - may take a long time (~5min) initially
+uv sync
 
-# link the extension files
+# Activate the environment
+
+# **Frontend/typescript development only** link the extension files
 jupyter labextension develop . --overwrite
 
 # compile the extension
@@ -119,7 +121,7 @@ jlpm build
 
 ```bash
 # pre-commit (optional)
-pre-commit run 
+pre-commit run
 
 # or, to install the git hook
 pre-commit install
@@ -130,6 +132,14 @@ jlpm lint
 jlpm lint:check
 
 ```
+
+!!! note
+
+    If you're developing the fronted on Windows you need to [enable developer mode](https://learn.microsoft.com/en-us/windows/apps/get-started/enable-your-device-for-development#activate-developer-mode) for symlinks to work.
+
+    [see also](https://discuss.python.org/t/add-os-junction-pathlib-path-junction-to/50394).
+
+
 ### Upgrade files
 
 === "Python files"

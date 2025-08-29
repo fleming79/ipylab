@@ -1,5 +1,6 @@
 [build-system]
 requires = [
+  "nodejs-wheel",
   "hatchling>=1.5.0",
   "jupyterlab>=4.1.0,<5",
   "hatch-nodejs-version>=0.3.2",
@@ -62,10 +63,15 @@ test = [
   "trio",
   "numpy",
   "matplotlib",
-  "bqplot"
+  "bqplot",
 ]
-node=["nodejs-wheel"]
-dev = ["basedpyright", "ruff", "debugpy", { include-group = "test" }]
+dev = [
+  "nodejs-wheel",
+  "basedpyright",
+  "ruff",
+  "debugpy",
+  { include-group = "test" },
+]
 cov = ["coverage[toml]", "pytest-cov", "matplotlib", "trio"]
 
 [project.scripts]
@@ -184,4 +190,3 @@ docstring-code-format = true
 [tool.pyright]
 include = ["ipylab", 'examples', 'tests']
 typeCheckingMode = 'standard'
-
