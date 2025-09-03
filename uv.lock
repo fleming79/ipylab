@@ -126,7 +126,7 @@ wheels = [
 
 [[package]]
 name = "async-kernel"
-version = "0.1.3"
+version = "0.1.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -139,9 +139,9 @@ dependencies = [
     { name = "traitlets" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c0/87/a0704683e4af11d2c854e4663074f8ef379fed14f185b877140b1ceb2b04/async_kernel-0.1.3.tar.gz", hash = "sha256:dcc34b01ab5e401f126b6cca9cff1ee3fe2ca7c54f748032dd1ca2c449f2b18d", size = 235422, upload-time = "2025-09-02T02:15:45.039Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/48/11/56098fc8b6985e536682f617149722c0f4a172cca5addb72cbb875650d23/async_kernel-0.1.4.tar.gz", hash = "sha256:9c417702e9f25e69610d3e4332384fb02a8ab623d92a7e985790ce7ab629b2bc", size = 236653, upload-time = "2025-09-03T20:32:42.727Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/81/c7/8b747ba577e53b98dfd60c0fa30223a1fe6e17b1741904ecfdfb95393627/async_kernel-0.1.3-py3-none-any.whl", hash = "sha256:b824bce28ad6cd6ceddeb9dbb112596a99971fff1e31e618cfbfa49f4187b5d6", size = 60449, upload-time = "2025-09-02T02:15:43.385Z" },
+    { url = "https://files.pythonhosted.org/packages/37/3b/ddac0f277a5f8ec8fbcae8fa037859b8a672b11149b49c910f8398314683/async_kernel-0.1.4-py3-none-any.whl", hash = "sha256:5c0f2bf1beae98ec9c5b1ecc6e44ca59a39a1a644f6bfc2df6576f8668208967", size = 61281, upload-time = "2025-09-03T20:32:41.236Z" },
 ]
 
 [[package]]
@@ -187,14 +187,14 @@ wheels = [
 
 [[package]]
 name = "basedpyright"
-version = "1.31.3"
+version = "1.31.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "nodejs-wheel-binaries" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/64/3e/e5cd03d33a6ddd341427a0fe2fb27944ae11973069a8b880dad99102361b/basedpyright-1.31.3.tar.gz", hash = "sha256:c77bff2dc7df4fe09c0ee198589d8d24faaf8bfd883ee9e0af770b1a275a58f8", size = 22481852, upload-time = "2025-08-20T15:08:25.131Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0b/53/570b03ec0445a9b2cc69788482c1d12902a9b88a9b159e449c4c537c4e3a/basedpyright-1.31.4.tar.gz", hash = "sha256:2450deb16530f7c88c1a7da04530a079f9b0b18ae1c71cb6f812825b3b82d0b1", size = 22494467, upload-time = "2025-09-03T13:05:55.817Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d1/e5/edf168b8dd936bb82a97ebb76e7295c94a4f9d1c2e8e8a04696ef2b3a524/basedpyright-1.31.3-py3-none-any.whl", hash = "sha256:bdb0b5a9abe287a023d330fc71eaed181aaffd48f1dec59567f912cf716f38ff", size = 11722347, upload-time = "2025-08-20T15:08:20.528Z" },
+    { url = "https://files.pythonhosted.org/packages/e5/40/d1047a5addcade9291685d06ef42a63c1347517018bafd82747af9da0294/basedpyright-1.31.4-py3-none-any.whl", hash = "sha256:055e4a38024bd653be12d6216c1cfdbee49a1096d342b4d5f5b4560f7714b6fc", size = 11731440, upload-time = "2025-09-03T13:05:52.308Z" },
 ]
 
 [[package]]
@@ -912,7 +912,7 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "async-kernel", specifier = ">=0.1.2" },
+    { name = "async-kernel", specifier = "==0.1.4" },
     { name = "ipython", specifier = ">=8.32" },
     { name = "ipywidgets", specifier = ">=8.1.5" },
     { name = "ipywidgets", path = "pkg/ipywidgets-8.1.5-py3-none-any.whl" },
@@ -1264,7 +1264,7 @@ wheels = [
 
 [[package]]
 name = "jupyterlab"
-version = "4.4.6"
+version = "4.4.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "async-lru" },
@@ -1281,9 +1281,9 @@ dependencies = [
     { name = "tornado" },
     { name = "traitlets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/1e/5c/14f0852233d60d30bf0f22a817d6c20ac555d73526cc915274f97c07a2b9/jupyterlab-4.4.6.tar.gz", hash = "sha256:e0b720ff5392846bdbc01745f32f29f4d001c071a4bff94d8b516ba89b5a4157", size = 23040936, upload-time = "2025-08-15T11:44:15.915Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d0/07/b3beaeb5722d4a55e345a38884c67baebd9cec2269c5309ce494485a5858/jupyterlab-4.4.7.tar.gz", hash = "sha256:8c8e225492f4513ebde9bbbc00a05b651ab9a1f5b0013015d96fabf671c37188", size = 22965570, upload-time = "2025-09-03T13:26:40.461Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/53/38/6182d63f39428821e705e86fba61704fc69769a24ca5a9578c2c04986c9a/jupyterlab-4.4.6-py3-none-any.whl", hash = "sha256:e877e930f46dde2e3ee9da36a935c6cd4fdb15aa7440519d0fde696f9fadb833", size = 12268564, upload-time = "2025-08-15T11:44:11.42Z" },
+    { url = "https://files.pythonhosted.org/packages/7e/01/44f35124896dd5c73b26705c25bb8af2089895b32f057a1e4a3488847333/jupyterlab-4.4.7-py3-none-any.whl", hash = "sha256:808bae6136b507a4d18f04254218bfe71ed8ba399a36ef3280d5f259e69abf80", size = 12291583, upload-time = "2025-09-03T13:26:35.862Z" },
 ]
 
 [[package]]
