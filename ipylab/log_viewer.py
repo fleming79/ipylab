@@ -131,28 +131,28 @@ class LogViewer(Panel):
             self.app.logging_handler.register_callback(self._add_record)
 
     @override
-    def close(self, *, force=False):
+    def close(self, *, force=False) -> None:
         if force:
             super().close()
 
     @observe("connections")
-    def _observe_connections(self, _):
+    def _observe_connections(self, _) -> None:
         if self.connections and len(self.connections) == 1:
-            self.output.push(*(rec.output for rec in self._records), clear=True)  # type: ignore
+            self.output.push(*(rec.output for rec in self._records), clear=True)
         self.info.value = f"<b>Vpath: {self.app._vpath}</b>"
         self.title.label = f"Log: {self.app._vpath}"
 
     def _add_record(self, record: logging.LogRecord):
         self._records.append(record)
         if self.connections:
-            self.output.push(record.output)  # type: ignore
+            self.output.push(record.output)  # pyright: ignore[reportAttributeAccessIssue]
         if record.levelno >= LogLevel.ERROR and self.app._ready:
             Caller.get_instance().queue_call(self._notify_exception, record)
 
-    async def _notify_exception(self, record: logging.LogRecord):
+    async def _notify_exception(self, record: logging.LogRecord) -> None:
         "Create a notification that an error occurred."
         try:
-            message = f'{record.exc_info[0].__name__} {record.msg} [vpath="{self.app.vpath}"]'  # type: ignore
+            message = f'{record.exc_info[0].__name__} {record.msg} [vpath="{self.app.vpath}"]'  # pyright: ignore[reportOptionalSubscript, reportOptionalMemberAccess]
         except Exception:
             message = f"{record.levelname.capitalize()} [{self.app.vpath}]"
         await self.app.notification.notify(
@@ -174,11 +174,11 @@ class LogViewer(Panel):
             ],
         )
 
-    def _observe_buffer_size(self, change):
+    def _observe_buffer_size(self, change) -> None:
         if change["owner"] is self.buffer_size:
             self._records = collections.deque(self._records, maxlen=self.buffer_size.value)
 
-    def _button_on_click(self, b):
+    def _button_on_click(self, b) -> None:
         if b is self.button_show_send_dialog:
             b.disabled = True
             Caller.get_instance().call_soon(self._show_send_dialog, b)
@@ -186,14 +186,14 @@ class LogViewer(Panel):
             self._records.clear()
             self.output.push(clear=True)
 
-    async def _show_error(self, record: logging.LogRecord):
+    async def _show_error(self, record: logging.LogRecord) -> None:
         out = SimpleOutput().push(
             IPD_HTML(
                 f'<b><font color="red"></h3>{record.levelname.capitalize()}</b>&emsp;vpath={self.app.vpath}<br>{record.msg}</font>'
             )
         )
         with contextlib.suppress(Exception):
-            out.push(record.output)  # type: ignore
+            out.push(record.output)  # pyright: ignore[reportAttributeAccessIssue]
 
         objects = {
             "record": record,
@@ -209,8 +209,8 @@ class LogViewer(Panel):
         p.title.icon = Icon(name="ipylab-test_tube", svgstr=SVGSTR_TEST_TUBE)
         await self.app.shell.add(p, mode=InsertMode.split_right)
 
-    async def _show_send_dialog(self, b: Button):
-        options = {f"{r.asctime}: {r.msg}": r for r in reversed(self._records)}  # type: ignore
+    async def _show_send_dialog(self, b: Button) -> None:
+        options = {f"{r.asctime}: {r.msg}": r for r in reversed(self._records)}
         search = Combobox(
             placeholder="Search",
             tooltip="Search for a log entry or object.",
@@ -227,7 +227,7 @@ class LogViewer(Panel):
         record_out = SimpleOutput()
         body = VBox([search, select, record_out])
 
-        def observe(change: dict):
+        def observe(change: dict) -> None:
             if change["owner"] is select:
                 record = select.value
                 items = (record.output,) if record else ()

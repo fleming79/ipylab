@@ -59,7 +59,7 @@ class RankedMenu(Ipylab):
         type: Literal["command", "submenu", "separator"],
         args: dict | None,
         selector=None,
-    ):
+    ) -> MenuItemConnection:
         info = {"rank": rank, "args": args, "type": type}
         if selector:
             info["selector"] = selector
@@ -99,19 +99,19 @@ class RankedMenu(Ipylab):
         mic.add_to_tuple(self, "connections")
         return mic
 
-    async def activate(self):
+    async def activate(self) -> None:
         "Open this menu assuming it is in the main menu"
         await self.app.main_menu.set_property("activeMenu", self, toObject=["value"])
         await self.app.main_menu.execute_method("openActiveMenu")
 
-    async def open_somewhere(self):
+    async def open_somewhere(self) -> None:
         "Open this menu somewhere"
         await self.execute_method("open")
 
 
 class BuiltinMenu(RankedMenu):
     @override
-    async def activate(self):
+    async def activate(self) -> None:
         name = self.ipylab_base[-1].removeprefix("mainMenu.").lower()
         await self.app.commands.execute(f"{name}:open")
 
@@ -126,16 +126,16 @@ class Menu(Singular, RankedMenu):
     ipylab_base = IpylabBase(Obj.IpylabModel, "palette").tag(sync=True)
 
     commands = Instance(CommandRegistry)
-    connections: Container[tuple[MenuConnection, ...]] = TypedTuple(  # type: ignore
+    connections: Container[tuple[MenuConnection, ...]] = TypedTuple(  # pyright: ignore[reportIncompatibleVariableOverride]
         trait=Union([Instance(MenuConnection), Instance(MenuItemConnection)])
     )
 
     @classmethod
     @override
-    def get_single_key(cls, commands: CommandRegistry, **kwgs):
+    def get_single_key(cls, commands: CommandRegistry, **kwgs) -> CommandRegistry:
         return commands
 
-    def __init__(self, *, commands: CommandRegistry, **kwgs):
+    def __init__(self, *, commands: CommandRegistry, **kwgs) -> None:
         if self._ipylab_init_complete:
             return
         commands.close_with_self(self)
@@ -177,7 +177,7 @@ class MainMenu(Menu):
 
     @classmethod
     @override
-    def get_single_key(cls, **kwgs):  # type: ignore
+    def get_single_key(cls, **kwgs) -> type[Self]:  # pyright: ignore[reportIncompatibleMethodOverride]
         return cls
 
     def __init__(self):
@@ -192,7 +192,7 @@ class MainMenu(Menu):
         return await self.execute_method("addMenu", (menu, update, options), toObject=["args[0]"])
 
     @override
-    async def activate(self):
+    async def activate(self) -> None:
         "Does nothing. Instead you should activate a submenu."
 
 
@@ -202,7 +202,7 @@ class ContextMenu(Menu):
     ipylab_base = IpylabBase(Obj.IpylabModel, "app.contextMenu").tag(sync=True)
 
     @override
-    async def add_item(  # type: ignore
+    async def add_item(
         self,
         *,
         command: str | CommandConnection = "",
@@ -221,5 +221,5 @@ class ContextMenu(Menu):
         return await self._add_item(command, submenu, rank, type, args, selector or app.selector)
 
     @override
-    async def activate(self):
+    async def activate(self) -> None:
         "Does nothing for a context menu"

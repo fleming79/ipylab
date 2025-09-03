@@ -61,9 +61,9 @@ def _jupyter_labextension_paths():
 
 def _get_plugin_manager():
     # Only to be run once here
-    import pluggy
+    import pluggy  # noqa: PLC0415
 
-    from ipylab import hookspecs, lib
+    from ipylab import hookspecs, lib  # noqa: PLC0415
 
     pm = pluggy.PluginManager("ipylab")
     pm.add_hookspecs(hookspecs)

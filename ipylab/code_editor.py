@@ -15,16 +15,7 @@ from ipywidgets import Layout, register, widget_serialization
 from ipywidgets.widgets.trait_types import InstanceDict
 from ipywidgets.widgets.widget_description import DescriptionStyle
 from ipywidgets.widgets.widget_string import _String
-from traitlets import (
-    Callable,
-    Container,
-    Dict,
-    Instance,
-    Int,
-    Unicode,
-    default,
-    observe,
-)
+from traitlets import Callable, Dict, Instance, Int, TraitType, Unicode, default, observe
 from typing_extensions import override
 
 import ipylab
@@ -33,6 +24,7 @@ from ipylab.ipylab import Ipylab
 
 if TYPE_CHECKING:
     from IPython.core.interactiveshell import InteractiveShell
+    from IPython.core.oinspect import Bundle
 
     __all__ = ["CodeEditor", "CodeEditorOptions"]
 
@@ -58,7 +50,7 @@ class IpylabCompleter(IPC.IPCompleter):
         namespace: LastUpdatedDict
 
     @default("disable_matchers")
-    def _default_disable_matchers(self):
+    def _default_disable_matchers(self) -> list[str]:
         return [
             "IPCompleter.latex_name_matcher",
             "IPCompleter.unicode_name_matcher",
@@ -71,10 +63,10 @@ class IpylabCompleter(IPC.IPCompleter):
             "IPCompleter.file_matcher",
         ]
 
-    def update_namespace(self):
+    def update_namespace(self) -> None:
         self.namespace = self.app.get_namespace(self.code_editor.namespace_id)
 
-    def do_complete(self, code: str, cursor_pos: int):
+    def do_complete(self, code: str, cursor_pos: int) -> dict[str, Any]:
         """Completions provided by IPython completer, using Jedi for different namespaces."""
         # Adapted from IPython Shell._get_completions_experimental
         self.update_namespace()
@@ -112,7 +104,7 @@ class IpylabCompleter(IPC.IPCompleter):
             "status": "ok",
         }
 
-    def _object_inspect_mime(self, oname: str, detail_level=0, omit_sections=()):
+    def _object_inspect_mime(self, oname: str, detail_level=0, omit_sections=()) -> Bundle:
         """Get object info as a mimebundle of formatted representations.
 
         A mimebundle is a dictionary, keyed by mime-type.
@@ -211,7 +203,7 @@ class CodeEditor(Ipylab, _String):
     style = InstanceDict(DescriptionStyle, help="Styling customizations").tag(sync=True, **widget_serialization)
     mime_type = Unicode("text/plain", help="syntax style").tag(sync=True)
     key_bindings = Dict().tag(sync=True)
-    editor_options: Instance[CodeEditorOptions] = Dict().tag(sync=True)  # type: ignore
+    editor_options: TraitType[CodeEditorOptions, CodeEditorOptions] = Dict().tag(sync=True)  # pyright: ignore[reportAssignmentType]
     update_throttle_ms = Int(100, help="The limit at which changes are synchronised").tag(sync=True)
     _sync = Int(0).tag(sync=True)
 
@@ -228,11 +220,11 @@ class CodeEditor(Ipylab, _String):
         ),
     )
     namespace_id = Unicode("")
-    evaluate: Container[typing.Callable[[str], typing.Coroutine]] = Callable()  # type: ignore
-    load_value: Container[typing.Callable[[str], None]] = Callable()  # type: ignore
+    evaluate: TraitType[typing.Callable[[str], typing.Coroutine], typing.Callable[[str], typing.Coroutine]] = Callable()
+    load_value: TraitType[typing.Callable[[str], None], typing.Callable[[str], None]] = Callable()
 
     @default("key_bindings")
-    def _default_key_bindings(self):
+    def _default_key_bindings(self) -> dict[str, list[str]]:
         return {
             "invoke_completer": ["Tab"],
             "invoke_tooltip": ["Shift Tab"],
@@ -257,7 +249,7 @@ class CodeEditor(Ipylab, _String):
 
             Caller.get_instance().queue_call(self._send_value)
 
-    async def _send_value(self):
+    async def _send_value(self) -> None:
         while True:
             value = self.value
             await self.operation("setValue", {"value": value})
@@ -270,9 +262,9 @@ class CodeEditor(Ipylab, _String):
     async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list):
         match operation:
             case "requestComplete":
-                return self.completer.do_complete(payload["code"], payload["cursor_pos"])  # type: ignore
+                return self.completer.do_complete(payload["code"], payload["cursor_pos"])
             case "requestInspect":
-                return self.completer.do_inspect(payload["code"], payload["cursor_pos"])  # type: ignore
+                return self.completer.do_inspect(payload["code"], payload["cursor_pos"])
             case "evaluateCode":
                 await self.evaluate(payload["code"])
                 return True
@@ -289,5 +281,6 @@ class CodeEditor(Ipylab, _String):
 
         return await super()._do_operation_for_frontend(operation, payload, buffers)
 
-    async def clear_undo_history(self):
+    async def clear_undo_history(self) -> None:
+        ""
         await self.operation("clearUndoHistory")

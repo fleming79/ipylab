@@ -38,7 +38,7 @@ class Shell(Singular, Ipylab):
     log_viewer = Fixed(LogViewer)
 
     connections: Container[tuple[ShellConnection, ...]] = TypedTuple(trait=Instance(ShellConnection))
-    console: Instance[ConsoleConnection | None] = Instance(ConsoleConnection, default_value=None, allow_none=True)  # type: ignore
+    console: Instance[ConsoleConnection | None] = Instance(ConsoleConnection, default_value=None, allow_none=True)  # pyright: ignore[reportAssignmentType]
 
     async def add(
         self,
@@ -158,12 +158,12 @@ class Shell(Singular, Ipylab):
             await sc.activate()
         return sc
 
-    def add_objects_to_ipython_namespace(self, objects: dict, *, reset=False):
+    def add_objects_to_ipython_namespace(self, objects: dict, *, reset=False) -> None:
         "Load objects into the IPython/console namespace."
         with contextlib.suppress(AttributeError):
             if reset:
-                self.comm.kernel.shell.reset()  # type: ignore
-            self.comm.kernel.shell.push(objects)  # type: ignore
+                self.comm.kernel.shell.reset()  # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
+            self.comm.kernel.shell.push(objects)  # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
 
     async def open_console(
         self,
@@ -200,16 +200,16 @@ class Shell(Singular, Ipylab):
         self.add_objects_to_ipython_namespace(objects_, reset=reset_shell)
         return cc
 
-    async def expand_left(self):
+    async def expand_left(self) -> None:
         await self.execute_method("expandLeft")
 
-    async def expand_right(self):
+    async def expand_right(self) -> None:
         await self.execute_method("expandRight")
 
-    async def collapse_left(self):
+    async def collapse_left(self) -> None:
         await self.execute_method("collapseLeft")
 
-    async def collapse_right(self):
+    async def collapse_right(self) -> None:
         await self.execute_method("collapseRight")
 
     async def connect_to_widget(self, widget_id="", **kwgs: Unpack[IpylabKwgs]) -> ShellConnection:

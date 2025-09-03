@@ -19,9 +19,9 @@ if TYPE_CHECKING:
 
 @hookimpl
 def launch_ipylab():
-    import sys
+    import sys  # noqa: PLC0415
 
-    from jupyterlab.labapp import LabApp
+    from jupyterlab.labapp import LabApp  # noqa: PLC0415
 
     if not sys.argv:
         sys.argv = ["--IdentityProvider.token=''"]

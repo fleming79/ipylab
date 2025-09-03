@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any, Literal, Self, Unpack, final
 from async_kernel.caller import Caller
 from async_kernel.kernelspec import KernelName
 from ipywidgets import Widget, register
-from traitlets import Bool, Container, Dict, Unicode, UseEnum, observe
+from traitlets import Bool, Dict, Unicode, UseEnum, observe
 from typing_extensions import override
 
 import ipylab
@@ -63,19 +63,19 @@ class App(Singular, Ipylab):
         created=lambda c: c["owner"].shell.log_viewer,
     )
     log_level = UseEnum(LogLevel, LogLevel.ERROR)
-    namespaces: Container[dict[str, LastUpdatedDict]] = Dict(read_only=True)  # type: ignore
+    namespaces: Dict[str, LastUpdatedDict] = Dict(read_only=True)
 
     @override
-    def close(self, *, force=False):
+    def close(self, *, force=False) -> None:
         if force:
             super().close()
 
     @observe("_ready", "log_level")
-    def _app_observe_ready(self, change):
+    def _app_observe_ready(self, change) -> None:
         if change["name"] == "_ready" and self._ready:
             assert self._vpath, "Vpath should always before '_ready'."
             self._selector = to_selector(self._vpath)
-            ipylab.plugin_manager.hook.autostart._call_history.clear()  # type: ignore
+            ipylab.plugin_manager.hook.autostart._call_history.clear()  # pyright: ignore[reportOptionalMemberAccess]
             try:
                 if not ipylab.plugin_manager.hook.autostart_once._call_history:
                     ipylab.plugin_manager.hook.autostart_once.call_historic(
@@ -89,21 +89,21 @@ class App(Singular, Ipylab):
         if self.logging_handler:
             self.logging_handler.setLevel(self.log_level)
 
-    def _autostart_callback(self, result):
+    def _autostart_callback(self, result) -> None:
         if inspect.iscoroutine(result):
             Caller.get_instance().call_soon(result)  # pyright: ignore[reportCallIssue, reportArgumentType]
 
     @property
-    def repr_info(self):
+    def repr_info(self) -> dict[str, str]:
         return {"vpath": self._vpath, "session name": self.session_name}
 
     @property
-    def repr_log(self):
+    def repr_log(self) -> str:
         "A representation to use when logging"
         return self.__class__.__name__
 
     @property
-    def vpath(self):
+    def vpath(self) -> str:
         """The virtual path for this kernel.
 
         `vpath` is equivalent to the session `path` in the frontend.
@@ -124,12 +124,12 @@ class App(Singular, Ipylab):
         return self._vpath
 
     @property
-    def session_name(self):
+    def session_name(self) -> str:
         "The full path including vpath."
         return os.environ.get("JPY_SESSION_NAME", "")
 
     @property
-    def selector(self):
+    def selector(self) -> str:
         """The default selector based on the `vpath` for this kernel.
 
         Raises
@@ -143,7 +143,7 @@ class App(Singular, Ipylab):
         return self._selector
 
     @override
-    async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list):
+    async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list) -> Any:
         match operation:
             case "evaluate":
                 return await self._evaluate(payload, buffers)
@@ -157,7 +157,7 @@ class App(Singular, Ipylab):
 
         return await super()._do_operation_for_frontend(operation, payload, buffers)
 
-    async def shutdown_kernel(self, vpath: str | None = None):
+    async def shutdown_kernel(self, vpath: str | None = None) -> None:
         "Shutdown the kernel"
         await self.operation("shutdownKernel", {"vpath": vpath})
 
@@ -194,12 +194,12 @@ class App(Singular, Ipylab):
                 ns.update(objs)
         if objects:
             ns.update(objects)
-        if namespace_id == "":
+        if namespace_id == "" and (kernel := getattr(self.comm, "kernel", None)):
             with contextlib.suppress(AttributeError):
-                ns.update(self.comm.kernel.shell.user_ns)  # type: ignore
+                ns.update(kernel.shell.user_ns)
         return ns
 
-    async def _evaluate(self, options: dict[str, Any], buffers: list):
+    async def _evaluate(self, options: dict[str, Any], buffers: list) -> dict[str, Any]:
         """Evaluate code for `evaluate`.
 
         A call to this method should originate from a call to `evaluate` from
@@ -236,7 +236,7 @@ class App(Singular, Ipylab):
                         # We use a partial so that we can evaluate with the same namespace.
                         ns["_partial_call"] = functools.partial(result, **kwgs)
                         source = compile("_partial_call()", "-- Result call --", "eval")
-                        result = eval(source, ns)  # type: ignore
+                        result = eval(source, ns)
                         ns.pop("_partial_call")
                     if inspect.isawaitable(result):
                         result = await result
@@ -265,7 +265,7 @@ class App(Singular, Ipylab):
         preferred_kernel: KernelName | Literal["python3"] | str = KernelName.asyncio,  # noqa: PYI051
         kwgs: None | dict = None,
         **kwargs: Unpack[IpylabKwgs],
-    ):
+    ) -> Any:
         """Evaluate code asynchronously in the 'vpath' Python kernel.
 
         Execution is coordinated via the frontend and will evaluate/execute the

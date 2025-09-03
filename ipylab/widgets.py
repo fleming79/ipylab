@@ -69,7 +69,7 @@ class Panel(HasApp, WidgetBase, Box):
     async def add_to_shell(self, *, connection_id="", **kwgs: Unpack[AddToShellType]) -> ShellConnection:
         """Add this panel to the shell."""
         if connection_id:
-            kwgs["connection_id"] = connection_id  # type: ignore
+            kwgs["connection_id"] = connection_id  # pyright: ignore[reportGeneralTypeIssues]
         return await self.app.shell.add(self, **self.add_to_shell_defaults | kwgs)
 
 
@@ -89,7 +89,7 @@ class SplitPanel(Panel):
     def _observer(self, _):
         Caller().queue_call(self._toggle_orientation, self.children)
 
-    async def _toggle_orientation(self, children: tuple[Widget, ...]):
+    async def _toggle_orientation(self, children: tuple[Widget, ...]) -> None:
         """Toggle the orientation to cause lumino_widget.parent to re-render content."""
         await anyio.sleep(0.1)
         if children != self.children:

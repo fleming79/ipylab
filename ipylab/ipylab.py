@@ -14,32 +14,14 @@ import traitlets
 from anyio import Event
 from async_kernel import Caller, Future
 from ipywidgets import TypedTuple, Widget, register
-from traitlets import (
-    Bool,
-    Container,
-    Dict,
-    Instance,
-    Int,
-    List,
-    TraitType,
-    Unicode,
-    observe,
-)
+from traitlets import Bool, Container, Dict, Instance, Int, List, TraitType, Unicode, observe
 from typing_extensions import override
 
 import ipylab._frontend as _fe
-from ipylab.common import (
-    HasApp,
-    IpylabKwgs,
-    Obj,
-    SignalCallbackData,
-    Transform,
-    TransformType,
-    pack,
-)
+from ipylab.common import HasApp, IpylabKwgs, Obj, SignalCallbackData, Transform, TransformType, pack
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Generator
     from types import CoroutineType
     from typing import Self, Unpack
 
@@ -117,18 +99,18 @@ class Ipylab(HasApp, WidgetBase):
         "Extra info to provide for __repr__."
         return {}
 
-    def __init__(self, **kwgs):
+    def __init__(self, **kwgs) -> None:
         if self._ipylab_init_complete:
             return
-        for k in kwgs:
+        for k, v in kwgs.items():
             if self.has_trait(k):
-                self.set_trait(k, kwgs[k])
+                self.set_trait(k, v)
         self.set_trait("_python_class", self.__class__.__name__)
         super().__init__()
         self._ipylab_init_complete = True
         self.on_msg(self._on_custom_msg)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         if not self._repr_mimebundle_:
             status = "CLOSED"
         elif (not self._ready) and self._repr_mimebundle_:
@@ -145,7 +127,7 @@ class Ipylab(HasApp, WidgetBase):
         return f"{status}{self.__class__.__name__}({info})"
 
     @observe("_ready")
-    def _observe_ready(self, _: dict):
+    def _observe_ready(self, _: dict) -> None:
         if self._ready:
             self.log.debug("ready")
             self._ready_event.set()
@@ -154,7 +136,7 @@ class Ipylab(HasApp, WidgetBase):
                 self._call_ready_callback(cb)
 
     @override
-    def close(self):
+    def close(self) -> None:
         if self.comm:
             self._ipylab_send({"close": True})
         super().close()
@@ -162,14 +144,14 @@ class Ipylab(HasApp, WidgetBase):
             if self.trait_has_value(k):
                 getattr(self, k).clear()
 
-    def _ipylab_send(self, content, buffers: list | None = None):
+    def _ipylab_send(self, content, buffers: list | None = None) -> None:
         try:
             self.send({"ipylab": json.dumps(content, default=pack)}, buffers)
         except Exception as e:
             self.log.exception("Send error", obj=content, exc_info=e)
             raise
 
-    def _on_custom_msg(self, _, msg: dict, buffers: list):
+    def _on_custom_msg(self, _, msg: dict, buffers: list) -> None:
         """Handle incoming custom messages.
 
         This method is called when a custom message is received from the frontend.
@@ -202,7 +184,7 @@ class Ipylab(HasApp, WidgetBase):
         except Exception as e:
             self.log.exception("Message processing error", obj=msg, exc_info=e)
 
-    def _set_result(self, key: str, error: str | None, payload: Any):
+    def _set_result(self, key: str, error: str | None, payload: Any) -> None:
         future = self._pending_operations.pop(key)
         if error is not None:
             error_ = IpylabFrontendError(error)
@@ -212,7 +194,7 @@ class Ipylab(HasApp, WidgetBase):
         else:
             future.set_result(payload)
 
-    async def _do_operation_for_fe(self, key: str, operation: str, payload: dict, buffers: list | None):
+    async def _do_operation_for_fe(self, key: str, operation: str, payload: dict, buffers: list | None) -> None:
         """Handle operation requests from the frontend and reply with a result."""
         await self.ready()
         content: dict[str, Any] = {"ipylab_FE": key}
@@ -231,7 +213,7 @@ class Ipylab(HasApp, WidgetBase):
         finally:
             self._ipylab_send(content, buffers)
 
-    async def _notify_signal(self, data: SignalCallbackData):
+    async def _notify_signal(self, data: SignalCallbackData) -> None:
         if callbacks := self._signal_callbacks.get(data["dottedname"]):
             for callback in callbacks:
                 try:
@@ -241,7 +223,7 @@ class Ipylab(HasApp, WidgetBase):
                 except Exception as e:
                     self.log.exception("Signal callback", obj={"callback": callback, "data": data}, exc_info=e)
 
-    async def _obj_operation(self, base: Obj, subpath: str, operation: str, kwgs, kwargs: IpylabKwgs):
+    async def _obj_operation(self, base: Obj, subpath: str, operation: str, kwgs, kwargs: IpylabKwgs) -> Any:
         await self.ready()
         kwgs |= {"genericOperation": operation, "basename": base, "subpath": subpath}
         return await self.operation("genericOperation", kwgs=kwgs, **kwargs)
@@ -267,7 +249,7 @@ class Ipylab(HasApp, WidgetBase):
             await self._ready_event.wait()
         return self
 
-    def on_ready(self, callback: Callable[[Self], None | CoroutineType], remove=False):
+    def on_ready(self, callback: Callable[[Self], None | CoroutineType], remove=False) -> None:
         """Register a historic callback to execute when the frontend indicates
         it is ready.
 
@@ -365,7 +347,9 @@ class Ipylab(HasApp, WidgetBase):
         """
         return await self._obj_operation(obj, subpath, "executeMethod", {"args": args}, kwargs)
 
-    async def get_property(self, subpath: str, *, obj=Obj.base, null_if_missing=False, **kwargs: Unpack[IpylabKwgs]):
+    async def get_property(
+        self, subpath: str, *, obj=Obj.base, null_if_missing=False, **kwargs: Unpack[IpylabKwgs]
+    ) -> Any:
         """Get a property from an object in the frontend.
 
         Parameters
@@ -435,7 +419,7 @@ class Ipylab(HasApp, WidgetBase):
         return await self._obj_operation(obj, subpath, "listProperties", kwgs, kwargs)
 
     @classmethod
-    def _list_signals(cls, obj, *, prefix=""):
+    def _list_signals(cls, obj, *, prefix="") -> Generator[str | Any, Any, None]:
         if isinstance(obj, dict):
             for k, v in obj.items():
                 if k == "<signals>":
@@ -446,7 +430,7 @@ class Ipylab(HasApp, WidgetBase):
 
     def register_signal_callback(
         self, dottedname: str, callback: Callable[[SignalCallbackData], None | CoroutineType], *, remove=False
-    ):
+    ) -> None:
         """Registers a callback function to be executed when a specific signal is emitted.
 
         The signal is identified by its dotted name (e.g., 'shell.activeChanged').
@@ -478,7 +462,7 @@ class Ipylab(HasApp, WidgetBase):
             dottednames.discard(dottedname)
         self.set_trait("_signal_dottednames", tuple(sorted(dottednames)))
 
-    async def list_signals(self, depth=3):
+    async def list_signals(self, depth=3) -> list[str | Any]:
         """List the nested signals associated with the base in the frontend.
 
         See also:
@@ -488,7 +472,7 @@ class Ipylab(HasApp, WidgetBase):
         properties = await self.list_properties(depth=depth)
         return list(self._list_signals(properties))
 
-    async def list_view_signals(self, depth=3):
+    async def list_view_signals(self, depth=3) -> list[str | Any]:
         """List the nested signals belonging to a view of this object.
 
         Notes:

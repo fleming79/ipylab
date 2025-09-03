@@ -47,11 +47,11 @@ class CommandOptions(TypedDict):
 
 
 class KeybindingConnection(InfoConnection):
-    command: Instance[CommandConnection] = Instance(InfoConnection)  # type: ignore
+    command = Instance(InfoConnection)
 
     @override
     @classmethod
-    def to_id(cls, command: CommandConnection):  # type: ignore
+    def to_id(cls, command: CommandConnection) -> str:  # pyright: ignore[reportIncompatibleMethodOverride]
         return super().to_id(str(command), str(uuid.uuid4()))
 
 
@@ -66,13 +66,14 @@ class CommandConnection(InfoConnection):
     commands: Instance[CommandRegistry] = Instance("ipylab.commands.CommandRegistry")
     key_bindings: Container[tuple[KeybindingConnection, ...]] = TypedTuple(trait=Instance(KeybindingConnection))
 
-    @override
     @classmethod
-    def to_id(cls, command_registry: str, vpath: str, name: str):  # type: ignore
+    @override
+    def to_id(cls, command_registry: str, vpath: str, name: str) -> str:  # pyright: ignore[reportIncompatibleMethodOverride]
         return super().to_id(command_registry, vpath, name)
 
     @property
-    def repr_info(self):  # type: ignore
+    @override
+    def repr_info(self) -> dict[str, Any]:
         return {"name": self.commands.name} | {"info": self.info}
 
     async def configure(self, *, emit=True, **kwgs: Unpack[CommandOptions]) -> CommandOptions:
@@ -81,7 +82,7 @@ class CommandConnection(InfoConnection):
             msg = f"The following useless configuration options were detected for {diff} in {self}"
             raise KeyError(msg)
 
-        config: CommandOptions = await self.update_property("config", kwgs)  # type: ignore
+        config: CommandOptions = await self.update_property(subpath="config", value=kwgs)  # pyright: ignore[reportAssignmentType, reportArgumentType]
         if emit:
             await self.commands.execute_method("commandChanged.emit", ({"id": self.connection_id},))
         return config
@@ -115,7 +116,7 @@ class CommandPalletItemConnection(InfoConnection):
 
     @override
     @classmethod
-    def to_id(cls, command: CommandConnection, category: str):  # type: ignore
+    def to_id(cls, command: CommandConnection, category: str) -> str:  # pyright: ignore[reportIncompatibleMethodOverride]
         return super().to_id(str(command), category)
 
 
@@ -188,7 +189,7 @@ class CommandRegistry(Singular, Ipylab):
 
     @classmethod
     @override
-    def get_single_key(cls, name: str, **kwgs):
+    def get_single_key(cls, name: str, **kwgs) -> str:
         return name
 
     @property
@@ -308,7 +309,7 @@ class CommandRegistry(Singular, Ipylab):
 
     async def execute(
         self, command_id: str | CommandConnection, args: dict | None = None, **kwargs: Unpack[IpylabKwgs]
-    ):
+    ) -> Any:
         """Execute a command registered in the frontend command registry returning
         the result.
 

@@ -129,6 +129,7 @@ ignore = ["W002"]
 
 [tool.ruff]
 target-version = "py311"
+line-length = 120
 src = ['docs']
 
 [tool.codespell]
@@ -178,9 +179,12 @@ ignore = [
   "PTH123", # `open()` should be replaced by `Path.open()`
   "UP031",  # Use format specifiers instead of percent format
   "PT023",  # Use `@pytest.mark.skip` over `@pytest.mark.skip()`
+  "NPY002", # numpy-legacy-random
+  "RUF200", # hatch context formatting for local dist files such as "traitlets @ {root:uri}..." ref: https://github.com/astral-sh/ruff/issues/7844
 ]
 [tool.ruff.format]
 docstring-code-format = true
+
 
 [tool.ruff.lint.per-file-ignores]
 "tests*" = ['ARG002', 'SLF001', 'S101', 'PLR2004']

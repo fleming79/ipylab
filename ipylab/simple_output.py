@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Any, Self
 
 from ipywidgets import DOMWidget, Widget, register
 from traitlets import Bool, Callable, Enum, Int, Unicode, default
@@ -11,6 +11,7 @@ from traitlets import Bool, Callable, Enum, Int, Unicode, default
 from ipylab.ipylab import Ipylab
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
     from typing import Any, Unpack
 
     from IPython.display import TextDisplayObject
@@ -42,15 +43,15 @@ class SimpleOutput(Ipylab, DOMWidget):
     format = Callable(allow_none=True, default_value=None)
 
     @default("format")
-    def _default_format(self):
+    def _default_format(self) -> Any | None:
         try:
-            return self.comm.kernel.shell.display_formatter.format  # type: ignore
+            return self.comm.kernel.shell.display_formatter.format  # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
         except AttributeError:
             return None
 
     def _pack_outputs(
         self, outputs: tuple[dict[str, str] | Widget | str | TextDisplayObject | Any, ...], *, stream_text=False
-    ):
+    ) -> Generator[dict[Any, Any], Any, None]:
         fmt = self.format
         for output in outputs:
             if isinstance(output, dict) and "output_type" in output:
@@ -60,8 +61,8 @@ class SimpleOutput(Ipylab, DOMWidget):
             elif fmt:
                 data, metadata = fmt(output)
                 yield {"output_type": "display_data", "data": data, "metadata": metadata}
-            elif hasattr(output, "_repr_mimebundle_") and callable(output._repr_mimebundle_):  # type: ignore
-                yield {"output_type": "display_data", "data": output._repr_mimebundle_()}  # type: ignore
+            elif hasattr(output, "_repr_mimebundle_") and callable(output._repr_mimebundle_):  # pyright: ignore[reportAttributeAccessIssue]
+                yield {"output_type": "display_data", "data": output._repr_mimebundle_()}  # pyright: ignore[reportAttributeAccessIssue]
             else:
                 yield {"output_type": "display_data", "data": repr(output)}
 
@@ -125,7 +126,7 @@ class AutoScroll(WidgetBase, DOMWidget):
     sentinel_text = Unicode(".", help="Provided for debugging purposes").tag(sync=True)
 
     @observe("enabled")
-    def _observe(self, _):
+    def _observe(self, _) -> None:
         layout = self.layout
         with layout.hold_trait_notifications():
             if self.enabled:
@@ -135,6 +136,6 @@ class AutoScroll(WidgetBase, DOMWidget):
                 layout.overflow = "auto"
                 layout.height = "auto"
 
-    def __init__(self, *, enabled=True, **kwargs):
+    def __init__(self, *, enabled=True, **kwargs) -> None:
         self.enabled = enabled
         super().__init__(**kwargs)

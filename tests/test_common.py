@@ -17,6 +17,7 @@ from ipylab.common import (
     TransformDictAdvanced,
     TransformDictConnection,
     TransformDictFunction,
+    TransformType,
 )
 from ipylab.connection import Connection
 from traitlets import Unicode
@@ -86,12 +87,12 @@ class TestTransformValidate:
         assert "path2" in result["mappings"]
 
     def test_validate_invalid_function_transform(self):
-        transform = {
+        transform: TransformType = {  # pyright: ignore[reportAssignmentType]
             "transform": Transform.function,
             "code": "invalid_code",
         }
         with pytest.raises(TypeError):
-            Transform.validate(transform)  # type: ignore
+            Transform.validate(transform)
 
     def test_validate_invalid_connection_transform(self):
         transform: TransformDictConnection = {
@@ -104,12 +105,12 @@ class TestTransformValidate:
             Transform.validate(transform)
 
     def test_validate_invalid_advanced_transform(self):
-        transform = {
+        transform: TransformType = {  # pyright: ignore[reportAssignmentType]
             "transform": Transform.advanced,
             "mappings": "invalid_mappings",
         }
         with pytest.raises(TypeError):
-            Transform.validate(transform)  # type: ignore
+            Transform.validate(transform)
 
     def test_validate_non_dict_transform(self):
         transform = Transform.auto
@@ -233,7 +234,7 @@ class TestFixed:
 
     def test_readonly_create_invalid(self, app):
         with pytest.raises(TypeError):
-            assert Fixed(123)  # type: ignore
+            assert Fixed(123)  # pyright: ignore[reportArgumentType]
 
     def test_readonly_created_callback_method(self):
         class TestOwner:
@@ -257,7 +258,9 @@ class TestFixed:
 
         owner = TestOwner()
         with pytest.raises(AttributeError, match="Setting `Fixed` parameter TestOwner.test_instance is forbidden!"):
-            owner.test_instance = CommonTestClass()  # type: ignore Note: This type should be ignored because it is a fixed value. Removing indicates a problem.
+            owner.test_instance = (  # pyright: ignore[reportAttributeAccessIssue]
+                CommonTestClass()
+            )  #  Note: This type should be ignored because it is a fixed value. Removing indicates a problem.
 
     def test_function_to_eval(self):
         eval_str = ipylab.common.module_obj_to_import_string(test_last_updated_dict)

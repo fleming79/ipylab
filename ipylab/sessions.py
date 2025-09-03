@@ -21,11 +21,11 @@ class SessionManager(Singular, Ipylab):
         "Get a dict of running sessions."
         return await self.operation("getRunning", {"refresh": refresh})
 
-    async def get_current(self):
+    async def get_current(self) -> dict | None:
         "Get the session of the current widget in the shell."
         return await self.operation("getCurrentSession")
 
-    async def stop_if_needed(self, *, path: str):
+    async def stop_if_needed(self, *, path: str) -> None:
         """
         https://jupyterlab.readthedocs.io/en/latest/api/interfaces/services.Session.IManager.html#stopIfNeeded
         """

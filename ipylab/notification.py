@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import inspect
 from enum import StrEnum
-from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict
+from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict
 
 import traitlets
 from ipywidgets import TypedTuple, register
@@ -68,7 +68,7 @@ class NotificationConnection(InfoConnection):
 
         actions_ = [await self.app.notification._ensure_action(v) for v in actions]
         if actions_:
-            args["actions"] = list(map(pack, actions_))  # type: ignore
+            args["actions"] = list(map(pack, actions_))
             to_object.extend(f"options.actions.{i}" for i in range(len(actions_)))
             for action in actions_:
                 self.close_with_self(action)
@@ -90,7 +90,7 @@ class NotificationManager(Singular, Ipylab):
     )
 
     @override
-    async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list):
+    async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list) -> Any:
         """Overload this function as required."""
         action = ActionConnection(payload["connection_id"])
         match operation:
@@ -109,7 +109,7 @@ class NotificationManager(Singular, Ipylab):
         if isinstance(value, ActionConnection):
             await value.ready()
             return value
-        return await self.new_action(**value)  # type: ignore
+        return await self.new_action(**value)
 
     async def notify(
         self,
@@ -135,7 +135,7 @@ class NotificationManager(Singular, Ipylab):
         kwgs = {"type": NotificationType(type), "message": message, "options": options}
         actions_ = [await self._ensure_action(v) for v in actions]
         if actions_:
-            options["actions"] = actions_  # type: ignore
+            options["actions"] = actions_  # pyright: ignore[reportArgumentType]
         connection_id = NotificationConnection.to_id()
         notification: NotificationConnection = await self.operation(
             operation="notification",
@@ -144,7 +144,7 @@ class NotificationManager(Singular, Ipylab):
             toObject=[f"options.actions[{i}]" for i in range(len(actions_))] if actions_ else [],
         )
         notification.add_to_tuple(self, "connections")
-        notification.info = kwgs
+        notification.info = kwgs  # pyright: ignore[reportAttributeAccessIssue]
         return notification
 
     async def new_action(
@@ -170,6 +170,6 @@ class NotificationManager(Singular, Ipylab):
         ac: ActionConnection = await self.operation("createAction", kwgs, transform=transform)
         self.close_with_self(ac)
         ac.callback = callback
-        ac.info = kwgs
+        ac.info = kwgs  # pyright: ignore[reportAttributeAccessIssue]
         ac.add_to_tuple(self, "connections")
         return ac

@@ -271,7 +271,7 @@ class Transform(StrEnum):
         match transform_:
             case Transform.advanced:
                 mappings = typing.cast("TransformDictAdvanced", transform)["mappings"]
-                return {key: await cls.transform_payload(mappings[key], payload[key]) for key in mappings}  # type: ignore
+                return {key: await cls.transform_payload(mappings[key], payload[key]) for key in mappings}
             case Transform.connection | Transform.auto if isinstance(payload, dict) and (
                 connection_id := payload.get("connection_id")
             ):
@@ -325,7 +325,7 @@ class LastUpdatedDict(OrderedDict):
     _updating = False
     _last = True
 
-    def __init__(self, *args, mode: Literal["first", "last"] = "last", **kwargs):
+    def __init__(self, *args, mode: Literal["first", "last"] = "last", **kwargs) -> None:
         self._last = mode == "last"
         super().__init__(*args, **kwargs)
 
@@ -335,7 +335,7 @@ class LastUpdatedDict(OrderedDict):
             self.move_to_end(key, self._last)
 
     @override
-    def update(self, m, /, **kwargs):  # type: ignore
+    def update(self, m, /, **kwargs) -> None:  # pyright: ignore[reportIncompatibleMethodOverride]
         self._updating = True
         try:
             super().update(m, **kwargs)
@@ -389,7 +389,7 @@ class Fixed(Generic[S, T]):
         created: Callable[[FixedCreated[S, T]]] | None = None,
     ):
         if inspect.isclass(obj):
-            self.create = lambda _: obj()  # type: ignore
+            self.create = lambda _: obj()
         elif callable(obj):
             self.create = obj
         elif isinstance(obj, str):
@@ -405,11 +405,11 @@ class Fixed(Generic[S, T]):
 
     def __get__(self, obj: S, objtype: type[S] | None = None) -> T:
         if obj is None:
-            return self  # type: ignore
+            return self  # pyright: ignore[reportReturnType]
         try:
             return self.instances[obj]
         except KeyError:
-            instance: T = self.create(FixedCreate(name=self.name, owner=obj))  # type: ignore
+            instance: T = self.create(FixedCreate(name=self.name, owner=obj))  # pyright: ignore[reportAssignmentType]
             self.instances[obj] = instance
             if self.created:
                 try:
@@ -418,7 +418,7 @@ class Fixed(Generic[S, T]):
                     if log := getattr(obj, "log", None):
                         msg = f"Callback `created` failed for {obj.__class__}.{self.name}"
                         log.exception(msg, extra={"obj": self.created})
-            return instance  # type: ignore
+            return instance
 
     def __set__(self, obj: S, value: Self):
         # Note: above we use `Self` for the `value` type hint to give a useful typing error
@@ -443,7 +443,7 @@ class HasApp(HasTraits):
     closed = Bool(read_only=True)
     log: Instance[IpylabLoggerAdapter] = Instance("ipylab.log.IpylabLoggerAdapter")
     app = Fixed(lambda _: ipylab.App())
-    add_traits = None  # type: ignore # Don't support the method HasTraits.add_traits as it creates a new type that isn't a subclass of its origin)
+    add_traits = None  # pyright: ignore[reportAssignmentType] Don't support the method HasTraits.add_traits as it creates a new type that isn't a subclass of its origin)
 
     @default("log")
     def _default_log(self):

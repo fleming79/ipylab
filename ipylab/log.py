@@ -91,7 +91,7 @@ class IpylabLoggerAdapter(logging.LoggerAdapter):
 
 class IpylabLogHandler(logging.Handler):
     _loggers: ClassVar[weakref.WeakSet[logging.Logger]] = weakref.WeakSet()
-    formatter: IpylabLogFormatter  # type: ignore
+    formatter: IpylabLogFormatter  # pyright: ignore[reportIncompatibleVariableOverride]
 
     def __init__(self, level: LogLevel) -> None:
         super().__init__(level)
@@ -104,18 +104,18 @@ class IpylabLogHandler(logging.Handler):
             logger.addHandler(self)
 
     @override
-    def setLevel(self, level: LogLevel) -> None:  # type: ignore
+    def setLevel(self, level: LogLevel) -> None:  # pyright: ignore[reportIncompatibleMethodOverride]
         level = LogLevel(level)
         super().setLevel(level)
         for logger in self._loggers:
             logger.setLevel(level)
 
-    def emit(self, record):
+    def emit(self, record) -> None:
         std_ = "stderr" if record.levelno >= LogLevel.ERROR else "stdout"
         record.output = {"output_type": "stream", "name": std_, "text": self.format(record)}
         self._callbacks(record)
 
-    def register_callback(self, callback, *, remove=False):
+    def register_callback(self, callback, *, remove=False) -> None:
         """Register a callback for when a record is emitted.
 
         The callback will be called with one argument, the record.
@@ -147,7 +147,7 @@ class IpylabLogFormatter(logging.Formatter):
         record.obj_rep = truncated_repr(self.get_ref(record, "obj"), 120)
         return super().format(record)
 
-    def get_ref(self, record, key):
+    def get_ref(self, record, key) -> object | None:
         ref = getattr(record, key, None)
         return ref() if key == "owner" and callable(ref) else ref
 
@@ -157,5 +157,5 @@ class IpylabLogFormatter(logging.Formatter):
         if self.app.logging_handler:
             tbf = self.tb_formatter
             tbf.verbose if self.app.logging_handler.level == LogLevel.DEBUG else tbf.minimal  # noqa: B018
-            return tbf.stb2text(tbf.structured_traceback(*ei))  # type: ignore
+            return tbf.stb2text(tbf.structured_traceback(*ei))  # pyright: ignore[reportArgumentType]
         return super().formatException(ei)

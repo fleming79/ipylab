@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ipywidgets import Widget
 from traitlets import Unicode
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from typing import Any
 
 
-def _combine(options: dict | None, **kwgs):
+def _combine(options: dict | None, **kwgs) -> dict[str, Any]:
     if options:
         kwgs.update(options)
     return kwgs
@@ -23,7 +23,7 @@ def _combine(options: dict | None, **kwgs):
 class Dialog(Ipylab):
     _model_name = Unicode("DialogModel", help="Name of the model.", read_only=True).tag(sync=True)
 
-    async def get_boolean(self, title: str, options: dict | None = None):
+    async def get_boolean(self, title: str, options: dict | None = None) -> bool:
         """Open a Jupyterlab dialog to get a boolean value.
         see: https://jupyterlab.readthedocs.io/en/stable/api/functions/apputils.InputDialog.getBoolean.html
         """
@@ -36,28 +36,24 @@ class Dialog(Ipylab):
         see: https://jupyterlab.readthedocs.io/en/stable/api/functions/apputils.InputDialog.getItem.html
         """
         return await self.operation("getItem", kwgs=_combine(options, title=title, items=tuple(items)))
-        # type: ignore
 
     async def get_number(self, title: str, options: dict | None = None) -> float:
         """Open a Jupyterlab dialog to get a number.
         see: https://jupyterlab.readthedocs.io/en/stable/api/functions/apputils.InputDialog.getNumber.html
         """
         return await self.operation("getNumber", kwgs=_combine(options, title=title))
-        # type: ignore
 
     async def get_text(self, title: str, options: dict | None = None) -> str:
         """Open a Jupyterlab dialog to get a string.
         see: https://jupyterlab.readthedocs.io/en/stable/api/functions/apputils.InputDialog.getText.html
         """
         return await self.operation("getText", kwgs=_combine(options, title=title))
-        # type: ignore
 
     async def get_password(self, title: str, options: dict | None = None) -> str:
         """Open a Jupyterlab dialog to get a number.
         see: https://jupyterlab.readthedocs.io/en/stable/api/functions/apputils.InputDialog.getPassword.html
         """
         return await self.operation("getPassword", kwgs=_combine(options, title=title))
-        # type: ignore
 
     async def show_dialog(
         self, title: str = "", body: str | Widget = "", options: dict | None = None, *, has_close=True
@@ -126,7 +122,7 @@ class Dialog(Ipylab):
         to_lumino_widget = ["body"] if isinstance(body, Widget) else None
         return await self.operation("showDialog", kwgs=kwgs, toLuminoWidget=to_lumino_widget)
 
-    async def show_error_message(self, title: str, error: str, options: dict | None = None):
+    async def show_error_message(self, title: str, error: str, options: dict | None = None) -> None:
         """Open a Jupyterlab error message dialog.
 
         buttons = [
@@ -147,7 +143,7 @@ class Dialog(Ipylab):
         """
         return await self.operation("showErrorMessage", kwgs=_combine(options, title=title, error=error))
 
-    async def get_open_files(self, options: dict | None = None):
+    async def get_open_files(self, options: dict | None = None) -> bool:
         """Get a list of files using a Jupyterlab dialog relative to the current
         path in Jupyterlab.
 

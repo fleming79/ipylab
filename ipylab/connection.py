@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from ipywidgets import Widget, register
 from traitlets import Bool, Dict, Instance, Unicode
@@ -63,7 +63,7 @@ class Connection(Singular, Ipylab):
         return connection_id in cls._singular_instances
 
     @classmethod
-    def close_if_exists(cls, connection_id: str):
+    def close_if_exists(cls, connection_id: str) -> None:
         if inst := cls._singular_instances.pop(connection_id, None):
             inst.close()
 
@@ -72,7 +72,7 @@ class Connection(Singular, Ipylab):
         cls._CLASS_DEFINITIONS[cls.prefix.strip(cls._SEP)] = cls
         super().__init_subclass__(**kwargs)
 
-    def __init__(self, connection_id: str, **kwgs):
+    def __init__(self, connection_id: str, **kwgs) -> None:
         super().__init__(connection_id=connection_id, **kwgs)
 
     def __str__(self):
@@ -93,11 +93,11 @@ class Connection(Singular, Ipylab):
 
     @property
     @override
-    def repr_info(self):
+    def repr_info(self) -> str | dict[str, str | dict[str, Any]]:
         return repr(self.connection_id)
 
     @override
-    def close(self, *, dispose=True):
+    def close(self, *, dispose=True) -> None:
         """Permanently close the widget.
 
         dispose: bool
@@ -127,19 +127,19 @@ Connection._CLASS_DEFINITIONS[Connection.prefix.strip(Connection._SEP)] = Connec
 class InfoConnection(Connection):
     "A connection with info and auto_dispose enabled."
 
-    info = Dict(help="info about the item")
+    info: Dict[str, Any] = Dict(help="info about the item")
     auto_dispose = Bool(True).tag(sync=True)
 
 
 class ShellConnection(Connection):
     "A connection to a widget loaded in the shell."
 
-    _model_name = Unicode("ShellConnectionModel").tag(sync=True)
+    _model_name: Unicode[str, str | bytes] = Unicode("ShellConnectionModel").tag(sync=True)
     auto_dispose = Bool(True).tag(sync=True)
 
     widget = Instance(Widget, allow_none=True, default_value=None, help="The widget that has the view")
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Object disposal"""
         # Losing strong references doesn't mean the widget should be closed.
         self.close(dispose=False)

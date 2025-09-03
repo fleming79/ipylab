@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 
 @hookspec(firstresult=True)
-def launch_ipylab():
+def launch_ipylab() -> None:
     """A hook called to start Jupyterlab.
 
     This is called by with the shell command `ipylab`.
@@ -49,12 +49,12 @@ async def autostart(app: ipylab.App) -> None | Awaitable[None]:
 
 
 @hookspec
-def default_namespace_objects(namespace_id: str, app: ipylab.App) -> dict[str, Any]:  # type: ignore
+def default_namespace_objects(namespace_id: str, app: ipylab.App) -> dict[str, Any]:  # pyright: ignore[reportReturnType]
     "A hook to specify additional namespace objects when a namespace is loaded."
 
 
 @hookspec(firstresult=True)
-async def vpath_getter(app: ipylab.App, kwgs: dict) -> str:  # type: ignore
+async def vpath_getter(app: ipylab.App, kwgs: dict) -> str:  # pyright: ignore[reportReturnType]
     """A hook called during `app.shell.add` when `evaluate` is code and `vpath`
     is passed as a dict.
 
@@ -64,5 +64,5 @@ async def vpath_getter(app: ipylab.App, kwgs: dict) -> str:  # type: ignore
 
 
 @hookspec(firstresult=True)
-def get_logging_handler(app: ipylab.App) -> IpylabLogHandler:  # type: ignore
+def get_logging_handler(app: ipylab.App) -> IpylabLogHandler:  # pyright: ignore[reportReturnType]
     "Get the logging handler."
