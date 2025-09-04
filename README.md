@@ -55,7 +55,6 @@ improved the functionality.
 | traitlets                                          | [#918](https://github.com/ipython/traitlets/pull/918)   | Accepted - pending release  | Improved type hints |
 | ipywidgets, jupyterlab-widgets, widgetsnbextension | [#3922](https://github.com/jupyter-widgets/ipywidgets/pull/3922) + [#3921](https://github.com/jupyter-widgets/ipywidgets/pull/3921) | Pending review | Provides for widgets comms without needing a notebook or console to be open. Plus fixes for proper garbage collection and widget tooltips |
 | jupyter_client | [#1064](https://github.com/jupyter/jupyter_client/pull/1064)  | Pending review | Faster message serialization |
-| async_kernel | [Not a PR](https://github.com/fleming79/ipykernel/tree/async) | Awaiting feedback from [Ipython / Jupyter developers](https://github.com/ipython/ipykernel/pull/1384) | This kernel is native async. Importantly, execute_requests are run in tasks enabling shell messages to pass whilst execute_requests are being performed. This makes it possible to await async methods in ipylab that rely on custom shell messages.  |
 
 Use the source distribution to ensure the dependencies are bundled.
 
