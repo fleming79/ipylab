@@ -320,11 +320,9 @@ class Ipylab(HasApp, WidgetBase):
         if toObject:
             content["toObject"] = toObject
 
-        future = Future()
-        self._pending_operations[ipylab_PY] = future
+        self._pending_operations[ipylab_PY] = future = Future()
         self._ipylab_send(content)
-        payload = await future.result()
-        return await Transform.transform_payload(content["transform"], payload)
+        return await Transform.transform_payload(transform=content["transform"], payload=await future)
 
     async def execute_method(self, subpath: str, args: tuple = (), obj=Obj.base, **kwargs: Unpack[IpylabKwgs]) -> Any:
         """Execute a method on a remote object in the frontend.
