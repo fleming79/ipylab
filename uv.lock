@@ -126,7 +126,7 @@ wheels = [
 
 [[package]]
 name = "async-kernel"
-version = "0.1.4"
+version = "0.2.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -139,9 +139,9 @@ dependencies = [
     { name = "traitlets" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/48/11/56098fc8b6985e536682f617149722c0f4a172cca5addb72cbb875650d23/async_kernel-0.1.4.tar.gz", hash = "sha256:9c417702e9f25e69610d3e4332384fb02a8ab623d92a7e985790ce7ab629b2bc", size = 236653, upload-time = "2025-09-03T20:32:42.727Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6d/d6/d1b5884078531cecf3f97a4fcb323b46aa7b3c9add2902fa446440445227/async_kernel-0.2.1.tar.gz", hash = "sha256:b635f890bd093fcc4f05618af525a36dae188f5426f17df70f1fc95f48fa4a93", size = 241200, upload-time = "2025-09-10T08:13:46.292Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/37/3b/ddac0f277a5f8ec8fbcae8fa037859b8a672b11149b49c910f8398314683/async_kernel-0.1.4-py3-none-any.whl", hash = "sha256:5c0f2bf1beae98ec9c5b1ecc6e44ca59a39a1a644f6bfc2df6576f8668208967", size = 61281, upload-time = "2025-09-03T20:32:41.236Z" },
+    { url = "https://files.pythonhosted.org/packages/66/8a/2d55793c5140675ca97f251db55111b76bf3bcaf58e3d67ce31c1122b2cf/async_kernel-0.2.1-py3-none-any.whl", hash = "sha256:f45e0ef8c67b47378f98cf557693529d5128c7e85abdd10a0cabdb3d28de83e1", size = 63450, upload-time = "2025-09-10T08:13:44.828Z" },
 ]
 
 [[package]]
@@ -912,7 +912,7 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "async-kernel", specifier = "==0.1.4" },
+    { name = "async-kernel", specifier = ">=0.2.1,<0.3" },
     { name = "ipython", specifier = ">=8.32" },
     { name = "ipywidgets", specifier = ">=8.1.5" },
     { name = "ipywidgets", path = "pkg/ipywidgets-8.1.5-py3-none-any.whl" },
