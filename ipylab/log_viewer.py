@@ -95,6 +95,7 @@ class LogViewer(Panel):
     )
     autoscroll_enabled = Fixed(
         lambda _: Checkbox(
+            True,
             description="Auto scroll",
             indent=False,
             tooltip="Automatically scroll to the most recent logs.",
@@ -181,7 +182,7 @@ class LogViewer(Panel):
     def _button_on_click(self, b) -> None:
         if b is self.button_show_send_dialog:
             b.disabled = True
-            Caller.get_instance().call_soon(self._show_send_dialog, b)
+            self.app.call_later(0, "LogViewer", self._show_send_dialog, b)
         elif b is self.button_clear:
             self._records.clear()
             self.output.push(clear=True)
@@ -201,7 +202,9 @@ class LogViewer(Panel):
             "obj": getattr(record, "obj", None),
         }
         b = Button(description="Send to console", tooltip="Send `record`, `owner` and `obj` to the console")
-        b.on_click(lambda _: Caller.get_instance().call_soon(self.app.shell.open_console, objects=objects))
+        b.on_click(
+            lambda _: self.app.call_later(0, "LogViewer open console", self.app.shell.open_console, objects=objects)
+        )
         out.push(b)
         p = Panel([out])
         p.title.label = record.levelname.capitalize()

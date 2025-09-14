@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, Any
 
 import anyio
 import pytest
-from async_kernel import Caller
 
 if TYPE_CHECKING:
     import ipylab
@@ -72,7 +71,7 @@ async def test_app_evaluate(app: ipylab.App, kw: dict[str, Any], result, mocker)
     ready = mocker.patch.object(app, "ready")
     send = mocker.patch.object(app, "send")
 
-    Caller().call_soon(app.evaluate, **kw, vpath="irrelevant")
+    app.call_later(0, "Evaluate test", app.evaluate, **kw, vpath="irrelevant")
     await anyio.sleep(0.01)
     assert ready.call_count == 2
     assert send.call_count == 1

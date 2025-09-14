@@ -9,7 +9,6 @@ import inspect
 import os
 from typing import TYPE_CHECKING, Any, Literal, Self, Unpack, final
 
-from async_kernel.caller import Caller
 from async_kernel.kernelspec import KernelName
 from ipywidgets import Widget, register
 from traitlets import Bool, Dict, Unicode, UseEnum, observe
@@ -91,7 +90,7 @@ class App(Singular, Ipylab):
 
     def _autostart_callback(self, result) -> None:
         if inspect.iscoroutine(result):
-            Caller.get_instance().call_soon(lambda: result)
+            self.call_later(0, "Autostart callback await", lambda: result)
 
     @property
     def repr_info(self) -> dict[str, str]:

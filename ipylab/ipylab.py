@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import functools
 import inspect
 import json
 import uuid
@@ -18,7 +19,7 @@ from traitlets import Bool, Container, Dict, Instance, Int, List, TraitType, Uni
 from typing_extensions import override
 
 import ipylab._frontend as _fe
-from ipylab.common import HasApp, IpylabKwgs, Obj, SignalCallbackData, Transform, TransformType, pack
+from ipylab.common import HasApp, IpylabKwgs, Obj, P, SignalCallbackData, T, Transform, TransformType, pack
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator
@@ -133,7 +134,7 @@ class Ipylab(HasApp, WidgetBase):
             self._ready_event.set()
             self._ready_event = Event()
             for cb in self._on_ready_callbacks:
-                self._call_ready_callback(cb)
+                self._call_on_ready_callback(cb)
 
     @override
     def close(self) -> None:
@@ -150,6 +151,30 @@ class Ipylab(HasApp, WidgetBase):
         except Exception as e:
             self.log.exception("Send error", obj=content, exc_info=e)
             raise
+
+    def _call_on_ready_callback(self, callback: Callable[[Self], None | CoroutineType]):
+        self.call_later(0, "On ready", callback, self)
+
+    def call_later(
+        self,
+        delay: float,
+        description: str,
+        func: Callable[P, T | CoroutineType[Any, Any, T]],
+        /,
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> Future[T]:
+        self.log.debug("Calling %s (%s)", func, description)
+        fut = Caller.get_instance().call_later(delay, func, *args, **kwargs)
+        fut.add_done_callback(functools.partial(self.on_done_log, description=description))
+        return fut
+
+    def on_done_log(self, fut: Future, description=""):
+        "A callback to use attach to futures with  `Future.add_done_callback`."
+        if fut.cancelled():
+            self.log.debug("Cancelled %s", fut)
+        if e := fut.exception():
+            self.log.exception(description, exc_info=e)
 
     def _on_custom_msg(self, _, msg: dict, buffers: list) -> None:
         """Handle incoming custom messages.
@@ -171,14 +196,13 @@ class Ipylab(HasApp, WidgetBase):
                 case {"ipylab_PY": str(key), **rest}:
                     self._set_result(key=key, error=None, payload=rest.get("payload"))
                 case {"ipylab_FE": str(key), "operation": operation, "payload": payload}:
-                    Caller.get_instance().call_soon(
-                        self._do_operation_for_fe, key=key, operation=operation, payload=payload, buffers=buffers
-                    )
+                    kwgs = {"key": key, "operation": operation, "payload": payload, "buffers": buffers}
+                    self.call_later(0, "From the frontend - operation", self._do_operation_for_fe, **kwgs)
                 case {"closed": closed} if closed:
                     self.close()
                 case {"signal": {"dottedname": dottedname, **rest}}:
                     data = SignalCallbackData(owner=self, dottedname=dottedname, args=rest.get("args"))
-                    Caller.get_instance().call_soon(self._notify_signal, data=data)
+                    self.call_later(0, "From the frontend -signal", self._notify_signal, data=data)
                 case _ as data:
                     self.log.error(f"Unhandled custom message {data=}", obj=data)  # noqa: G004
         except Exception as e:
@@ -233,9 +257,6 @@ class Ipylab(HasApp, WidgetBase):
         # Overload as required
         raise NotImplementedError(operation)
 
-    def _call_ready_callback(self, callback: Callable[[Self], None | CoroutineType]):
-        Caller.get_instance().call_soon(callback, self)
-
     async def ready(self) -> Self:
         """Wait for the instance to be ready.
 
@@ -271,7 +292,7 @@ class Ipylab(HasApp, WidgetBase):
         if not remove and callback not in self._on_ready_callbacks:
             self._on_ready_callbacks.append(callback)
             if self._ready:
-                self._call_ready_callback(callback)
+                self._call_on_ready_callback(callback)
         elif callback in self._on_ready_callbacks:
             self._on_ready_callbacks.remove(callback)
 
