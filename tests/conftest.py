@@ -14,8 +14,13 @@ async def anyio_backend_autouse(anyio_backend):
 
 
 @pytest.fixture
-async def app(mocker):
-    async with Caller(create=True):
-        app = ipylab.App()
-        mocker.patch.object(app, "ready")
-        yield app
+async def caller(anyio_backend):
+    async with Caller(create=True) as caller:
+        yield caller
+
+
+@pytest.fixture
+async def app(caller, mocker):
+    app = ipylab.App()
+    mocker.patch.object(app, "ready")
+    return app

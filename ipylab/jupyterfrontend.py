@@ -91,7 +91,7 @@ class App(Singular, Ipylab):
 
     def _autostart_callback(self, result) -> None:
         if inspect.iscoroutine(result):
-            Caller.get_instance().call_soon(result)  # pyright: ignore[reportCallIssue, reportArgumentType]
+            Caller.get_instance().call_soon(lambda: result)
 
     @property
     def repr_info(self) -> dict[str, str]:
@@ -225,21 +225,20 @@ class App(Singular, Ipylab):
                         result = eval(source, ns)
                 if not name:
                     continue
-                while callable(result) or inspect.isawaitable(result):
-                    if callable(result):
-                        kwgs = {}
-                        for p in inspect.signature(result).parameters:
-                            if p in options:
-                                kwgs[p] = options[p]
-                            elif p in ns:
-                                kwgs[p] = ns[p]
-                        # We use a partial so that we can evaluate with the same namespace.
-                        ns["_partial_call"] = functools.partial(result, **kwgs)
-                        source = compile("_partial_call()", "-- Result call --", "eval")
-                        result = eval(source, ns)
-                        ns.pop("_partial_call")
-                    if inspect.isawaitable(result):
-                        result = await result
+                if callable(result):
+                    kwgs = {}
+                    for p in inspect.signature(result).parameters:
+                        if p in options:
+                            kwgs[p] = options[p]
+                        elif p in ns:
+                            kwgs[p] = ns[p]
+                    # We use a partial so that we can evaluate with the same namespace.
+                    ns["_partial_call"] = functools.partial(result, **kwgs)
+                    source = compile("_partial_call()", "-- Result call --", "eval")
+                    result = eval(source, ns)
+                    ns.pop("_partial_call")
+                if inspect.iscoroutine(result):
+                    result = await result
                 if name:
                     ns[name] = result
             buffers = ns.pop("buffers", [])
@@ -269,8 +268,9 @@ class App(Singular, Ipylab):
         """Evaluate code asynchronously in the 'vpath' Python kernel.
 
         Execution is coordinated via the frontend and will evaluate/execute the
-        code specified. Most forms of expressions are acceptable. Awaitiables
-        will be awaited recursively prior to sending the result.
+        code specified. Most forms of expressions are acceptable. If the last
+        result of evaluation is a coroutine; then it will be awaited prior
+        to sending the result.
 
         Parameters
         ----------

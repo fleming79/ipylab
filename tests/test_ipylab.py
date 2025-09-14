@@ -6,7 +6,7 @@ from ipylab.jupyterfrontend import App
 
 
 class TestOnReady:
-    async def test_on_ready_add_and_remove(self):
+    async def test_on_ready_add_and_remove(self, caller):
         obj = Ipylab()
         callback = MagicMock()
 
@@ -16,11 +16,13 @@ class TestOnReady:
 
         # Simulate the ready event
         obj.set_trait("_ready", True)
+        await anyio.sleep(0.1)
         callback.assert_called()
 
         callback.reset_mock()
         obj.set_trait("_ready", False)
         obj.set_trait("_ready", True)
+        await anyio.sleep(0.1)
         callback.assert_called()
 
         # Reset the mock and remove the callback
@@ -31,6 +33,7 @@ class TestOnReady:
         # Simulate the ready event again, callback should not be called
         obj.set_trait("_ready", False)
         obj.set_trait("_ready", True)
+        await anyio.sleep(0.1)
         callback.assert_not_called()
 
         obj.close()
@@ -45,6 +48,7 @@ class TestOnReady:
 
         # Simulate the ready event
         obj.set_trait("_ready", True)
+        await anyio.sleep(0.1)
         callback.assert_called()
         await anyio.sleep(0.1)
         assert callback.await_count == 1

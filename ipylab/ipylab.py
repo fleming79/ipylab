@@ -234,9 +234,7 @@ class Ipylab(HasApp, WidgetBase):
         raise NotImplementedError(operation)
 
     def _call_ready_callback(self, callback: Callable[[Self], None | CoroutineType]):
-        result = callback(self)
-        if inspect.iscoroutine(result):
-            Caller.get_instance().call_soon(result)  # pyright: ignore[reportCallIssue, reportArgumentType]
+        Caller.get_instance().call_soon(callback, self)
 
     async def ready(self) -> Self:
         """Wait for the instance to be ready.
