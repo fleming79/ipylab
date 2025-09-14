@@ -7,19 +7,8 @@ import collections
 import contextlib
 from typing import TYPE_CHECKING, Self
 
-from async_kernel import Caller
 from IPython.display import HTML as IPD_HTML
-from ipywidgets import (
-    HTML,
-    BoundedIntText,
-    Button,
-    Checkbox,
-    Combobox,
-    Dropdown,
-    HBox,
-    Select,
-    VBox,
-)
+from ipywidgets import HTML, BoundedIntText, Button, Checkbox, Combobox, Dropdown, HBox, Select, VBox
 from traitlets import directional_link, link, observe
 from typing_extensions import override
 
@@ -115,13 +104,13 @@ class LogViewer(Panel):
             layout={"justify_content": "space-between", "flex": "0 0 auto"},
         ),
     )
-    output = Fixed(SimpleOutput)
+    output = Fixed(lambda _: SimpleOutput(layout={"width": "max-content"}))
     autoscroll_widget: Fixed[Self, AutoScroll] = Fixed(
         lambda c: AutoScroll(content=c["owner"].output),
-        created=lambda c: link(
-            source=(c["owner"].autoscroll_enabled, "value"),
-            target=(c["obj"], "enabled"),
-        ),
+        created=lambda c: [
+            link(source=(c["owner"].autoscroll_enabled, "value"), target=(c["obj"], "enabled")),
+            c["obj"].layout.setattr("width", "max-content"),
+        ],
     )
 
     def __init__(self):
@@ -148,7 +137,7 @@ class LogViewer(Panel):
         if self.connections:
             self.output.push(record.output)  # pyright: ignore[reportAttributeAccessIssue]
         if record.levelno >= LogLevel.ERROR and self.app._ready:
-            Caller.get_instance().queue_call(self._notify_exception, record)
+            self.app.call_later(0, "Notify exception", self._notify_exception, record)
 
     async def _notify_exception(self, record: logging.LogRecord) -> None:
         "Create a notification that an error occurred."

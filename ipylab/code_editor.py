@@ -8,7 +8,6 @@ import typing
 from typing import TYPE_CHECKING, Any, NotRequired, Self, TypedDict
 
 import anyio
-from async_kernel import Caller
 from IPython.core import completer as IPC
 from IPython.utils.tokenutil import token_at_cursor
 from ipywidgets import Layout, register, widget_serialization
@@ -212,6 +211,7 @@ class CodeEditor(Ipylab, _String):
 
     value = Unicode()
     _setting_value = False
+    _sending = False
     completer: Fixed[Self, IpylabCompleter] = Fixed(
         lambda c: IpylabCompleter(
             code_editor=c["owner"],
@@ -243,20 +243,24 @@ class CodeEditor(Ipylab, _String):
 
     @observe("value")
     def _observe_value(self, change):
-        if self._setting_value != change["new"]:
+        if self._setting_value != change["new"] and not self._sending:
             # We use throttling to ensure there isn't a backlog of changes to synchronise.
             # When the value is set in Python, we the shared model in the frontend should exactly reflect it.
 
-            Caller.get_instance().queue_call(self._send_value)
+            self.call_later(0, "Update value", self._send_value)
 
     async def _send_value(self) -> None:
-        while True:
-            value = self.value
-            await self.operation("setValue", {"value": value})
-            self._sync = self._sync + 1
-            await anyio.sleep(self.update_throttle_ms / 1e3)
-            if self.value == value:
-                break
+        self._sending = True
+        try:
+            while True:
+                value = self.value
+                await self.operation("setValue", {"value": value})
+                self._sync = self._sync + 1
+                await anyio.sleep(self.update_throttle_ms / 1e3)
+                if self.value == value:
+                    break
+        finally:
+            self._sending = False
 
     @override
     async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list):
