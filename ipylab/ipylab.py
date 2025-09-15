@@ -12,8 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 import anyio
 import traitlets
-from anyio import Event
-from async_kernel import Caller, Future
+from async_kernel import AsyncEvent, Caller, Future
 from ipywidgets import TypedTuple, Widget, register
 from traitlets import Bool, Container, Dict, Instance, Int, List, TraitType, Unicode, observe
 from typing_extensions import override
@@ -88,7 +87,7 @@ class Ipylab(HasApp, WidgetBase):
     _ready = Bool(read_only=True, help="Set to by frontend when ready").tag(sync=True)
     _view_count = Int().tag(sync=True)
     _on_ready_callbacks: Container[list[Callable[[Self], None | CoroutineType]]] = List(trait=traitlets.Callable())
-    _ready_event = Instance(Event, ())
+    _ready_event = Instance(AsyncEvent, ())
     _comm = None
     _ipylab_init_complete = False
     _pending_operations: Dict[str, Future] = Dict()
@@ -132,7 +131,7 @@ class Ipylab(HasApp, WidgetBase):
         if self._ready:
             self.log.debug("ready")
             self._ready_event.set()
-            self._ready_event = Event()
+            self._ready_event = AsyncEvent()
             for cb in self._on_ready_callbacks:
                 self._call_on_ready_callback(cb)
 
