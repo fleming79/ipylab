@@ -131,9 +131,10 @@ class Ipylab(HasApp, WidgetBase):
         if self._ready:
             self.log.debug("ready")
             self._ready_event.set()
-            self._ready_event = AsyncEvent()
             for cb in self._on_ready_callbacks:
                 self._call_on_ready_callback(cb)
+        else:
+            self._ready_event = AsyncEvent()
 
     @override
     def close(self) -> None:
