@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 import anyio
 import traitlets
 from async_kernel import AsyncEvent, Caller, Future
+from async_kernel.caller import truncated_rep
 from ipywidgets import TypedTuple, Widget, register
 from traitlets import Bool, Container, Dict, Instance, Int, List, TraitType, Unicode, observe
 from typing_extensions import override
@@ -117,11 +118,10 @@ class Ipylab(HasApp, WidgetBase):
             status = "Not ready"
         else:
             status = ""
-        info = (
-            ", ".join(f"{k}={v!r}" for k, v in self.repr_info.items())
-            if isinstance(self.repr_info, dict)
-            else self.repr_info
-        )
+        try:
+            info = truncated_rep.repr(self.repr_info)
+        except Exception:
+            info = "--info not available--"
         if status:
             return f"< {status}: {self.__class__.__name__}({info}) >"
         return f"{status}{self.__class__.__name__}({info})"
