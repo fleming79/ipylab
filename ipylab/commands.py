@@ -8,13 +8,14 @@ import inspect
 import uuid
 from typing import TYPE_CHECKING, Any, ClassVar, NotRequired, TypedDict, Unpack
 
+from async_kernel.caller import AsyncLock
 from ipywidgets import TypedTuple
 from traitlets import Callable as CallableTrait
 from traitlets import Container, Dict, Instance, Tuple, Unicode
 from typing_extensions import override
 
 import ipylab
-from ipylab.common import IpylabKwgs, Obj, Singular, TransformType, pack
+from ipylab.common import Fixed, IpylabKwgs, Obj, Singular, TransformType, pack
 from ipylab.connection import InfoConnection, ShellConnection
 from ipylab.ipylab import Ipylab, IpylabBase, Transform, register
 from ipylab.widgets import Icon
@@ -74,7 +75,7 @@ class CommandConnection(InfoConnection):
     @property
     @override
     def repr_info(self) -> dict[str, Any]:
-        return {"name": self.commands.name} | {"info": self.info}
+        return {"info": self.info}
 
     async def configure(self, *, emit=True, **kwgs: Unpack[CommandOptions]) -> CommandOptions:
         await self.ready()
@@ -186,6 +187,7 @@ class CommandRegistry(Singular, Ipylab):
     name = Unicode(APP_COMMANDS_NAME, read_only=True).tag(sync=True)
     all_commands = Tuple(read_only=True).tag(sync=True)
     connections: Container[tuple[InfoConnection, ...]] = TypedTuple(trait=Instance(InfoConnection))
+    _lock = Fixed(AsyncLock)
 
     @classmethod
     @override
@@ -282,30 +284,31 @@ class CommandRegistry(Singular, Ipylab):
 
         await self.ready()
         app = await self.app.ready()
-        connection_id = CommandConnection.to_id(self.name, app.vpath, name)
-        CommandConnection.close_if_exists(connection_id)
-        kwgs = kwgs | {
-            "id": connection_id,
-            "connection_id": connection_id,
-            "caption": caption,
-            "label": label or name,
-            "iconClass": icon_class,
-            "icon": f"{pack(icon)}.labIcon" if isinstance(icon, Icon) else None,
-        }
-        cc: CommandConnection = await self.operation(
-            "addCommand",
-            kwgs,
-            transform={"transform": Transform.connection, "connection_id": connection_id},
-            toObject=["icon"] if isinstance(icon, Icon) else [],
-        )
-        self.close_with_self(cc)
-        cc.commands = self
-        cc.namespace_id = namespace_id
-        cc.python_command = execute
-        cc.args = args or {}
-        cc.info = kwgs
-        cc.add_to_tuple(self, "connections")
-        return cc
+        async with self._lock:
+            connection_id = CommandConnection.to_id(self.name, app.vpath, name)
+            CommandConnection.close_if_exists(connection_id)
+            kwgs = kwgs | {
+                "id": connection_id,
+                "connection_id": connection_id,
+                "caption": caption,
+                "label": label or name,
+                "iconClass": icon_class,
+                "icon": f"{pack(icon)}.labIcon" if isinstance(icon, Icon) else None,
+            }
+            cc: CommandConnection = await self.operation(
+                "addCommand",
+                kwgs,
+                transform={"transform": Transform.connection, "connection_id": connection_id},
+                toObject=["icon"] if isinstance(icon, Icon) else [],
+            )
+            self.close_with_self(cc)
+            cc.commands = self
+            cc.namespace_id = namespace_id
+            cc.python_command = execute
+            cc.args = args or {}
+            cc.info = kwgs
+            cc.add_to_tuple(self, "connections")
+            return cc
 
     async def execute(
         self, command_id: str | CommandConnection, args: dict | None = None, **kwargs: Unpack[IpylabKwgs]
@@ -338,17 +341,18 @@ class CommandRegistry(Singular, Ipylab):
         "Make a new menu that can be used where a menu is required."
         await self.ready()
         connection_id = ipylab.menu.MenuConnection.to_id()
-        ipylab.menu.MenuConnection.close_if_exists(connection_id)
-        options = {"id": connection_id, "label": label, "rank": int(rank)}
-        mc: MenuConnection = await self.execute_method(
-            "generateMenu",
-            (f"{pack(self)}.base", options, (Obj.this, "translator")),
-            obj=Obj.MainMenu,
-            toObject=["args[0]", "args[2]"],
-            transform={"transform": Transform.connection, "connection_id": connection_id},
-        )
-        self.close_with_self(mc)
-        mc.info = options
-        mc.commands = self
-        mc.add_to_tuple(self, "connections")
-        return mc
+        async with self._lock:
+            ipylab.menu.MenuConnection.close_if_exists(connection_id)
+            options = {"id": connection_id, "label": label, "rank": int(rank)}
+            mc: MenuConnection = await self.execute_method(
+                "generateMenu",
+                (f"{pack(self)}.base", options, (Obj.this, "translator")),
+                obj=Obj.MainMenu,
+                toObject=["args[0]", "args[2]"],
+                transform={"transform": Transform.connection, "connection_id": connection_id},
+            )
+            self.close_with_self(mc)
+            mc.info = options
+            mc.commands = self
+            mc.add_to_tuple(self, "connections")
+            return mc
