@@ -343,14 +343,14 @@ class LastUpdatedDict(OrderedDict):
             self._updating = False
 
 
-class FixedCreate(Generic[S], TypedDict):
+class FixedCreate(TypedDict, Generic[S]):
     "A TypedDict relevant to Fixed"
 
     name: str
     owner: S
 
 
-class FixedCreated(Generic[S, T], TypedDict):
+class FixedCreated(TypedDict, Generic[S, T]):
     "A TypedDict relevant to Fixed"
 
     name: str

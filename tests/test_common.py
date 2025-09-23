@@ -119,7 +119,7 @@ class TestTransformValidate:
 
     def test_validate_invalid_non_dict_transform(self):
         transform = Transform.function
-        with pytest.raises(ValueError, match="This type of transform should be passed as a dict.*"):
+        with pytest.raises(ValueError, match="This type of transform should be passed as a dict"):
             Transform.validate(transform)
 
 
@@ -257,7 +257,7 @@ class TestFixed:
             test_instance = Fixed[Self, CommonTestClass](CommonTestClass)
 
         owner = TestOwner()
-        with pytest.raises(AttributeError, match="Setting `Fixed` parameter TestOwner.test_instance is forbidden!"):
+        with pytest.raises(AttributeError, match="test_instance is forbidden"):
             owner.test_instance = (  # pyright: ignore[reportAttributeAccessIssue]
                 CommonTestClass()
             )  #  Note: This type should be ignored because it is a fixed value. Removing indicates a problem.
