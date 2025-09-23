@@ -109,7 +109,6 @@ class LogViewer(Panel):
         lambda c: AutoScroll(content=c["owner"].output),
         created=lambda c: [
             link(source=(c["owner"].autoscroll_enabled, "value"), target=(c["obj"], "enabled")),
-            c["obj"].layout.setattr("width", "max-content"),
         ],
     )
 
