@@ -9,16 +9,16 @@ resolution-markers = [
 
 [[package]]
 name = "anyio"
-version = "4.10.0"
+version = "4.11.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "idna" },
     { name = "sniffio" },
     { name = "typing-extensions", marker = "python_full_version < '3.13'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f1/b4/636b3b65173d3ce9a38ef5f0522789614e590dab6a8d505340a4efe4c567/anyio-4.10.0.tar.gz", hash = "sha256:3f3fae35c96039744587aa5b8371e7e8e603c0702999535961dd336026973ba6", size = 213252, upload-time = "2025-08-04T08:54:26.451Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c6/78/7d432127c41b50bccba979505f272c16cbcadcc33645d5fa3a738110ae75/anyio-4.11.0.tar.gz", hash = "sha256:82a8d0b81e318cc5ce71a5f1f8b5c4e63619620b63141ef8c995fa0db95a57c4", size = 219094, upload-time = "2025-09-23T09:19:12.58Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6f/12/e5e0282d673bb9746bacfb6e2dba8719989d3660cdb2ea79aee9a9651afb/anyio-4.10.0-py3-none-any.whl", hash = "sha256:60e474ac86736bbfd6f210f7a61218939c318f43f9972497381f1c5e930ed3d1", size = 107213, upload-time = "2025-08-04T08:54:24.882Z" },
+    { url = "https://files.pythonhosted.org/packages/15/b3/9b1a8074496371342ec1e796a96f99c82c945a339cd81a8e73de28b4cf9e/anyio-4.11.0-py3-none-any.whl", hash = "sha256:0287e96f4d26d4149305414d4e3bc32f0dcd0862365a4bddea19d7a1ec38c4fc", size = 109097, upload-time = "2025-09-23T09:19:10.601Z" },
 ]
 
 [[package]]
@@ -97,7 +97,7 @@ wheels = [
 
 [[package]]
 name = "async-kernel"
-version = "0.4.0"
+version = "0.5.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -110,9 +110,9 @@ dependencies = [
     { name = "traitlets" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f8/c9/191df84732b5088518ae039295eb998c511affa1afeed99d2cd91ad9fbd4/async_kernel-0.4.0.tar.gz", hash = "sha256:ac8004d8a2eecccf431c50a690be402d891b328db767fb58ccf8324ecfce2250", size = 245278, upload-time = "2025-09-23T01:54:45.565Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/34/4c/a4323b94e1d312235908c86bcbae67d0a20844889787d31e41b304d6c3f0/async_kernel-0.5.0.tar.gz", hash = "sha256:b0358fe3cee1418c7b08010d7cd6722a2ef4ec4b9129644fdf48d57565986f87", size = 248633, upload-time = "2025-09-24T03:03:19.618Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/11/00/fed24e4fa1dad58b869973992b559e6c8dcb6ebd5d719d2bfe9a61eb59c7/async_kernel-0.4.0-py3-none-any.whl", hash = "sha256:43c1be051c6437a958d9e479074f892584454590f96df5ca9f9df8aebe326b5a", size = 64949, upload-time = "2025-09-23T01:54:43.863Z" },
+    { url = "https://files.pythonhosted.org/packages/f1/01/1c72bd22609cfee582b6316f48436a5318aa37dba2945941fc6a9327b985/async_kernel-0.5.0-py3-none-any.whl", hash = "sha256:4096c5d2bc96c8174ec0e2100e0e0b3c38aef18d425ad43c72af1255ff0a031f", size = 64897, upload-time = "2025-09-24T03:03:18.128Z" },
 ]
 
 [[package]]
@@ -926,7 +926,7 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "async-kernel", specifier = ">=0.4,<0.5" },
+    { name = "async-kernel", specifier = ">=0.5,<0.6" },
     { name = "ipython", specifier = ">=8.32" },
     { name = "ipywidgets", specifier = ">=8.1.5" },
     { name = "ipywidgets", path = "pkg/ipywidgets-8.1.5-py3-none-any.whl" },
