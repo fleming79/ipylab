@@ -1,70 +1,123 @@
 // Copyright (c) ipylab contributors
 // Distributed under the terms of the Modified BSD License.
 
-import {
-  JupyterFrontEndPlugin,
-  JupyterFrontEnd,
-  ILabShell
-} from '@jupyterlab/application';
-
-import { ICommandPalette } from '@jupyterlab/apputils';
-
-import { IMainMenu } from '@jupyterlab/mainmenu';
-
 import { IJupyterWidgetRegistry } from '@jupyter-widgets/base';
-
-import { MODULE_NAME, MODULE_VERSION } from './version';
+import {
+  ILabShell,
+  ILayoutRestorer,
+  JupyterFrontEnd,
+  JupyterFrontEndPlugin
+} from '@jupyterlab/application';
+import { ICommandPalette } from '@jupyterlab/apputils';
+import { IEditorServices } from '@jupyterlab/codeeditor';
+import { IDefaultFileBrowser } from '@jupyterlab/filebrowser';
+import { ILauncher } from '@jupyterlab/launcher';
+import { IMainMenu } from '@jupyterlab/mainmenu';
+import { IRenderMimeRegistry } from '@jupyterlab/rendermime';
+import { ISettingRegistry } from '@jupyterlab/settingregistry';
+import { ITranslator } from '@jupyterlab/translation';
 import { INotebookTracker } from '@jupyterlab/notebook';
+import { MODULE_NAME, MODULE_VERSION } from './version';
 
-const EXTENSION_ID = 'ipylab:plugin';
+const PLUGIN_ID = 'ipylab:settings';
+
+/**
+ * The command IDs used by the plugin.
+ */
+namespace CommandIDs {
+  export const restore = 'ipylab:restore';
+  export const checkStartKernel = 'ipylab:check-start-kernel';
+}
 
 /**
  * The default plugin.
  */
 const extension: JupyterFrontEndPlugin<void> = {
-  id: EXTENSION_ID,
+  id: PLUGIN_ID,
   autoStart: true,
-  requires: [IJupyterWidgetRegistry, IMainMenu, INotebookTracker],
-  optional: [ICommandPalette, ILabShell],
-  activate: (
+  requires: [
+    IJupyterWidgetRegistry,
+    IRenderMimeRegistry,
+    ISettingRegistry,
+    IEditorServices,
+    INotebookTracker
+  ],
+  optional: [
+    ILayoutRestorer,
+    ICommandPalette,
+    ILabShell,
+    IDefaultFileBrowser,
+    ILauncher,
+    ITranslator,
+    IMainMenu
+  ],
+  activate: async (
     app: JupyterFrontEnd,
     registry: IJupyterWidgetRegistry,
-    mainMenu: IMainMenu,
+    rendermime: IRenderMimeRegistry,
+    settings: ISettingRegistry,
+    editorServices: IEditorServices,
     notebookTracker: INotebookTracker,
+    restorer: ILayoutRestorer,
     palette: ICommandPalette,
-    labShell: ILabShell | null
-  ): void => {
+    labShell: ILabShell | null,
+    defaultBrowser: IDefaultFileBrowser | null,
+    launcher: ILauncher | null,
+    translator: ITranslator | null,
+    mainMenu: IMainMenu | null
+  ) => {
+    // add globals
+    const exports = await import('./widget');
+
+    exports.IpylabModel.app = app;
+    exports.IpylabModel.rendermime = rendermime;
+    exports.IpylabModel.labShell = labShell;
+    exports.IpylabModel.defaultBrowser = defaultBrowser;
+    exports.IpylabModel.palette = palette;
+    exports.IpylabModel.translator = translator;
+    exports.IpylabModel.launcher = launcher;
+    exports.IpylabModel.mainMenu = mainMenu;
+    exports.IpylabModel.editorServices = editorServices;
+    exports.IpylabModel.notebookTracker = notebookTracker;
+
     registry.registerWidget({
       name: MODULE_NAME,
       version: MODULE_VERSION,
-      exports: async () => {
-        const widgetExports = await import('./widget');
-
-        // add globals
-        widgetExports.JupyterFrontEndModel.app = app;
-        widgetExports.ShellModel.shell = app.shell;
-        widgetExports.ShellModel.labShell = labShell;
-
-        widgetExports.CommandRegistryModel.commands = app.commands;
-
-        widgetExports.CustomMenuModel.mainMenu = mainMenu;
-        widgetExports.CustomMenuModel.shell = app.shell;
-        widgetExports.CustomMenuModel.commands = app.commands;
-        widgetExports.CustomMenuModel.notebookTracker = notebookTracker;
-
-        widgetExports.CustomToolbarModel.commands = app.commands;
-        widgetExports.CustomToolbarModel.notebookTracker = notebookTracker;
-
-        widgetExports.CommandPaletteModel.palette = palette;
-        widgetExports.SessionManagerModel.sessions =
-          app.serviceManager.sessions;
-        widgetExports.SessionManagerModel.shell = app.shell;
-        widgetExports.SessionManagerModel.labShell = labShell;
-
-        return widgetExports;
-      }
+      exports
     });
+
+    let when;
+    if (exports.IpylabModel.PER_KERNEL_WM) {
+      app.commands.addCommand(CommandIDs.restore, {
+        execute: exports.ShellModel.restoreToShell
+      });
+      app.commands.addCommand(CommandIDs.checkStartKernel, {
+        label: 'Start or restart ipylab kernel',
+        caption: 'Start or restart  the python kernel with path="ipylab".',
+        execute: () => exports.JupyterFrontEndModel.startIpylabKernel(true)
+      });
+
+      palette.addItem({
+        command: CommandIDs.checkStartKernel,
+        category: 'ipylab',
+        rank: 50
+      });
+      when = settings.load(PLUGIN_ID).then(async () => {
+        const config = await settings.get(PLUGIN_ID, 'autostart');
+        if (config.composite as boolean) {
+          await exports.JupyterFrontEndModel.startIpylabKernel();
+        }
+      });
+      // Handle state restoration.
+      if (restorer) {
+        void restorer.restore(exports.IpylabModel.tracker, {
+          command: CommandIDs.restore,
+          args: widget => (widget as any).ipylabSettings,
+          name: widget => (widget as any).ipylabSettings.connection_id,
+          when
+        });
+      }
+    }
   }
 };
-
 export default extension;

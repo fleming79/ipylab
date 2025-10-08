@@ -1,45 +1,212 @@
 # Copyright (c) ipylab contributors.
 # Distributed under the terms of the Modified BSD License.
 
-from ipywidgets import Widget, register, widget_serialization
-from traitlets import List, Unicode
-from ._frontend import module_name, module_version
+from __future__ import annotations
+
+import contextlib
+from typing import TYPE_CHECKING, Literal, Unpack
+
+from async_kernel.kernelspec import KernelName
+from ipywidgets import DOMWidget, TypedTuple, Widget
+from traitlets import Container, Instance, Unicode
+
+import ipylab
+from ipylab import Area, InsertMode, Ipylab, ShellConnection, Transform, pack
+from ipylab.common import IpylabKwgs, Obj, Singular, TransformType
+from ipylab.ipylab import IpylabBase
+
+if TYPE_CHECKING:
+    import inspect
+    from typing import Literal
 
 
-@register
-class Shell(Widget):
-    _model_name = Unicode("ShellModel").tag(sync=True)
-    _model_module = Unicode(module_name).tag(sync=True)
-    _model_module_version = Unicode(module_version).tag(sync=True)
+__all__ = ["ConsoleConnection", "Shell"]
 
-    _widgets = List([], read_only=True).tag(sync=True)
 
-    def add(self, widget, area, args=None):
-        args = args or {}
-        serialized_widget = widget_serialization["to_json"](widget, None)
-        self.send(
-            {
-                "func": "add",
-                "payload": {
-                    "serializedWidget": serialized_widget,
-                    "area": area,
-                    "args": args,
-                },
-            }
-        )
+class ConsoleConnection(ShellConnection):
+    "A connection intended for a JupyterConsole"
 
-    def expand_left(self):
-        self.send(
-            {
-                "func": "expandLeft",
-                "payload": {},
-            }
-        )
 
-    def expand_right(self):
-        self.send(
-            {
-                "func": "expandRight",
-                "payload": {},
-            }
-        )
+class Shell(Singular, Ipylab):
+    """Provides access to the shell."""
+
+    _model_name = Unicode("ShellModel", help="Name of the model.", read_only=True).tag(sync=True)
+    ipylab_base = IpylabBase(Obj.IpylabModel, "app.shell").tag(sync=True)
+    current_widget_id = Unicode(read_only=True).tag(sync=True)
+
+    connections: Container[tuple[ShellConnection, ...]] = TypedTuple(trait=Instance(ShellConnection))
+    console: Instance[ConsoleConnection | None] = Instance(ConsoleConnection, default_value=None, allow_none=True)  # pyright: ignore[reportAssignmentType]
+
+    async def add(
+        self,
+        obj: Widget | inspect._SourceObjectType,
+        *,
+        area: Area = Area.main,
+        activate: bool = True,
+        mode: InsertMode = InsertMode.tab_after,
+        rank: int | None = None,
+        ref: ShellConnection | None = None,
+        options: dict | None = None,
+        vpath: str | dict[Literal["title"], str] = "",
+        preferred_kernel: KernelName | Literal["python3"] | str = KernelName.asyncio,  # noqa: PYI051
+        **args,
+    ) -> ShellConnection:
+        """Add a widget to the shell.
+
+        If the widget is already in the shell, it may be moved or activated.
+
+        To multiple instances of the same widget in the shell provide a new connection_id
+        with `connection_id=ShellConnection.to_id()`.
+
+        Parameters
+        ---------
+        obj:
+            When `obj` is NOT a Widget it is assumed `obj` should be evaluated
+            in a python kernel.
+            specify additional keyword arguments directly in **args
+        area: Area
+            The area in the shell where to put obj.
+        activate: bool
+            Activate the widget once it is added to the shell.
+        mode: InsertMode
+            The insert mode.
+        rank: int
+            The rank to apply to the widget.
+        ref: ShellConnection
+            A connection to a widget in the shell. By default the current active
+            widget is used as a reference.
+        vpath: str | dict[literal['title':str]]
+            **Only relevant for 'evaluate'**
+            The 'virtual' path for the app. A new kernel will be created if a session
+            doesn't exist with the same path.
+            If a dict is provided, a text_dialog will be used to obtain the vpath
+            with the hook `vpath_getter`.
+
+            Note:
+            The result (payload) of evaluate must be a Widget with a view and
+            NOT a ShellConnection.
+        preferred_kernel:
+            The name of the kernel to use if a new kernel is started.
+        options:
+            Other options not including
+
+        Basic example
+        -------------
+
+        The example evaluates code in a session with path="test". A new kernel is started if a
+        session doesn't exist that has a path = vpath.
+        ```
+        app.shell.add("ipylab.Panel([ipw.HTML('<h1>Test')])", vpath="test")
+        ```
+        """
+        app = await self.app.ready()
+        vpath = vpath or app.vpath
+        args["options"] = {
+            "activate": activate,
+            "mode": InsertMode(mode),
+            "rank": int(rank) if rank else None,
+            "ref": f"{pack(ref)}.id" if isinstance(ref, ShellConnection) else None,
+        } | (options or {})
+        args["area"] = area
+        if "asMainArea" not in args:
+            args["asMainArea"] = area in [Area.left, Area.main, Area.right, Area.down]
+        if isinstance(obj, ShellConnection):
+            if "connection_id" in args and args["connection_id"] != obj.connection_id:
+                msg = f"The provided {args['connection_id']=} does not match {obj.connection_id=}"
+                raise RuntimeError(msg)
+            args["connection_id"] = obj.connection_id
+        elif isinstance(obj, Widget):
+            if not obj._view_name:
+                msg = f"This widget does not have a view {obj}"
+                raise RuntimeError(msg)
+            if not args.get("connection_id") and reversed(self.connections):
+                for c in self.connections:
+                    if c.widget is obj:
+                        args["connection_id"] = c.connection_id
+                        break
+            args["ipy_model"] = obj.model_id
+        else:
+            args["evaluate"] = pack(obj)
+        if isinstance(obj, DOMWidget):
+            obj.add_class(app.selector.removeprefix("."))
+        if "evaluate" in args and isinstance(vpath, dict):
+            val = await self.app.dialog.get_text(vpath.get("title", "Enter vpath"))
+            vpath = val
+        args["vpath"] = vpath
+        args["preferredKernel"] = preferred_kernel
+        sc_current = None
+        if activate and area == Area.main:
+            current_widget_id: str | None = await self.get_property("currentWidget.id")
+            if current_widget_id and current_widget_id.startswith("launcher"):
+                sc_current = await self.connect_to_widget(current_widget_id)
+        sc: ShellConnection = await self.operation("addToShell", {"args": args}, transform=Transform.connection)
+        sc.add_to_tuple(self, "connections")
+        if vpath != app.vpath:
+            sc.auto_dispose = False
+        if isinstance(obj, Widget):
+            sc.widget = obj
+            if isinstance(obj, ipylab.Panel):
+                sc.add_to_tuple(obj, "connections")
+        if sc_current:
+            sc_current.close()
+        if activate:
+            await sc.activate()
+        return sc
+
+    def add_objects_to_ipython_namespace(self, objects: dict, *, reset=False) -> None:
+        "Load objects into the IPython/console namespace."
+        with contextlib.suppress(AttributeError):
+            if reset:
+                self.comm.kernel.shell.reset()  # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
+            self.comm.kernel.shell.push(objects)  # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
+
+    async def open_console(
+        self,
+        *,
+        mode=InsertMode.split_bottom,
+        activate=True,
+        ref: ShellConnection | str = "",
+        objects: dict | None = None,
+        reset_shell=False,
+    ) -> ConsoleConnection:
+        """Open/activate a Jupyterlab console for this python kernel shell (path=app.vpath).
+
+        Args:
+            ref: The ShellConnection or `id` of the widget in the shell.
+            objects: Objects to load into the user namespace (shell.user_ns). By default `ref` as a ShellConnection is loaded.
+            reset_shell: Set true to reset the shell (clear the namespace).
+        """
+        await self.ready()
+        app = await self.app.ready()
+        ref_ = ref or self.current_widget_id
+        if not isinstance(ref_, ShellConnection):
+            ref_ = await self.connect_to_widget(ref_)
+        objects_ = {"ref": ref_} | (objects or {})
+        args = {"path": app.vpath, "insertMode": InsertMode(mode), "activate": activate, "ref": f"{pack(ref_)}.id"}
+        tf: TransformType = {"transform": Transform.connection, "connection_id": ConsoleConnection.to_id(app.vpath)}
+        cc: ConsoleConnection = await app.commands.execute("console:open", args, toObject=["args[ref]"], transform=tf)
+        self.console = cc
+        cc.add_to_tuple(self, "connections")
+        self.add_objects_to_ipython_namespace(objects_, reset=reset_shell)
+        return cc
+
+    async def expand_left(self) -> None:
+        await self.execute_method("expandLeft")
+
+    async def expand_right(self) -> None:
+        await self.execute_method("expandRight")
+
+    async def collapse_left(self) -> None:
+        await self.execute_method("collapseLeft")
+
+    async def collapse_right(self) -> None:
+        await self.execute_method("collapseRight")
+
+    async def connect_to_widget(self, widget_id="", **kwgs: Unpack[IpylabKwgs]) -> ShellConnection:
+        "Make a connection to a widget in the shell (see also `get_widget_ids`)."
+        kwgs["transform"] = Transform.connection
+        return await self.operation("getWidget", {"id": widget_id}, **kwgs)
+
+    async def list_widget_ids(self, **kwgs: Unpack[IpylabKwgs]) -> dict[Area, list[str]]:
+        "Get a mapping of Areas to a list of widget ids in that area in the shell."
+        return await self.operation("getWidgetIds", **kwgs)

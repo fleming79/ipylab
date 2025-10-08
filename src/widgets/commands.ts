@@ -1,194 +1,140 @@
 // Copyright (c) ipylab contributors
 // Distributed under the terms of the Modified BSD License.
 
-import { ObservableMap } from '@jupyterlab/observables';
-import { LabIcon } from '@jupyterlab/ui-components';
-import {
-  ISerializers,
-  unpack_models,
-  WidgetModel
-} from '@jupyter-widgets/base';
-
-import { ArrayExt } from '@lumino/algorithm';
-
 import { CommandRegistry } from '@lumino/commands';
-
-import { ReadonlyPartialJSONObject } from '@lumino/coreutils';
-
+import { IpylabModel } from './ipylab';
 import { IDisposable } from '@lumino/disposable';
-
-import { MODULE_NAME, MODULE_VERSION } from '../version';
+import { ObservableDisposable } from '../observable_disposable';
 
 /**
  * The model for a command registry.
  */
-export class CommandRegistryModel extends WidgetModel {
+export class CommandRegistryModel extends IpylabModel {
   /**
    * The default attributes.
    */
-  defaults(): any {
+  defaults(): Backbone.ObjectHash {
     return {
       ...super.defaults(),
-      _model_name: CommandRegistryModel.model_name,
-      _model_module: CommandRegistryModel.model_module,
-      _model_module_version: CommandRegistryModel.model_module_version,
-      _command_list: [],
-      _commands: []
+      _model_name: 'CommandRegistryModel'
     };
   }
+  async ipylabInit(base: any = null) {
+    if (!base) {
+      base =
+        this.get('name') === 'Jupyterlab'
+          ? IpylabModel.app.commands
+          : new CommandRegistry();
+    }
+    await super.ipylabInit(base);
+  }
 
-  /**
-   * Initialize a CommandRegistryModel instance.
-   *
-   * @param attributes The base attributes.
-   * @param options The initialization options.
-   */
-  initialize(attributes: any, options: any): void {
-    this._commands = CommandRegistryModel.commands;
-    super.initialize(attributes, options);
-    this.on('msg:custom', this._onMessage.bind(this));
-    this.on('comm_live_update', () => {
-      if (this.comm_live) {
-        return;
-      }
-      Private.customCommands.values().forEach(command => command.dispose());
-      this._sendCommandList();
-    });
-
-    // restore existing commands
-    const commands = this.get('_commands');
-    Promise.all(commands.map((command: any) => this._addCommand(command)))
-      .then(() => this._sendCommandList())
-      .catch(console.warn);
+  setReady() {
+    this.base.commandChanged.connect(this.sendCommandList, this);
+    this.sendCommandList();
+    super.setReady();
   }
 
   /**
-   * Handle a custom message from the backend.
+   * Close model
    *
-   * @param msg The message to handle.
+   * @param comm_closed - true if the comm is already being closed. If false, the comm will be closed.
+   *
+   * @returns - a promise that is fulfilled when all the associated views have been removed.
    */
-  private async _onMessage(msg: any): Promise<void> {
-    switch (msg.func) {
+  close(comm_closed = false): Promise<void> {
+    this?.base?.commandChanged?.disconnect(this.sendCommandList, this);
+    return super.close(comm_closed);
+  }
+
+  async operation(op: string, payload: any): Promise<any> {
+    switch (op) {
       case 'execute':
-        this._execute(msg.payload);
-        break;
-      case 'addCommand': {
-        await this._addCommand(msg.payload);
-        // keep track of the commands
-        const commands = this.get('_commands');
-        this.set('_commands', commands.concat(msg.payload));
-        this.save_changes();
-        break;
-      }
-      case 'removeCommand':
-        this._removeCommand(msg.payload);
-        break;
+        return await this.base.execute(payload.id, payload.args);
+      case 'addCommand':
+        return await this.addCommand(payload);
       default:
-        break;
+        return await super.operation(op, payload);
     }
   }
 
   /**
    * Send the list of commands to the backend.
    */
-  private _sendCommandList(): void {
-    this._commands.notifyCommandChanged();
-    this.set('_command_list', this._commands.listCommands());
+  private sendCommandList(sender?: object, args?: any): void {
+    if (args && args.type !== 'added' && args.type !== 'removed') {
+      return;
+    }
+    this.set('all_commands', this.base.listCommands());
     this.save_changes();
-  }
-
-  /**
-   * Execute a command
-   *
-   * @param bundle The command bundle.
-   * @param bundle.id
-   * @param bundle.args
-   */
-  private _execute(bundle: {
-    id: string;
-    args: ReadonlyPartialJSONObject;
-  }): void {
-    const { id, args } = bundle;
-    void this._commands.execute(id, args);
   }
 
   /**
    * Add a new command to the command registry.
    *
-   * @param options The command options.
+   * @param payload The command options.
    */
-  private async _addCommand(
+  private async addCommand(
     options: CommandRegistry.ICommandOptions & { id: string }
-  ): Promise<void> {
-    const { id, caption, label, iconClass, icon } = options;
-    if (this._commands.hasCommand(id)) {
-      Private.customCommands.get(id).dispose();
-    }
+  ): Promise<IDisposable> {
+    const { id, isToggleable, icon } = options;
 
-    let labIcon: LabIcon | null = null;
-    if (icon) {
-      labIcon = (await unpack_models(icon, this.widget_manager))?.labIcon;
-    }
-
-    const commandEnabled = (command: IDisposable): boolean => {
-      return !command.isDisposed && !!this.comm && this.comm_live;
-    };
-    const command = this._commands.addCommand(id, {
-      caption,
-      label,
-      iconClass,
-      icon: labIcon,
-      execute: args => {
-        if (!this.comm_live) {
-          command.dispose();
-          return;
-        }
-        this.send({ event: 'execute', id, args: JSON.stringify(args) }, {});
+    // Make a new object and define functions so we can dynamically update.
+    delete options.icon;
+    const isToggled = isToggleable ? () => options.isToggled ?? true : null;
+    const mappings = {
+      caption: () => options.caption ?? '',
+      className: () => options.className ?? '',
+      dataset: () => options.dataset ?? {},
+      describedBy: () => options.describedBy ?? '',
+      execute: async (args: any) => {
+        const w1 = IpylabModel.app.shell.currentWidget;
+        const connection_id = w1
+          ? IpylabModel.ConnectionModel.get_id(w1, true)
+          : '';
+        const payload = { id, args, connection_id };
+        return await this.scheduleOperation('execute', payload, 'object');
       },
-      isEnabled: () => commandEnabled(command),
-      isVisible: () => commandEnabled(command)
-    });
-    Private.customCommands.set(id, command);
-    this._sendCommandList();
+      icon: icon,
+      iconClass: () => options.iconClass ?? '',
+      iconLabel: () => options.iconLabel ?? '',
+      isEnabled: () => options.isEnabled ?? true,
+      isToggleable,
+      isToggled,
+      isVisible: () => options.isVisible ?? true,
+      label: () => options.label,
+      mnemonic: () => Number(options.mnemonic ?? -1),
+      usage: () => options.usage ?? ''
+    };
+    const command = this.base.addCommand(id, mappings as any);
+    return new CommandLink(command, id, options, mappings);
   }
-
-  /**
-   * Remove a command from the command registry.
-   *
-   * @param bundle The command bundle.
-   * @param bundle.id
-   */
-  private _removeCommand(bundle: { id: string }): void {
-    const { id } = bundle;
-    if (Private.customCommands.has(id)) {
-      Private.customCommands.get(id).dispose();
-    }
-    const commands = this.get('_commands').slice();
-    ArrayExt.removeAllWhere(commands, (w: any) => w.id === id);
-    this.set('_commands', commands);
-    this.save_changes();
-    this._sendCommandList();
-  }
-
-  static serializers: ISerializers = {
-    ...WidgetModel.serializers
-  };
-
-  static model_name = 'CommandRegistryModel';
-  static model_module = MODULE_NAME;
-  static model_module_version = MODULE_VERSION;
-  static view_name: string = null;
-  static view_module: string = null;
-  static view_module_version = MODULE_VERSION;
-
-  private _commands: CommandRegistry;
-
-  static commands: CommandRegistry;
+  public readonly base: CommandRegistry;
 }
 
-/**
- * A namespace for private data
- */
-namespace Private {
-  export const customCommands = new ObservableMap<IDisposable>();
+class CommandLink extends ObservableDisposable {
+  constructor(
+    command: IDisposable,
+    id: string = '',
+    options: CommandRegistry.ICommandOptions,
+    mappings: any
+  ) {
+    super();
+    this.command = command;
+    this.id = id;
+    this.config = options;
+    this.mappings = mappings;
+  }
+
+  dispose(): void {
+    if (this.isDisposed) {
+      return;
+    }
+    this.command.dispose();
+    super.dispose();
+  }
+  readonly id: string;
+  readonly config: CommandRegistry.ICommandOptions;
+  readonly command: IDisposable;
+  readonly mappings: any;
 }

@@ -1,58 +1,320 @@
-#!/usr/bin/env python
-# coding: utf-8
-
 # Copyright (c) ipylab contributors.
 # Distributed under the terms of the Modified BSD License.
 
-import asyncio
+from __future__ import annotations
 
-from ipywidgets import CallbackDispatcher, Widget, register, widget_serialization
-from traitlets import Instance, Unicode
-from ._frontend import module_name, module_version
+import contextlib
+import functools
+import inspect
+import os
+from typing import TYPE_CHECKING, Any, Literal, Self, Unpack, final
 
-from .commands import CommandRegistry
-from .menu import CustomMenu
-from .toolbar import CustomToolbar
-from .shell import Shell
-from .sessions import SessionManager
+from async_kernel.kernelspec import KernelName
+from ipywidgets import Widget, register
+from traitlets import Bool, Dict, Unicode, observe
+from typing_extensions import override
+
+import ipylab
+from ipylab import Ipylab
+from ipylab.commands import APP_COMMANDS_NAME, CommandPalette, CommandRegistry
+from ipylab.common import Fixed, IpylabKwgs, LastUpdatedDict, Obj, Singular, to_selector
+from ipylab.dialog import Dialog
+from ipylab.ipylab import IpylabBase
+from ipylab.menu import ContextMenu, MainMenu
+from ipylab.sessions import SessionManager
+from ipylab.shell import Shell
+from ipylab.toolbar import CustomToolbar
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+    from typing import ClassVar
 
 
+@final
 @register
-class JupyterFrontEnd(Widget):
+class JupyterFrontEnd(Singular, Ipylab):
+    """A connection to the 'app' in the frontend.
+
+    A singleton (per kernel) not to be subclassed or closed.
+    """
+
+    DEFAULT_COMMANDS: ClassVar = {"Open console", "Show log viewer"}
     _model_name = Unicode("JupyterFrontEndModel").tag(sync=True)
-    _model_module = Unicode(module_name).tag(sync=True)
-    _model_module_version = Unicode(module_version).tag(sync=True)
-
+    ipylab_base = IpylabBase(Obj.IpylabModel, "app").tag(sync=True)
     version = Unicode(read_only=True).tag(sync=True)
-    shell = Instance(Shell).tag(sync=True, **widget_serialization)
-    commands = Instance(CommandRegistry).tag(sync=True, **widget_serialization)
-    sessions = Instance(SessionManager).tag(sync=True, **widget_serialization)
-    menu = Instance(CustomMenu).tag(sync=True, **widget_serialization)
-    toolbar = Instance(CustomToolbar).tag(sync=True, **widget_serialization)
+    _vpath = Unicode(read_only=True).tag(sync=True)
+    per_kernel_widget_manager_detected = Bool(read_only=True).tag(sync=True)
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(
-            *args,
-            shell=Shell(),
-            commands=CommandRegistry(),
-            sessions=SessionManager(),
-            menu=CustomMenu(),
-            toolbar=CustomToolbar(),
-            **kwargs,
-        )
-        self._ready_event = asyncio.Event()
-        self._on_ready_callbacks = CallbackDispatcher()
-        self.on_msg(self._on_frontend_msg)
-        self.menu.set_command_registry(self.commands)
-        self.toolbar.set_command_registry(self.commands)
+    shell = Fixed(Shell)
+    dialog = Fixed(Dialog)
+    commands = Fixed(lambda _: CommandRegistry(name=APP_COMMANDS_NAME))
+    main_menu = Fixed(MainMenu)
+    command_pallet = Fixed(CommandPalette)
+    context_menu: Fixed[Self, ContextMenu] = Fixed(lambda c: ContextMenu(commands=c["owner"].commands))
+    sessions = Fixed(SessionManager)
+    toolbar = Fixed(CustomToolbar)
 
-    def _on_frontend_msg(self, _, content, buffers):
-        if content.get("event", "") == "lab_ready":
-            self._ready_event.set()
-            self._on_ready_callbacks()
+    namespaces: Dict[str, LastUpdatedDict] = Dict(read_only=True)
 
-    async def ready(self):
-        await self._ready_event.wait()
+    @override
+    def close(self, *, force=False) -> None:
+        if force:
+            super().close()
 
-    def on_ready(self, callback, remove=False):
-        self._on_ready_callbacks.register_callback(callback, remove)
+    @observe("_ready")
+    def _app_observe_ready(self, change) -> None:
+        if change["name"] == "_ready" and self._ready:
+            assert self._vpath, "Vpath should always before '_ready'."
+            self._selector = to_selector(self._vpath)
+
+    def _autostart_callback(self, result) -> None:
+        if inspect.iscoroutine(result):
+            self.call_later(0, "Autostart callback await", lambda: result)
+
+    @property
+    def repr_info(self) -> dict[str, str]:
+        return {"vpath": self._vpath, "session name": self.session_name}
+
+    @property
+    def repr_log(self) -> str:
+        "A representation to use when logging"
+        return self.__class__.__name__
+
+    @property
+    def vpath(self) -> str:
+        """The virtual path for this kernel.
+
+        `vpath` is equivalent to the session `path` in the frontend.
+
+        Raises
+        ------
+        RuntimeError
+            If JupyterFrontEnd is not ready.
+
+        Returns
+        -------
+        str
+            Virtual path to the application.
+        """
+        if not self._ready:
+            msg = "`vpath` cannot not be accessed until app is ready."
+            raise RuntimeError(msg)
+        return self._vpath
+
+    @property
+    def session_name(self) -> str:
+        "The full path including vpath."
+        return os.environ.get("JPY_SESSION_NAME", "")
+
+    @property
+    def selector(self) -> str:
+        """The default selector based on the `vpath` for this kernel.
+
+        Raises
+        ------
+        RuntimeError
+            If the application is not ready.
+        """
+        if not self._ready:
+            msg = "`vpath` cannot not be accessed until app is ready."
+            raise RuntimeError(msg)
+        return self._selector
+
+    @override
+    async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list) -> Any:
+        match operation:
+            case "evaluate":
+                return await self._evaluate(payload, buffers)
+            case "shell_eval":
+                result = await self._evaluate(payload, buffers)
+                widget = result.get("payload")
+                if not isinstance(widget, Widget):
+                    msg = f"Expected an Widget but got {type(widget)}"
+                    raise TypeError(msg)
+                return await self.shell.add(widget, **payload)
+
+        return await super()._do_operation_for_frontend(operation, payload, buffers)
+
+    async def shutdown_kernel(self, vpath: str | None = None) -> None:
+        "Shutdown the kernel"
+        await self.operation("shutdownKernel", {"vpath": vpath})
+
+    def start_iyplab_python_kernel(self, *, restart=False):
+        "Start the 'ipylab' Python kernel."
+        return self.operation("startIyplabKernel", {"restart": restart})
+
+    def get_namespace(self, namespace_id="", **objects) -> LastUpdatedDict:
+        """Get the namespace corresponding to namespace_id.
+
+        The namespace is a `LastUpdatedDict` that maintains the order by which
+        items are added.
+
+        Default oubjects are added to the namespace via the plugin hook
+        `default_namespace_objects`.
+
+        Note:
+            To remove a namespace call `app.namespaces.pop(<namespace_id>)`.
+
+        The default namespace `""` will also load objects from `shell.user_ns` if
+        the kernel is an ipykernel (the default kernel provided in Jupyterlab).
+
+        Args:
+            namespace_id: The identifier for the namespace to use in this kernel.
+            objects: Additional objects to add to the namespace.
+        """
+        ns = self.namespaces.get(namespace_id)
+        if ns is None:
+            self.namespaces[namespace_id] = ns = LastUpdatedDict()
+        if objects:
+            ns.update(objects)
+        if namespace_id == "" and (kernel := getattr(self.comm, "kernel", None)):
+            with contextlib.suppress(AttributeError):
+                ns.update(kernel.shell.user_ns)
+        return ns
+
+    async def _evaluate(self, options: dict[str, Any], buffers: list) -> dict[str, Any]:
+        """Evaluate code for `evaluate`.
+
+        A call to this method should originate from a call to `evaluate` from
+        app in another kernel. The call is sent as a message via the frontend."""
+        try:
+            evaluate = options["evaluate"]
+            if isinstance(evaluate, str):
+                evaluate = (evaluate,)
+            namespace_id = options.get("namespace_id", "")
+            ns = self.get_namespace(namespace_id, buffers=buffers)
+            for row in evaluate:
+                name, expression = ("payload", row) if isinstance(row, str) else row
+                if expression.startswith("import_item(dottedname="):
+                    result = eval(expression, {"import_item": ipylab.common.import_item})
+                else:
+                    try:
+                        source = compile(expression, "-- Evaluate --", "eval")
+                    except SyntaxError:
+                        source = compile(expression, "-- Expression --", "exec")
+                        exec(source, ns)
+                        result = next(reversed(ns.values()))  # Requires: LastUpdatedDict
+                    else:
+                        result = eval(source, ns)
+                if not name:
+                    continue
+                if callable(result):
+                    kwgs = {}
+                    for p in inspect.signature(result).parameters:
+                        if p in options:
+                            kwgs[p] = options[p]
+                        elif p in ns:
+                            kwgs[p] = ns[p]
+                    # We use a partial so that we can evaluate with the same namespace.
+                    ns["_partial_call"] = functools.partial(result, **kwgs)
+                    source = compile("_partial_call()", "-- Result call --", "eval")
+                    result = eval(source, ns)
+                    ns.pop("_partial_call")
+                if inspect.iscoroutine(result):
+                    result = await result
+                if name:
+                    ns[name] = result
+            buffers = ns.pop("buffers", [])
+            payload = ns.pop("payload", None)
+            if payload is not None:
+                ns["_call_count"] = n = ns.get("_call_count", 0) + 1
+                ns[f"payload_{n}"] = payload
+            if namespace_id == "":
+                self.shell.add_objects_to_ipython_namespace(ns)
+        except BaseException as e:
+            if isinstance(e, NameError):
+                e.add_note("Tip: Check for missing an imports?")
+            raise
+        else:
+            return {"payload": payload, "buffers": buffers}
+
+    async def evaluate(
+        self,
+        evaluate: str | inspect._SourceObjectType | Iterable[str | tuple[str, str | inspect._SourceObjectType]],
+        *,
+        vpath: str,
+        namespace_id="",
+        preferred_kernel: KernelName | Literal["python3"] | str = KernelName.asyncio,  # noqa: PYI051
+        kwgs: None | dict = None,
+        **kwargs: Unpack[IpylabKwgs],
+    ) -> Any:
+        """Evaluate code asynchronously in the 'vpath' Python kernel.
+
+        Execution is coordinated via the frontend and will evaluate/execute the
+        code specified. Most forms of expressions are acceptable. If the last
+        result of evaluation is a coroutine; then it will be awaited prior
+        to sending the result.
+
+        Args:
+            evaluate: An expression or list of expressions to evaluate.
+                The following combinations are acceptable:
+                1. code    # Shorthand version                  -> payload = code
+                2. [("payload", code)]                          -> payload = code
+                3. [("payload", code1), ("", code2), code3]     -> payload = code3
+
+                * Code is handled as a list of mappings of `symbol name` to expressions.
+                [(symbol name, expression), ...]
+                * The shorthand version is changed to a single element list automatically.
+                * `code` is changed to ("payload", code) automatically.
+                * The latest defined `"payload"` is the return value from evaluation.
+
+                Each expression will be evaluated and if a syntax error occurs in evaluation
+                it will instead be executed. The latest set symbol is taken as the execution
+                result.
+
+                If the result is callable or awaitable it will be called or await recursively
+                until the result or awaitable is no longer callable or awaitable. To prevent this
+                make the symbol name an empty string.
+
+                ??? References
+                    - eval: https://docs.python.org/3/library/functions.html#eval
+                    - exec: https://docs.python.org/3/library/functions.html#exec
+
+                Once evaluation is complete, the symbols named `payload` and `buffers`
+                will be returned.
+
+            vpath: The path of kernel session where the evaluation should take place.
+            preferred_kernel: The name of the kernel to use if a new kernel is started.
+            namespace_id: The namespace where to perform evaluation.
+                The default namespace will also update the shell.user_ns after
+                successful evaluation.
+            kwgs: dict | None
+                Specify kwgs that may be used when calling a callable.
+                Note:The namespace is also searched.
+
+        Examples:
+            simple:
+
+            ``` python
+            task = app.evaluate(
+                "app.shell.open_console",
+                vpath="test",
+                kwgs={"mode": ipylab.InsertMode.split_right, "activate": False},
+            )
+            # The task result will be a ShellConnection. Closing the connection should
+            # also close the console that was opened.
+            ```
+
+            Advanced example:
+            ``` python
+            async def do_something(widget, area):
+                p = iplab.panel(content=widget)
+                return p.add_to_shell()
+
+
+            task = app.evaluate(
+                [("widget", "ipw.Dropdown()"), do_something],
+                area=iplab.Area.right,
+                vpath="test",
+            )
+            # Task result should be a ShellConnection
+            ```
+        """
+        await self.ready()
+        kwgs = (kwgs or {}) | {
+            "evaluate": evaluate,
+            "vpath": vpath or self.vpath,
+            "preferredKernel": preferred_kernel,
+            "namespace_id": namespace_id,
+        }
+        return await self.operation("evaluate", kwgs=kwgs, **kwargs)

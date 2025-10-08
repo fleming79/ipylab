@@ -2,29 +2,33 @@
 // Distributed under the terms of the Modified BSD License.
 
 import { CommandRegistryModel } from './widgets/commands';
-import { CommandPaletteModel } from './widgets/palette';
-import { SessionManagerModel } from './widgets/sessions';
+import { ConnectionModel, ShellConnectionModel } from './widgets/connection';
+import { DialogModel } from './widgets/dialog';
 import { JupyterFrontEndModel } from './widgets/frontend';
-import { PanelModel } from './widgets/panel';
+import { IconModel, IconView } from './widgets/icon';
+import { IpylabModel } from './widgets/ipylab';
+import { PanelModel, PanelView } from './widgets/panel';
+import { SessionManagerModel } from './widgets/sessions';
 import { ShellModel } from './widgets/shell';
 import { SplitPanelModel, SplitPanelView } from './widgets/split_panel';
 import { TitleModel } from './widgets/title';
-import { IconView, IconModel } from './widgets/icon';
-import { CustomMenuModel } from './widgets/menu';
 import { CustomToolbarModel } from './widgets/toolbar';
-
 export {
   CommandRegistryModel,
-  CommandPaletteModel,
+  ConnectionModel,
+  CustomToolbarModel,
+  DialogModel,
+  IconModel,
+  IconView,
+  IpylabModel,
   JupyterFrontEndModel,
   PanelModel,
+  PanelView,
+  SessionManagerModel,
+  ShellConnectionModel,
   ShellModel,
   SplitPanelModel,
   SplitPanelView,
-  TitleModel,
-  SessionManagerModel,
-  IconModel,
-  IconView,
-  CustomMenuModel,
-  CustomToolbarModel
+  TitleModel
 };
+

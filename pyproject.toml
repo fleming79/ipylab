@@ -1,55 +1,88 @@
 [build-system]
-requires = ["hatchling>=1.5.0", "jupyterlab>=4.1.0,<5", "hatch-nodejs-version"]
+requires = [
+  "nodejs-wheel",
+  "hatchling>=1.5.0",
+  "jupyterlab>=4.1.0,<5",
+  "hatch-nodejs-version>=0.3.2",
+]
 build-backend = "hatchling.build"
 
 [project]
 name = "ipylab"
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.8"
+requires-python = ">=3.11"
 classifiers = [
-    "Framework :: Jupyter",
-    "Framework :: Jupyter :: JupyterLab",
-    "Framework :: Jupyter :: JupyterLab :: 4",
-    "Framework :: Jupyter :: JupyterLab :: Extensions",
-    "Framework :: Jupyter :: JupyterLab :: Extensions :: Prebuilt",
-    "License :: OSI Approved :: BSD License",
-    "Programming Language :: Python",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
+  "Framework :: Jupyter",
+  "Framework :: Jupyter :: JupyterLab",
+  "Framework :: Jupyter :: JupyterLab :: 4",
+  "Framework :: Jupyter :: JupyterLab :: Extensions",
+  "Framework :: Jupyter :: JupyterLab :: Extensions :: Prebuilt",
+  "License :: OSI Approved :: BSD License",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
 ]
+
 dependencies = [
-    "ipywidgets>=7.6.0,<9"
+  "async-kernel>=0.6,<0.7",
+  "jupyterlab>=4.3",
+  "ipywidgets>=8.1.5",
+  "ipython>=8.32",
+  "jupyterlab_widgets>=3.0.11",
+  "typing_extensions",
+  "traitlets @ https://github.com/fleming79/ipylab/releases/download/v2.0.1/traitlets-5.14.3-py3-none-any.whl#sha256:bcc8fc5a21d9b996de216eb01f360d717356779c864249ca376fc59f59d58377",
+  "jupyter_client @ https://github.com/fleming79/ipylab/releases/download/v2.0.1/jupyter_client-8.6.3-py3-none-any.whl#sha256:6533dbfdf3aacbd1dfd8556b94fb2a1445fc23ef59fbc12acd3f475212511b1c",
+  "widgetsnbextension @ https://github.com/fleming79/ipylab/releases/download/v2.0.1/widgetsnbextension-4.0.13-py3-none-any.whl#sha256:265a3bfff00a817d8b2e3f60b53666c96b330fd1174aa1afefd0bd029354117b",
+  "jupyterlab_widgets @ https://github.com/fleming79/ipylab/releases/download/v2.0.1/jupyterlab_widgets-3.0.13-py3-none-any.whl#sha256:2a4425e7602d83963056fefb964d323aac5a15727fc955dc4af20d269a869fdc",
+  "ipywidgets @ https://github.com/fleming79/ipylab/releases/download/v2.0.1/ipywidgets-8.1.5-py3-none-any.whl#sha256:bcc8fc5a21d9b996de216eb01f360d717356779c864249ca376fc59f59d58377",
 ]
 dynamic = ["version", "description", "authors", "urls", "keywords"]
 
+
+[dependency-groups]
+dev = [
+  "nodejs-wheel",
+  "basedpyright",
+  "ruff",
+  "pytest",
+  "pytest-mock",
+  "numpy",
+  "bqplot",
+]
+cov = ["coverage[toml]", "pytest-cov", "matplotlib", "trio"]
+
+[project.scripts]
+ipylab = "ipylab.__main__:launch"
+
+
 [tool.hatch.version]
 source = "nodejs"
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.hatch.metadata.hooks.nodejs]
 fields = ["description", "authors", "urls"]
 
 [tool.hatch.build.targets.sdist]
-artifacts = ["ipylab/labextension"]
 exclude = [".github", "binder"]
 
 [tool.hatch.build.targets.wheel.shared-data]
 "ipylab/labextension" = "share/jupyter/labextensions/ipylab"
-"install.json" = "share/jupyter/labextensions/ipylab/install.json"
 
-[tool.hatch.build.hooks.version]
-path = "ipylab/_version.py"
+[tool.hatch.build.targets.wheel.force-include]
+"ipylab/labextension/package.json" = "ipylab/labextension/package.json"
+
 
 [tool.hatch.build.hooks.jupyter-builder]
 dependencies = ["hatch-jupyter-builder>=0.5"]
 build-function = "hatch_jupyter_builder.npm_builder"
 ensured-targets = [
-    "ipylab/labextension/static/style.js",
-    "ipylab/labextension/package.json",
+  "ipylab/labextension/static/style.js",
+  "ipylab/labextension/package.json",
 ]
 skip-if-exists = ["ipylab/labextension/static/style.js"]
 
