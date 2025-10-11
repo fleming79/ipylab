@@ -209,14 +209,16 @@ class Ipylab(HasApp, WidgetBase):
             self.log.exception("Message processing error", obj=msg, exc_info=e)
 
     def _set_result(self, key: str, error: str | None, payload: Any) -> None:
-        future = self._pending_operations.pop(key)
-        if error is not None:
-            error_ = IpylabFrontendError(error)
-            error_.add_note(f"{payload=}")
-            payload = error_
-            future.set_exception(error_)
-        else:
-            future.set_result(payload)
+        if future := self._pending_operations.pop(key, None):
+            if error is not None:
+                error_ = IpylabFrontendError(error)
+                error_.add_note(f"{payload=}")
+                payload = error_
+                future.set_exception(error_)
+            else:
+                future.set_result(payload)
+        elif not error:
+            self.log.debug("Already processed key='%s' payload=%s", key, payload)
 
     async def _do_operation_for_fe(self, key: str, operation: str, payload: dict, buffers: list | None) -> None:
         """Handle operation requests from the frontend and reply with a result."""
