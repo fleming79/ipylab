@@ -10,7 +10,7 @@ import { Widget } from '@lumino/widgets';
 /**
  * ConnectionModel provides a connection to an object using a unique 'connection_id'.
  *
- * The object to be referenced must first be registered static method
+ * The object to be referenced must first be registered with the static class method
  * `ConnectionModel.registerConnection`.
  */
 export class ConnectionModel extends IpylabModel {
@@ -23,6 +23,7 @@ export class ConnectionModel extends IpylabModel {
 
   async ipylabInit(base: any = null) {
     this.connection_id = this.get('connection_id');
+    if (this.client_id != this.kernel.clientId) return;
     base = await this.getObject();
     if (!base) {
       this.close();
@@ -35,6 +36,10 @@ export class ConnectionModel extends IpylabModel {
   _base_disposed() {
     this.set('auto_dispose', false);
     this.close(false);
+  }
+
+  get client_id() {
+    return this.connection_id.split('session:').slice(-1)[0];
   }
 
   close(comm_closed = false): Promise<void> {
@@ -134,7 +139,7 @@ export class ConnectionModel extends IpylabModel {
     });
   }
 
-  static get_id(obj: any, register = false): string | null {
+  static get_id(obj: any, register: boolean, clientId: string): string | null {
     if (register && !Private.connections_rev.has(obj)) {
       const cls =
         obj instanceof Widget &&
@@ -142,7 +147,7 @@ export class ConnectionModel extends IpylabModel {
         ConnectionModel.ShellModel.getLuminoWidgetFromShell(obj.id)
           ? 'ShellConnection'
           : 'Connection';
-      const connection_id = ConnectionModel.new_id(cls);
+      const connection_id = ConnectionModel.new_id(cls, clientId);
       ConnectionModel.registerConnection(connection_id, obj);
     }
     return Private.connections_rev.get(obj);
@@ -165,11 +170,13 @@ export class ConnectionModel extends IpylabModel {
     return (widget as any)?.sessionContext?.session?.model ?? {};
   }
 
-  static new_id(cls: string): string {
+  static new_id(cls: string, clientId: string): string {
+    'Create a new connection_id';
     const _PREFIX = 'ipylab-';
     const _SEP = '|';
+    const _SESSION = 'session:';
 
-    return `${_PREFIX}${cls}${_SEP}${UUID.uuid4()}`;
+    return `${_PREFIX}${cls}${_SEP}${UUID.uuid4()}${_SEP}${_SESSION}${clientId}`;
   }
 
   // 'connection_id' is used by BackboneJS so we use connection_id here.

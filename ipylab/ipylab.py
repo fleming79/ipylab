@@ -1,16 +1,19 @@
 # Copyright (c) ipylab contributors.
 # Distributed under the terms of the Modified BSD License.
 
+
 from __future__ import annotations
 
 import functools
 import inspect
 import json
 import uuid
+from contextvars import ContextVar
 from types import CoroutineType
 from typing import TYPE_CHECKING, Any
 
 import anyio
+import async_kernel
 import traitlets
 from async_kernel import AsyncEvent, Caller, Future
 from async_kernel.caller import truncated_rep
@@ -27,7 +30,18 @@ if TYPE_CHECKING:
     from typing import Self, Unpack
 
 
-__all__ = ["Ipylab", "IpylabBase", "WidgetBase"]
+__all__ = ["Ipylab", "IpylabBase", "WidgetBase", "get_client_id"]
+
+_client_id_var = ContextVar[str]("_client_id_var", default="")
+
+
+def get_client_id() -> str:
+    """Gets the client id in the current context if there is one.
+
+    The client id is the *kernel.clientId* in the frontend which is also the 'session' in the message header.
+    This makes it possible to discriminate browser page from where a message originated.
+    """
+    return job["msg"]["header"]["session"] if (job := async_kernel.utils.get_job()) else _client_id_var.get()
 
 
 class IpylabBase(TraitType[tuple[str, str], None]):
@@ -85,8 +99,8 @@ class Ipylab(HasApp, WidgetBase):
     _model_name = Unicode("IpylabModel", help="Name of the model.", read_only=True).tag(sync=True)
     _python_class = Unicode().tag(sync=True)
     ipylab_base = IpylabBase(Obj.this, "").tag(sync=True)
-    _ready = Bool(read_only=True, help="Set to by frontend when ready").tag(sync=True)
-    _view_count = Int().tag(sync=True)
+    _ready = Bool(read_only=True, help="Set to by frontend once the frontend is ready.")
+    _view_count: Int[int, int] = Int().tag(sync=True)
     _on_ready_callbacks: Container[list[Callable[[Self], None | CoroutineType]]] = List(trait=traitlets.Callable())
     _ready_event = Instance(AsyncEvent, ())
     _comm = None
@@ -114,7 +128,7 @@ class Ipylab(HasApp, WidgetBase):
     def __repr__(self) -> str:
         if not self._repr_mimebundle_:
             status = "CLOSED"
-        elif (not self._ready) and self._repr_mimebundle_:
+        elif (self._ready is False) and self._repr_mimebundle_:
             status = "Not ready"
         else:
             status = ""
@@ -125,16 +139,6 @@ class Ipylab(HasApp, WidgetBase):
         if status:
             return f"< {status}: {self.__class__.__name__}({info}) >"
         return f"{status}{self.__class__.__name__}({info})"
-
-    @observe("_ready")
-    def _observe_ready(self, _: dict) -> None:
-        if self._ready:
-            self.log.debug("ready")
-            self._ready_event.set()
-            for cb in self._on_ready_callbacks:
-                self._call_on_ready_callback(cb)
-        else:
-            self._ready_event = AsyncEvent()
 
     @override
     def close(self) -> None:
@@ -147,7 +151,13 @@ class Ipylab(HasApp, WidgetBase):
 
     def _ipylab_send(self, content, buffers: list | None = None) -> None:
         try:
-            self.send({"ipylab": json.dumps(content, default=pack)}, buffers)
+            self.send(
+                {
+                    "ipylab": json.dumps(content, default=pack),
+                    "clientId": get_client_id(),
+                },
+                buffers,
+            )
         except Exception as e:
             self.log.exception("Send error", obj=content, exc_info=e)
             raise
@@ -176,6 +186,12 @@ class Ipylab(HasApp, WidgetBase):
         if e := fut.exception():
             self.log.exception(description, exc_info=e)
 
+    def _set_ready(self):
+        self.set_trait("_ready", True)
+        self._ready_event.set()
+        for cb in self._on_ready_callbacks:
+            self._call_on_ready_callback(cb)
+
     def _on_custom_msg(self, _, msg: dict, buffers: list) -> None:
         """Handle incoming custom messages.
 
@@ -189,6 +205,7 @@ class Ipylab(HasApp, WidgetBase):
         """
         if not (content := msg.get("ipylab")):
             return
+        _client_id_var.set(get_client_id())
         try:
             match json.loads(content):
                 case {"ipylab_PY": str(key), "error": str(error), **payload}:
@@ -198,7 +215,10 @@ class Ipylab(HasApp, WidgetBase):
                 case {"ipylab_FE": str(key), "operation": operation, "payload": payload}:
                     kwgs = {"key": key, "operation": operation, "payload": payload, "buffers": buffers}
                     self.call_later(0, "From the frontend - operation", self._do_operation_for_fe, **kwgs)
-                case {"closed": closed} if closed:
+                case "ready":
+                    self.log.debug("ready")
+                    self._set_ready()
+                case "closed":
                     self.close()
                 case {"signal": {"dottedname": dottedname, **rest}}:
                     data = SignalCallbackData(owner=self, dottedname=dottedname, args=rest.get("args"))
@@ -209,14 +229,15 @@ class Ipylab(HasApp, WidgetBase):
             self.log.exception("Message processing error", obj=msg, exc_info=e)
 
     def _set_result(self, key: str, error: str | None, payload: Any) -> None:
-        if future := self._pending_operations.pop(key, None):
+        if fut := self._pending_operations.pop(key, None):
             if error is not None:
-                error_ = IpylabFrontendError(error)
-                error_.add_note(f"{payload=}")
+                msg = f"An error occurred in the frontend (javascript) {error=} {payload}"
+                error_ = IpylabFrontendError(msg)
+                error_.add_note(f"Exception request content = {fut.metadata}")
                 payload = error_
-                future.set_exception(error_)
+                fut.set_exception(error_)
             else:
-                future.set_result(payload)
+                fut.set_result(payload)
         elif not error:
             self.log.debug("Already processed key='%s' payload=%s", key, payload)
 
@@ -341,10 +362,11 @@ class Ipylab(HasApp, WidgetBase):
         if toObject:
             content["toObject"] = toObject
 
-        self._pending_operations[ipylab_PY] = future = Future()
+        self._pending_operations[ipylab_PY] = fut = Future()
+        fut.metadata.update(content=content)
         self._ipylab_send(content)
         try:
-            return await Transform.transform_payload(transform=content["transform"], payload=await future)
+            return await Transform.transform_payload(transform=content["transform"], payload=await fut)
         except Exception as e:
             self.log.exception("Operation error", obj=content, exc_info=e)
             raise

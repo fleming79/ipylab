@@ -12,9 +12,9 @@ from ipywidgets import DOMWidget, TypedTuple, Widget
 from traitlets import Container, Instance, Unicode
 
 import ipylab
-from ipylab import Area, InsertMode, Ipylab, ShellConnection, Transform, pack
-from ipylab.common import Fixed, IpylabKwgs, Obj, Singular, TransformType
-from ipylab.ipylab import IpylabBase
+from ipylab.common import Area, Fixed, InsertMode, IpylabKwgs, Obj, Singular, Transform, TransformType, pack
+from ipylab.connection import ShellConnection
+from ipylab.ipylab import Ipylab, IpylabBase, get_client_id
 from ipylab.log_viewer import LogViewer
 
 if TYPE_CHECKING:
@@ -58,7 +58,7 @@ class Shell(Singular, Ipylab):
 
         If the widget is already in the shell, it may be moved or activated.
 
-        To multiple instances of the same widget in the shell provide a new connection_id
+        To force multiple instances of the same widget in the shell provide a new `connection_id`
         with `connection_id=ShellConnection.to_id()`.
 
         Parameters
@@ -124,7 +124,7 @@ class Shell(Singular, Ipylab):
                 raise RuntimeError(msg)
             if not args.get("connection_id") and reversed(self.connections):
                 for c in self.connections:
-                    if c.widget is obj:
+                    if c.widget is obj and c.client_id == get_client_id():
                         args["connection_id"] = c.connection_id
                         break
             args["ipy_model"] = obj.model_id

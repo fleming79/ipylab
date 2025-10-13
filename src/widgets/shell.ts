@@ -46,7 +46,7 @@ export class ShellModel extends IpylabModel {
   async operation(op: string, payload: any): Promise<any> {
     switch (op) {
       case 'addToShell':
-        return await ShellModel.addToShell(payload.args);
+        return await ShellModel.addToShell(payload.args, this.kernel.clientId);
       case 'getWidget':
         if (!payload.id) {
           return this.base.currentWidget;
@@ -70,10 +70,10 @@ export class ShellModel extends IpylabModel {
       return;
     }
 
-    await ShellModel.JFEM.getModelByVpath(args.vpath, args.preferredKernel);
+    const jfem = await ShellModel.JFEM.getModelByVpath(args.vpath, args.preferredKernel);
     await new Promise(resolve => {
       setTimeout(resolve, 10000);
-      ShellModel.addToShell(args).then(resolve, e => {
+      ShellModel.addToShell(args, jfem.kernel.clientId).then(resolve, e => {
         resolve(null);
         if (args.evaluate) {
           throw e;
@@ -98,7 +98,10 @@ export class ShellModel extends IpylabModel {
    * @param args An object with area, options, connection_id, id, vpath & evaluate.
    */
 
-  private static async addToShell(args: any): Promise<Widget> {
+  private static async addToShell(
+    args: any,
+    clientId: string
+  ): Promise<Widget> {
     let widget: Widget | MainAreaWidget;
 
     try {
@@ -118,7 +121,7 @@ export class ShellModel extends IpylabModel {
     }
     args.connection_id =
       args.connection_id ||
-      ShellModel.ConnectionModel.new_id('ShellConnection');
+      ShellModel.ConnectionModel.new_id('ShellConnection', clientId);
     if (args.asMainArea && !(widget instanceof MainAreaWidget)) {
       widget.addClass('ipylab-MainArea');
       const w = (widget = new MainAreaWidget({ content: widget }));

@@ -90,7 +90,7 @@ export class CommandRegistryModel extends IpylabModel {
       execute: async (args: any) => {
         const w1 = IpylabModel.app.shell.currentWidget;
         const connection_id = w1
-          ? IpylabModel.ConnectionModel.get_id(w1, true)
+          ? IpylabModel.ConnectionModel.get_id(w1, true, this.kernel.clientId)
           : '';
         const payload = { id, args, connection_id };
         return await this.scheduleOperation('execute', payload, 'object');

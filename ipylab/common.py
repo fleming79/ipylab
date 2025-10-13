@@ -457,9 +457,7 @@ class HasApp(HasTraits):
                 item.close()
             for obj, name in list(self._tuple_owners):
                 if val := getattr(obj, name, None):
-                    if (isinstance(obj, HasApp) and obj.closed) or (isinstance(obj, Widget) and not obj.comm):
-                        return
-                    obj.set_trait(name, tuple(v for v in val if v is not self))
+                    obj.set_trait(name, tuple(v for v in val if not getattr(v, "closed", False)))
 
     def _check_closed(self):
         if self.closed:

@@ -60,8 +60,6 @@ export class IpylabModel extends DOMWidgetModel {
 
   initialize(attributes: any, options: any): void {
     super.initialize(attributes, options);
-    this.set('_ready', false);
-    this.save_changes();
     this.on('msg:custom', this.onCustomMessage, this);
     IpylabModel.onKernelLost(this.kernel, this.onKernelLost, this);
     if (this.widget_manager.restoredStatus || !IpylabModel.PER_KERNEL_WM) {
@@ -119,8 +117,8 @@ export class IpylabModel extends DOMWidgetModel {
    * It can be overloaded, but shouldn't be called.
    */
   setReady() {
-    this.set('_ready', true);
     this.save_changes();
+    this.ipylabSend('ready');
   }
 
   onKernelLost() {
@@ -135,7 +133,7 @@ export class IpylabModel extends DOMWidgetModel {
     this.stopListening(this, 'change:_signal_dottednames', this.update_signals);
     this.stopListening(this, 'change:_view_count', this.update_signals);
     if (!comm_closed) {
-      this.ipylabSend({ closed: true });
+      this.ipylabSend('closed');
     }
     Object.defineProperty(this, 'base', { value: null });
     return super.close(true);
@@ -162,7 +160,8 @@ export class IpylabModel extends DOMWidgetModel {
         content.payload = {
           connection_id: IpylabModel.ConnectionModel.get_id(
             content.payload,
-            true
+            true,
+            this.kernel.clientId
           )
         };
       }
@@ -312,6 +311,9 @@ export class IpylabModel extends DOMWidgetModel {
    * @param msg The message received from the backend.
    */
   protected onCustomMessage(msg: any) {
+    if (msg.clientId != this.kernel.clientId) {
+      return;
+    }
     if (msg.ipylab) {
       this._onBackendMessage(JSON.parse(msg.ipylab));
     }
@@ -521,7 +523,11 @@ export class IpylabModel extends DOMWidgetModel {
       case 'auto':
         if (obj?.dispose) {
           return {
-            connection_id: IpylabModel.ConnectionModel.get_id(obj, true)
+            connection_id: IpylabModel.ConnectionModel.get_id(
+              obj,
+              true,
+              this.kernel.clientId
+            )
           };
         }
         if (typeof obj?.iterator === 'function') {
@@ -538,7 +544,11 @@ export class IpylabModel extends DOMWidgetModel {
           );
         }
         return {
-          connection_id: IpylabModel.ConnectionModel.get_id(obj, true)
+          connection_id: IpylabModel.ConnectionModel.get_id(
+            obj,
+            true,
+            this.kernel.clientId
+          )
         };
       case 'advanced':
         // expects args.mappings = {key:transform}
@@ -659,6 +669,9 @@ export class IpylabModel extends DOMWidgetModel {
         }
       }
       subpath = subpath ?? '';
+    if (typeof obj !== 'object') {
+      throw new Error(`failed to locate object for value:"${value}"!`);
+    }      
       return await getNestedProperty({ obj, subpath, nullIfMissing });
     }
     throw new Error(`Cannot convert this value to an object: ${value}`);
@@ -688,6 +701,7 @@ export class IpylabModel extends DOMWidgetModel {
   static get sessionManager(): Session.IManager {
     return IpylabModel.app.serviceManager.sessions;
   }
+
   private _signalDisconnectors = new Map<string, () => boolean>();
   widget_manager: KernelWidgetManager;
   private _pendingOperations = new Map<string, PromiseDelegate<any>>();

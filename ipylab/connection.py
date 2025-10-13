@@ -11,7 +11,7 @@ from traitlets import Bool, Dict, Instance, Unicode
 from typing_extensions import override
 
 from ipylab.common import Area, Singular
-from ipylab.ipylab import Ipylab
+from ipylab.ipylab import Ipylab, get_client_id
 
 if TYPE_CHECKING:
     from collections.abc import Hashable
@@ -44,13 +44,13 @@ class Connection(Singular, Ipylab):
     _CLASS_DEFINITIONS: ClassVar[dict[str, type[Self]]] = {}
     _PREFIX = "ipylab-"
     _SEP = "|"
+    _SESSION = "session:"
     prefix: ClassVar = f"{_PREFIX}Connection{_SEP}"
 
     _model_name = Unicode("ConnectionModel").tag(sync=True)
     connection_id = Unicode(read_only=True, help="connection id").tag(sync=True)
     _dispose = Bool(read_only=True).tag(sync=True)
     ipylab_base = None
-
     auto_dispose = Bool(False, read_only=True, help="Dispose of the object in frontend when closed.").tag(sync=True)
 
     @override
@@ -73,6 +73,8 @@ class Connection(Singular, Ipylab):
         super().__init_subclass__(**kwargs)
 
     def __init__(self, connection_id: str, **kwgs) -> None:
+        if self.singular_init_started:
+            return
         super().__init__(connection_id=connection_id, **kwgs)
 
     def __str__(self):
@@ -84,17 +86,21 @@ class Connection(Singular, Ipylab):
         args = tuple(aa for a in args if (aa := a.strip()))
         if args and args[0].startswith(cls.prefix):
             if len(args) != 1:
-                msg = "Extending a connection_id with extra args is not allowed!"
+                msg = "Extending a `connection_id` with extra args is not allowed!"
                 raise ValueError(msg)
             return args[0]
         if not args:
             args = (str(uuid.uuid4()),)
-        return cls.prefix + cls._SEP.join(args)
+        return f"{cls.prefix}{cls._SEP.join(args)}{cls._SEP}{cls._SESSION}{get_client_id()}"
 
     @property
     @override
     def repr_info(self) -> str | dict[str, str | dict[str, Any]]:
         return repr(self.connection_id)
+
+    @property
+    def client_id(self):
+        self.connection_id.rsplit(self._SESSION, maxsplit=1)[-1]
 
     @override
     def close(self, *, dispose=True) -> None:

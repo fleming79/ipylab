@@ -34,12 +34,12 @@ export function getNestedProperty({
   let pname = '';
   for (let i = 0; i < parts.length; i++) {
     pname = parts[i];
-    if (pname in obj) {
-      obj = obj[pname as keyof typeof obj];
-      subpath_ = !subpath_ ? pname : `${subpath_}.${pname}`;
-    } else {
-      break;
-    }
+  if (pname in obj) {
+    obj = obj[pname as keyof typeof obj];
+    subpath_ = !subpath_ ? pname : `${subpath_}.${pname}`;
+  } else {
+    break;
+  }
   }
   if (subpath_ !== subpath || typeof obj === 'undefined') {
     if (nullIfMissing) {

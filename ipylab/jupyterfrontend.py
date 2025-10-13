@@ -69,24 +69,26 @@ class App(Singular, Ipylab):
         if force:
             super().close()
 
-    @observe("_ready", "log_level")
-    def _app_observe_ready(self, change) -> None:
-        if change["name"] == "_ready" and self._ready:
-            assert self._vpath, "Vpath should always before '_ready'."
-            self._selector = to_selector(self._vpath)
-            ipylab.plugin_manager.hook.autostart._call_history.clear()  # pyright: ignore[reportOptionalMemberAccess]
-            try:
-                if not ipylab.plugin_manager.hook.autostart_once._call_history:
-                    ipylab.plugin_manager.hook.autostart_once.call_historic(
-                        kwargs={"app": self}, result_callback=self._autostart_callback
-                    )
-                ipylab.plugin_manager.hook.autostart.call_historic(
-                    kwargs={"app": self}, result_callback=self._autostart_callback
-                )
-            except Exception as e:
-                self.log.exception("Error with autostart", exc_info=e)
+    @observe("log_level")
+    def _observe_log_level(self, change) -> None:
         if self.logging_handler:
             self.logging_handler.setLevel(self.log_level)
+
+    def _set_ready(self) -> None:
+        super()._set_ready()
+        assert self._vpath, "Vpath should always before '_ready'."
+        self._selector = to_selector(self._vpath)
+        ipylab.plugin_manager.hook.autostart._call_history.clear()  # pyright: ignore[reportOptionalMemberAccess]
+        try:
+            if not ipylab.plugin_manager.hook.autostart_once._call_history:
+                ipylab.plugin_manager.hook.autostart_once.call_historic(
+                    kwargs={"app": self}, result_callback=self._autostart_callback
+                )
+            ipylab.plugin_manager.hook.autostart.call_historic(
+                kwargs={"app": self}, result_callback=self._autostart_callback
+            )
+        except Exception as e:
+            self.log.exception("Error with autostart", exc_info=e)
 
     def _autostart_callback(self, result) -> None:
         if inspect.iscoroutine(result):
@@ -117,7 +119,7 @@ class App(Singular, Ipylab):
         str
             Virtual path to the application.
         """
-        if not self._ready:
+        if self._ready is False:
             msg = "`vpath` cannot not be accessed until app is ready."
             raise RuntimeError(msg)
         return self._vpath
@@ -136,7 +138,7 @@ class App(Singular, Ipylab):
         RuntimeError
             If the application is not ready.
         """
-        if not self._ready:
+        if self._ready is False:
             msg = "`vpath` cannot not be accessed until app is ready."
             raise RuntimeError(msg)
         return self._selector

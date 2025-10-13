@@ -14,14 +14,14 @@ class TestOnReady:
         obj.on_ready(callback)
         assert callback in obj._on_ready_callbacks
 
-        # Simulate the ready event
-        obj.set_trait("_ready", True)
+        # Simulate the 'ready' message
+        obj._set_ready()
+        assert obj._ready
         await anyio.sleep(0.1)
         callback.assert_called()
 
         callback.reset_mock()
-        obj.set_trait("_ready", False)
-        obj.set_trait("_ready", True)
+        obj._set_ready()
         await anyio.sleep(0.1)
         callback.assert_called()
 
@@ -47,7 +47,7 @@ class TestOnReady:
         assert callback in obj._on_ready_callbacks
 
         # Simulate the ready event
-        obj.set_trait("_ready", True)
+        obj._set_ready()
         await anyio.sleep(0.1)
         callback.assert_called()
         await anyio.sleep(0.1)
