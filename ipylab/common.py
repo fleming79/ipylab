@@ -456,8 +456,11 @@ class HasApp(HasTraits):
             for item in list(self._close_extras):
                 item.close()
             for obj, name in list(self._tuple_owners):
-                if val := getattr(obj, name, None):
-                    obj.set_trait(name, tuple(v for v in val if not getattr(v, "closed", False)))
+                # Discard all closed items
+                if (val := getattr(obj, name, None)) and (
+                    (val_ := tuple(v for v in val if not getattr(v, "closed", False))) != val
+                ):
+                    obj.set_trait(name, val_)
 
     def _check_closed(self):
         if self.closed:
