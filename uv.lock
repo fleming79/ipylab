@@ -929,15 +929,15 @@ requires-dist = [
     { name = "async-kernel", specifier = ">=0.6,<0.7" },
     { name = "ipython", specifier = ">=8.32" },
     { name = "ipywidgets", specifier = ">=8.1.5" },
-    { name = "ipywidgets", url = "https://github.com/fleming79/ipylab/releases/download/v2.0.1/ipywidgets-8.1.5-py3-none-any.whl" },
+    { name = "ipywidgets", url = "https://github.com/fleming79/ipylab/releases/download/v2.0.3/ipywidgets-8.1.7-py3-none-any.whl" },
     { name = "jupyter-client", url = "https://github.com/fleming79/ipylab/releases/download/v2.0.1/jupyter_client-8.6.3-py3-none-any.whl" },
     { name = "jupyterlab", specifier = ">=4.3" },
     { name = "jupyterlab-widgets", specifier = ">=3.0.11" },
-    { name = "jupyterlab-widgets", url = "https://github.com/fleming79/ipylab/releases/download/v2.0.1/jupyterlab_widgets-3.0.13-py3-none-any.whl" },
+    { name = "jupyterlab-widgets", url = "https://github.com/fleming79/ipylab/releases/download/v2.0.3/jupyterlab_widgets-3.0.15-py3-none-any.whl" },
     { name = "pluggy", specifier = "~=1.5" },
     { name = "traitlets", url = "https://github.com/fleming79/ipylab/releases/download/v2.0.1/traitlets-5.14.3-py3-none-any.whl" },
     { name = "typing-extensions" },
-    { name = "widgetsnbextension", url = "https://github.com/fleming79/ipylab/releases/download/v2.0.1/widgetsnbextension-4.0.13-py3-none-any.whl" },
+    { name = "widgetsnbextension", url = "https://github.com/fleming79/ipylab/releases/download/v2.0.3/widgetsnbextension-4.0.14-py3-none-any.whl" },
 ]
 
 [package.metadata.requires-dev]
@@ -1041,8 +1041,8 @@ wheels = [
 
 [[package]]
 name = "ipywidgets"
-version = "8.1.5"
-source = { url = "https://github.com/fleming79/ipylab/releases/download/v2.0.1/ipywidgets-8.1.5-py3-none-any.whl" }
+version = "8.1.7"
+source = { url = "https://github.com/fleming79/ipylab/releases/download/v2.0.3/ipywidgets-8.1.7-py3-none-any.whl" }
 dependencies = [
     { name = "comm" },
     { name = "ipython" },
@@ -1051,7 +1051,7 @@ dependencies = [
     { name = "widgetsnbextension" },
 ]
 wheels = [
-    { url = "https://github.com/fleming79/ipylab/releases/download/v2.0.1/ipywidgets-8.1.5-py3-none-any.whl", hash = "sha256:bcc8fc5a21d9b996de216eb01f360d717356779c864249ca376fc59f59d58377" },
+    { url = "https://github.com/fleming79/ipylab/releases/download/v2.0.3/ipywidgets-8.1.7-py3-none-any.whl", hash = "sha256:29e75b4bb5c9ef51784673d6a5180fd5e2d61cdd47dcf0e393a235754975370e" },
 ]
 
 [package.metadata]
@@ -1060,12 +1060,13 @@ requires-dist = [
     { name = "ipykernel", marker = "extra == 'test'" },
     { name = "ipython", specifier = ">=6.1.0" },
     { name = "jsonschema", marker = "extra == 'test'" },
-    { name = "jupyterlab-widgets", specifier = "~=3.0.12" },
+    { name = "jupyterlab-widgets", specifier = "~=3.0.15" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=3.6.0" },
     { name = "pytest-cov", marker = "extra == 'test'" },
+    { name = "pytest-mock", marker = "extra == 'test'" },
     { name = "pytz", marker = "extra == 'test'" },
     { name = "traitlets", specifier = ">=4.3.1" },
-    { name = "widgetsnbextension", specifier = "~=4.0.12" },
+    { name = "widgetsnbextension", specifier = "~=4.0.14" },
 ]
 provides-extras = ["test"]
 
@@ -1348,10 +1349,10 @@ wheels = [
 
 [[package]]
 name = "jupyterlab-widgets"
-version = "3.0.13"
-source = { url = "https://github.com/fleming79/ipylab/releases/download/v2.0.1/jupyterlab_widgets-3.0.13-py3-none-any.whl" }
+version = "3.0.15"
+source = { url = "https://github.com/fleming79/ipylab/releases/download/v2.0.3/jupyterlab_widgets-3.0.15-py3-none-any.whl" }
 wheels = [
-    { url = "https://github.com/fleming79/ipylab/releases/download/v2.0.1/jupyterlab_widgets-3.0.13-py3-none-any.whl", hash = "sha256:2a4425e7602d83963056fefb964d323aac5a15727fc955dc4af20d269a869fdc" },
+    { url = "https://github.com/fleming79/ipylab/releases/download/v2.0.3/jupyterlab_widgets-3.0.15-py3-none-any.whl", hash = "sha256:944acef727c9314e4c50ebd2ecb25535df61ee00a593b6b6c1f87481b96cb7d9" },
 ]
 
 [[package]]
@@ -3269,10 +3270,10 @@ wheels = [
 
 [[package]]
 name = "widgetsnbextension"
-version = "4.0.13"
-source = { url = "https://github.com/fleming79/ipylab/releases/download/v2.0.1/widgetsnbextension-4.0.13-py3-none-any.whl" }
+version = "4.0.14"
+source = { url = "https://github.com/fleming79/ipylab/releases/download/v2.0.3/widgetsnbextension-4.0.14-py3-none-any.whl" }
 wheels = [
-    { url = "https://github.com/fleming79/ipylab/releases/download/v2.0.1/widgetsnbextension-4.0.13-py3-none-any.whl", hash = "sha256:265a3bfff00a817d8b2e3f60b53666c96b330fd1174aa1afefd0bd029354117b" },
+    { url = "https://github.com/fleming79/ipylab/releases/download/v2.0.3/widgetsnbextension-4.0.14-py3-none-any.whl", hash = "sha256:cd4d6bdfb17e99c9a09e8e79c4703be410630e71a7c344dffe241b562d89cea4" },
 ]
 
 [[package]]
