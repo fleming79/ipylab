@@ -36,9 +36,9 @@ dependencies = [
   "typing_extensions",
   "traitlets @ https://github.com/fleming79/ipylab/releases/download/v2.0.1/traitlets-5.14.3-py3-none-any.whl#sha256:bcc8fc5a21d9b996de216eb01f360d717356779c864249ca376fc59f59d58377",
   "jupyter_client @ https://github.com/fleming79/ipylab/releases/download/v2.0.1/jupyter_client-8.6.3-py3-none-any.whl#sha256:6533dbfdf3aacbd1dfd8556b94fb2a1445fc23ef59fbc12acd3f475212511b1c",
-  "widgetsnbextension @ https://github.com/fleming79/ipylab/releases/download/v2.0.1/widgetsnbextension-4.0.13-py3-none-any.whl#sha256:265a3bfff00a817d8b2e3f60b53666c96b330fd1174aa1afefd0bd029354117b",
-  "jupyterlab_widgets @ https://github.com/fleming79/ipylab/releases/download/v2.0.1/jupyterlab_widgets-3.0.13-py3-none-any.whl#sha256:2a4425e7602d83963056fefb964d323aac5a15727fc955dc4af20d269a869fdc",
-  "ipywidgets @ https://github.com/fleming79/ipylab/releases/download/v2.0.1/ipywidgets-8.1.5-py3-none-any.whl#sha256:bcc8fc5a21d9b996de216eb01f360d717356779c864249ca376fc59f59d58377",
+  "widgetsnbextension @ https://github.com/fleming79/ipylab/releases/download/v2.0.3/widgetsnbextension-4.0.13-py3-none-any.whl#sha256:581663e54ccc4bb892b62849a5e117af65936472b42edf35cca1de74b5d604b6",
+  "jupyterlab_widgets @ https://github.com/fleming79/ipylab/releases/download/v2.0.3/jupyterlab_widgets-3.0.13-py3-none-any.whl#sha256:2a4425e7602d83963056fefb964d323aac5a15727fc955dc4af20d269a869fdc",
+  "ipywidgets @ https://github.com/fleming79/ipylab/releases/download/v2.0.1/ipywidgets-8.1.5-py3-none-any.whl#sha256:803ba2db5544cf75a64c9dcf41a5d57ff915eb5918a5013670bce8f711ef9826",
 ]
 dynamic = ["version", "description", "authors", "urls", "keywords"]
 
@@ -89,7 +89,6 @@ allow-direct-references = true
 fields = ["description", "authors", "urls"]
 
 [tool.hatch.build.targets.sdist]
-artifacts = ["ipylab/labextension"]
 exclude = [".github", "binder"]
 
 [tool.hatch.build.targets.wheel.shared-data]

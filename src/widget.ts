@@ -18,6 +18,7 @@ import { ShellModel } from './widgets/shell';
 import { SimpleOutputModel, SimpleOutputView } from './widgets/simple_output';
 import { SplitPanelModel, SplitPanelView } from './widgets/split_panel';
 import { TitleModel } from './widgets/title';
+import { CustomToolbarModel } from './widgets/toolbar';
 export {
   AutoscrollModel,
   AutoscrollView,
@@ -43,5 +44,6 @@ export {
   SimpleOutputView,
   SplitPanelModel,
   SplitPanelView,
-  TitleModel
+  TitleModel,
+  CustomToolbarModel
 };

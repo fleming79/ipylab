@@ -14,7 +14,6 @@ The goal is to provide access to most of the JupyterLab environment from the Pyt
 - Open a workspace with a specific layout
 - Listen to JupyterLab signals (notebook opened, console closed) and trigger Python callbacks
 
-
 ## Examples
 
 ### Add Jupyter Widgets to the JupyterLab interface
@@ -33,32 +32,30 @@ The goal is to provide access to most of the JupyterLab environment from the Pyt
 
 ![ipytree-example](https://user-images.githubusercontent.com/591645/80026006-b8bb1d80-84e1-11ea-87cc-86495186b938.gif)
 
-
 ## Installation
 
 Use pip to install from source.
 
 Download [source](https://github.com/fleming79/ipylab/releases/download/v2.0.0b5/ipylab-2.0.0b5.tar.gz).
 
-``` bash
+```bash
 pip install ipylab-2.0.0b5.tar.gz # Update version as required.
 ```
-
 
 ## Dependencies
 
 The following dependencies are provided as wheels in the pkg directory which include patches to
 improved the functionality.
 
-| Name                                               | Pull request                                            | Status                      | Modification        |
-| -------------------------------------------------- | ------------------------------------------------------- | --------------------------- | ------------------- |
-| traitlets                                          | [#918](https://github.com/ipython/traitlets/pull/918)   | Accepted - pending release  | Improved type hints |
-| ipywidgets, jupyterlab-widgets, widgetsnbextension | [#3922](https://github.com/jupyter-widgets/ipywidgets/pull/3922) + [#3921](https://github.com/jupyter-widgets/ipywidgets/pull/3921) | Pending review | Provides for widgets comms without needing a notebook or console to be open. Plus fixes for proper garbage collection and widget tooltips |
-| jupyter_client | [#1064](https://github.com/jupyter/jupyter_client/pull/1064)  | Pending review | Faster message serialization |
+| Name                                               | Pull request                                                                                                                        | Status                     | Modification                                                                                                                              |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| traitlets                                          | [#918](https://github.com/ipython/traitlets/pull/918)                                                                               | Accepted - pending release | Improved type hints                                                                                                                       |
+| ipywidgets, jupyterlab-widgets, widgetsnbextension | [#3922](https://github.com/jupyter-widgets/ipywidgets/pull/3922) + [#3921](https://github.com/jupyter-widgets/ipywidgets/pull/3921) | Pending review             | Provides for widgets comms without needing a notebook or console to be open. Plus fixes for proper garbage collection and widget tooltips |
+| jupyter_client                                     | [#1064](https://github.com/jupyter/jupyter_client/pull/1064)                                                                        | Pending review             | Faster message serialization                                                                                                              |
 
 Use the source distribution to ensure the dependencies are bundled.
 
-``` bash
+```bash
 uv build --sdist
 ```
 
@@ -138,7 +135,6 @@ jlpm lint:check
 
     [see also](https://discuss.python.org/t/add-os-junction-pathlib-path-junction-to/50394).
 
-
 ### Upgrade files
 
 === "Python files"
@@ -150,7 +146,6 @@ jlpm lint:check
 === "Frontend"
 
     TODO
-
 
 ### Type checking
 
