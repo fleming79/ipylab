@@ -1,5 +1,7 @@
 name: ipylab-lite
+name: ipylab-lite
 channels:
+- conda-forge
 - conda-forge
 dependencies:
 - python-build

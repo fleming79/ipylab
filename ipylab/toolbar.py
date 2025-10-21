@@ -1,89 +1,62 @@
 # Copyright (c) ipylab contributors.
 # Distributed under the terms of the Modified BSD License.
+from __future__ import annotations
 
-from ipywidgets import Widget, register
-from traitlets import List, Unicode
-from ._frontend import module_name, module_version
-from .icon import Icon
-from .commands import CommandRegistry
+from typing import TYPE_CHECKING
+
+from ipywidgets import register
+from traitlets import Tuple, Unicode
+
+from ipylab.common import Transform, pack
+from ipylab.connection import InfoConnection
+from ipylab.ipylab import Ipylab
+from ipylab.widgets import Icon
+
+if TYPE_CHECKING:
+    from ipylab.commands import CommandConnection
+
+
+class TooltipButtonConnection(InfoConnection):
+    ""
 
 
 @register
-class CustomToolbar(Widget):
+class CustomToolbar(Ipylab):
     _model_name = Unicode("CustomToolbarModel").tag(sync=True)
-    _model_module = Unicode(module_name).tag(sync=True)
-    _model_module_version = Unicode(module_version).tag(sync=True)
+    toolbar_buttons = Tuple()
+    "The buttons added to the notebook toolbar"
 
-    _toolbar_buttons = List(Unicode, read_only=True).tag(sync=True)
-    commands = None
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.on_msg(self._on_frontend_msg)
-
-    def set_command_registry(self, commands: CommandRegistry):
-        if self.commands is not None:
-            raise ValueError("Cannot set command registry twice")
-        self.commands = commands
-
-    def _on_frontend_msg(self, _, content, buffers):
-        pass
-
-    def add_button(
+    async def add_button(
         self,
-        name,
-        execute,
+        name: str,
+        command: CommandConnection,
+        *,
         args=None,
         iconClass=None,
-        icon=None,
+        icon: Icon | None = None,
         label=None,
         after=None,
         tooltip=None,
         className=None,
-    ) -> None:
-        if name in self._toolbar_buttons:
-            raise Exception(f"Button {name} is already registered")
-        iconMsg = None
-        if isinstance(icon, Icon):
-            iconMsg = f"IPY_MODEL_{icon.model_id}"
-        elif isinstance(icon, str):
-            iconMsg = icon
+    ) -> TooltipButtonConnection:
+        connection_id = TooltipButtonConnection.to_id(name)
+        TooltipButtonConnection.close_if_exists(connection_id)
 
-        if callable(execute):
-            commandname = f"button_{name}_{execute.__name__}"
-            self.commands.add_command(commandname, execute=execute, label=name)
-            execute = commandname
-        elif not isinstance(execute, str):
-            raise TypeError("execute must be a str or callable")
-
-        self.send(
+        tb: TooltipButtonConnection = await self.operation(
+            "addToolbarButton",
             {
-                "func": "addToolbarButton",
-                "payload": {
-                    "name": name,
-                    "execute": execute,
-                    "args": args or {},
-                    "icon": iconMsg,
-                    "iconClass": iconClass,
-                    "label": label,
-                    "tooltip": tooltip,
-                    "after": after,
-                    "className": className,
-                },
-            }
+                "name": name,
+                "commandId": str(command),
+                "args": args or {},
+                "icon": f"{pack(icon)}.labIcon" if isinstance(icon, Icon) else None,
+                "iconClass": iconClass,
+                "label": label,
+                "tooltip": tooltip,
+                "after": after,
+                "className": className,
+            },
+            transform={"transform": Transform.connection, "connection_id": connection_id},
+            toObject=["icon"] if isinstance(icon, Icon) else [],
         )
-
-    def remove_button(self, name) -> None:
-        if name not in self._toolbar_buttons:
-            raise Exception(f"unknown button {name}")
-        self.send(
-            {
-                "func": "removeToolbarButton",
-                "payload": {
-                    "name": name,
-                },
-            }
-        )
-
-    def list_toolbar_buttons(self):
-        return self._toolbar_buttons
+        tb.add_to_tuple(self, "toolbar_buttons")
+        return tb

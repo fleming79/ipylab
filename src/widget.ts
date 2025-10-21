@@ -1,30 +1,49 @@
 // Copyright (c) ipylab contributors
 // Distributed under the terms of the Modified BSD License.
 
+import { AutoscrollModel, AutoscrollView } from './widgets/autoscroll';
+import { CodeEditorModel, CodeEditorView } from './widgets/code_editor';
 import { CommandRegistryModel } from './widgets/commands';
-import { CommandPaletteModel } from './widgets/palette';
-import { SessionManagerModel } from './widgets/sessions';
+import { ConnectionModel, ShellConnectionModel } from './widgets/connection';
+import { CSSStyleSheetModel } from './widgets/cssstylesheet';
+import { DialogModel } from './widgets/dialog';
 import { JupyterFrontEndModel } from './widgets/frontend';
-import { PanelModel } from './widgets/panel';
+import { IconModel, IconView } from './widgets/icon';
+import { IpylabModel } from './widgets/ipylab';
+import { NotificationManagerModel } from './widgets/notification';
+import { PanelModel, PanelView } from './widgets/panel';
+import { ResizeBoxModel, ResizeBoxView } from './widgets/resize_box';
+import { SessionManagerModel } from './widgets/sessions';
 import { ShellModel } from './widgets/shell';
+import { SimpleOutputModel, SimpleOutputView } from './widgets/simple_output';
 import { SplitPanelModel, SplitPanelView } from './widgets/split_panel';
 import { TitleModel } from './widgets/title';
-import { IconView, IconModel } from './widgets/icon';
-import { CustomMenuModel } from './widgets/menu';
 import { CustomToolbarModel } from './widgets/toolbar';
-
 export {
+  AutoscrollModel,
+  AutoscrollView,
+  CodeEditorModel,
+  CodeEditorView,
   CommandRegistryModel,
-  CommandPaletteModel,
-  JupyterFrontEndModel,
-  PanelModel,
-  ShellModel,
-  SplitPanelModel,
-  SplitPanelView,
-  TitleModel,
-  SessionManagerModel,
+  ConnectionModel,
+  CustomToolbarModel,
+  CSSStyleSheetModel,
+  DialogModel,
   IconModel,
   IconView,
-  CustomMenuModel,
-  CustomToolbarModel
+  IpylabModel,
+  JupyterFrontEndModel,
+  NotificationManagerModel,
+  PanelModel,
+  PanelView,
+  ResizeBoxModel,
+  ResizeBoxView,
+  SessionManagerModel,
+  ShellConnectionModel,
+  ShellModel,
+  SimpleOutputModel,
+  SimpleOutputView,
+  SplitPanelModel,
+  SplitPanelView,
+  TitleModel
 };
