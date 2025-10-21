@@ -135,7 +135,7 @@ class LogViewer(Panel):
         self._records.append(record)
         if self.connections:
             self.output.push(record.output)  # pyright: ignore[reportAttributeAccessIssue]
-        if record.levelno >= LogLevel.ERROR and self.app._ready:
+        if record.levelno >= LogLevel.ERROR and self.app._ready_events:
             self.app.call_later(0, "Notify exception", self._notify_exception, record)
 
     async def _notify_exception(self, record: logging.LogRecord) -> None:

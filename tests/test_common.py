@@ -284,7 +284,7 @@ class TestOnReady:
         callback.assert_called()
 
         callback.reset_mock()
-        obj._ready["123"] = async_kernel.AsyncEvent()
+        obj._ready_events["123"] = async_kernel.AsyncEvent()
         obj._on_ready("123")
         await anyio.sleep(0.1)
         callback.assert_called()
@@ -295,7 +295,7 @@ class TestOnReady:
         assert callback not in obj._on_ready_callbacks
 
         # Simulate the ready event again, callback should not be called
-        obj._ready["123"] = async_kernel.AsyncEvent()
+        obj._ready_events["123"] = async_kernel.AsyncEvent()
         await anyio.sleep(0.1)
         callback.assert_not_called()
 

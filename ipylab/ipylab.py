@@ -91,7 +91,7 @@ class Ipylab(HasApp, WidgetBase):
     _model_name = Unicode("IpylabModel", help="Name of the model.", read_only=True).tag(sync=True)
     _python_class = Unicode().tag(sync=True)
     ipylab_base = IpylabBase(Obj.this, "").tag(sync=True)
-    _ready: Fixed[Self, dict[str, AsyncEvent]] = Fixed(dict)
+    _ready_events: Fixed[Self, dict[str, AsyncEvent]] = Fixed(dict)
     _view_count = Int().tag(sync=True)
     _on_ready_callbacks: Container[list[Callable[[Self], None | CoroutineType]]] = List(trait=traitlets.Callable())
     _comm = None
@@ -119,7 +119,7 @@ class Ipylab(HasApp, WidgetBase):
     def __repr__(self) -> str:
         if not self._repr_mimebundle_:
             status = "CLOSED"
-        elif (not self._ready) and self._repr_mimebundle_:
+        elif not self.is_ready():
             status = "Not ready"
         else:
             status = ""
@@ -133,7 +133,7 @@ class Ipylab(HasApp, WidgetBase):
 
     @override
     def close(self) -> None:
-        for ready in self._ready.values():
+        for ready in self._ready_events.values():
             if not ready.is_set():
                 ready.set()
         if self.comm:
@@ -308,20 +308,29 @@ class Ipylab(HasApp, WidgetBase):
                 await self.app.ready()
             page_id = self.get_page_id()
             assert page_id
-        if not (ready := self._ready.get(page_id)):
-            self._ready[page_id] = ready = AsyncEvent()
+        if not (ready := self._ready_events.get(page_id)):
+            self._ready_events[page_id] = ready = AsyncEvent()
             self._ipylab_send("checkReady", page_id=page_id)
         await ready.wait()
         self._check_closed()
         return self
 
     def _on_ready(self, page_id: str):
-        if not (ready := self._ready.get(page_id)):
-            self._ready[page_id] = ready = AsyncEvent()
+        if not (ready := self._ready_events.get(page_id)):
+            self._ready_events[page_id] = ready = AsyncEvent()
         if not ready.is_set():
             ready.set()
             for cb in self._on_ready_callbacks:
                 self._call_on_ready_callback(cb)
+
+    def is_ready(self) -> bool:
+        "Will return True when it is ready for the current page context and not closed."
+        return bool(
+            (page_id := self.get_page_id())
+            and (event := self._ready_events.get(page_id))
+            and event.is_set()
+            and self._repr_mimebundle_
+        )
 
     def on_ready(self, callback: Callable[[Self], None | CoroutineType], remove=False) -> None:
         """Register a historic callback to execute when the frontend indicates
@@ -346,7 +355,7 @@ class Ipylab(HasApp, WidgetBase):
         """
         if not remove and callback not in self._on_ready_callbacks:
             self._on_ready_callbacks.append(callback)
-            if self._ready:
+            if self._ready_events:
                 self._call_on_ready_callback(callback)
         elif callback in self._on_ready_callbacks:
             self._on_ready_callbacks.remove(callback)

@@ -118,10 +118,10 @@ class App(Singular, Ipylab):
         str
             Virtual path to the application.
         """
-        if not self._ready:
-            msg = "`vpath` cannot not be accessed until app is ready."
+        if not (vpath := self._vpath):
+            msg = "`vpath` Has not yet been set! Tip: Use await app.ready() (or the Ipylab object `ready` method) to avoid this error."
             raise RuntimeError(msg)
-        return self._vpath
+        return vpath
 
     @property
     def session_name(self) -> str:
@@ -137,10 +137,7 @@ class App(Singular, Ipylab):
         RuntimeError
             If the application is not ready.
         """
-        if not self._ready:
-            msg = "`vpath` cannot not be accessed until app is ready."
-            raise RuntimeError(msg)
-        return to_selector(self._vpath)
+        return to_selector(self.vpath)
 
     @override
     async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list) -> Any:
