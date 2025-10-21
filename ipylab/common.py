@@ -311,8 +311,17 @@ class SignalCallbackData(TypedDict, Generic[L]):
 
 class IpylabKwgs(TypedDict):
     transform: NotRequired[TransformType]
+    "How the return value should be transformed. Default is auto."
     toLuminoWidget: NotRequired[list[str] | None]
+    "A list of arguments that should be replaced with a Lumino widget in the frontend."
     toObject: NotRequired[list[str] | None]
+    "A list of arguments that should be replaced with an object in the frontend."
+    page_id: NotRequired[str | None]
+    """
+    The specific page to which the operation/message should be associated.
+
+    Pass an empty string to *broadcast* to all browser pages.
+    """
 
 
 class LastUpdatedDict(OrderedDict):

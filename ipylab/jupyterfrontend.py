@@ -69,24 +69,25 @@ class App(Singular, Ipylab):
         if force:
             super().close()
 
-    @observe("_ready", "log_level")
-    def _app_observe_ready(self, change) -> None:
-        if change["name"] == "_ready" and self._ready:
-            assert self._vpath, "Vpath should always before '_ready'."
-            self._selector = to_selector(self._vpath)
-            ipylab.plugin_manager.hook.autostart._call_history.clear()  # pyright: ignore[reportOptionalMemberAccess]
-            try:
-                if not ipylab.plugin_manager.hook.autostart_once._call_history:
-                    ipylab.plugin_manager.hook.autostart_once.call_historic(
-                        kwargs={"app": self}, result_callback=self._autostart_callback
-                    )
-                ipylab.plugin_manager.hook.autostart.call_historic(
-                    kwargs={"app": self}, result_callback=self._autostart_callback
-                )
-            except Exception as e:
-                self.log.exception("Error with autostart", exc_info=e)
+    @observe("log_level")
+    def _observe_log_level(self, _) -> None:
         if self.logging_handler:
             self.logging_handler.setLevel(self.log_level)
+
+    def _on_ready(self, page_id: str):
+        super()._on_ready(page_id)
+        assert self._vpath, "'_vpath' must be set first."
+        ipylab.plugin_manager.hook.autostart._call_history.clear()  # pyright: ignore[reportOptionalMemberAccess]
+        try:
+            if not ipylab.plugin_manager.hook.autostart_once._call_history:
+                ipylab.plugin_manager.hook.autostart_once.call_historic(
+                    kwargs={"app": self}, result_callback=self._autostart_callback
+                )
+            ipylab.plugin_manager.hook.autostart.call_historic(
+                kwargs={"app": self}, result_callback=self._autostart_callback
+            )
+        except Exception as e:
+            self.log.exception("Error with autostart", exc_info=e)
 
     def _autostart_callback(self, result) -> None:
         if inspect.iscoroutine(result):
@@ -139,7 +140,7 @@ class App(Singular, Ipylab):
         if not self._ready:
             msg = "`vpath` cannot not be accessed until app is ready."
             raise RuntimeError(msg)
-        return self._selector
+        return to_selector(self._vpath)
 
     @override
     async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list) -> Any:

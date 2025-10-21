@@ -70,7 +70,7 @@ class CommandConnection(InfoConnection):
     @classmethod
     @override
     def to_id(cls, command_registry: str, vpath: str, name: str) -> str:  # pyright: ignore[reportIncompatibleMethodOverride]
-        return super().to_id(command_registry, vpath, name)
+        return super().to_id(command_registry, vpath, name, cls.get_page_id())
 
     @property
     @override
@@ -283,9 +283,8 @@ class CommandRegistry(Singular, Ipylab):
         """
 
         await self.ready()
-        app = await self.app.ready()
         async with self._lock:
-            connection_id = CommandConnection.to_id(self.name, app.vpath, name)
+            connection_id = CommandConnection.to_id(self.name, self.app.vpath, name)
             CommandConnection.close_if_exists(connection_id)
             kwgs = kwgs | {
                 "id": connection_id,
@@ -328,10 +327,9 @@ class CommandRegistry(Singular, Ipylab):
         for hints on how to determine what args can be used.
         """
         await self.ready()
-        app = await self.app.ready()
         id_ = str(command_id)
         if id_ not in self.all_commands:
-            id_ = CommandConnection.to_id(self.name, app.vpath, id_)
+            id_ = CommandConnection.to_id(self.name, self.app.vpath, id_)
             if id_ not in self.all_commands:
                 msg = f"Command '{command_id}' not registered!"
                 raise ValueError(msg)

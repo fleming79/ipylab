@@ -4,10 +4,15 @@
 from __future__ import annotations
 
 from typing import Self
+from unittest.mock import AsyncMock, MagicMock
 
+import anyio
+import async_kernel
 import ipylab
 import ipylab.common
+import ipylab.ipylab
 import pytest
+from ipylab import Ipylab
 from ipylab.common import (
     Fixed,
     FixedCreated,
@@ -121,11 +126,6 @@ class TestTransformValidate:
         transform = Transform.function
         with pytest.raises(ValueError, match="This type of transform should be passed as a dict"):
             Transform.validate(transform)
-
-
-@pytest.fixture
-async def mock_connection(mocker):
-    mocker.patch.object(Connection, "_ready")
 
 
 class TestTransformPayload:
@@ -266,3 +266,53 @@ class TestFixed:
         eval_str = ipylab.common.module_obj_to_import_string(test_last_updated_dict)
         obj = eval(eval_str, {"import_item": ipylab.common.import_item})
         assert obj is test_last_updated_dict
+
+
+class TestOnReady:
+    async def test_on_ready_add_and_remove(self, mock_connection):
+        obj = Ipylab()
+        callback = MagicMock()
+
+        # Add the callback
+        obj.on_ready(callback)
+        assert callback in obj._on_ready_callbacks
+
+        # Simulate the ready event
+        obj._on_ready("123")
+        await obj.ready()
+        await anyio.sleep(0.1)
+        callback.assert_called()
+
+        callback.reset_mock()
+        obj._ready["123"] = async_kernel.AsyncEvent()
+        obj._on_ready("123")
+        await anyio.sleep(0.1)
+        callback.assert_called()
+
+        # Reset the mock and remove the callback
+        callback.reset_mock()
+        obj.on_ready(callback, remove=True)
+        assert callback not in obj._on_ready_callbacks
+
+        # Simulate the ready event again, callback should not be called
+        obj._ready["123"] = async_kernel.AsyncEvent()
+        await anyio.sleep(0.1)
+        callback.assert_not_called()
+
+        obj.close()
+
+    async def test_on_ready_async(self, app, mock_connection):
+        obj = Ipylab()
+        callback = AsyncMock()
+
+        # Add the callback
+        obj.on_ready(callback)
+        assert callback in obj._on_ready_callbacks
+
+        # Simulate the ready event
+        obj._on_ready("123")
+        await anyio.sleep(0.1)
+        callback.assert_called()
+        await anyio.sleep(0.1)
+        assert callback.await_count == 1
+        obj.close()

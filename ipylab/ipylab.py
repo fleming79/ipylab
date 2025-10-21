@@ -1,25 +1,28 @@
 # Copyright (c) ipylab contributors.
 # Distributed under the terms of the Modified BSD License.
 
+
 from __future__ import annotations
 
 import functools
 import inspect
 import json
 import uuid
+from contextvars import ContextVar
 from types import CoroutineType
 from typing import TYPE_CHECKING, Any
 
 import anyio
+import async_kernel
 import traitlets
 from async_kernel import AsyncEvent, Caller, Future
 from async_kernel.caller import truncated_rep
 from ipywidgets import TypedTuple, Widget, register
-from traitlets import Bool, Container, Dict, Instance, Int, List, TraitType, Unicode, observe
+from traitlets import Container, Dict, Int, List, TraitType, Unicode, observe
 from typing_extensions import override
 
 import ipylab._frontend as _fe
-from ipylab.common import HasApp, IpylabKwgs, Obj, P, SignalCallbackData, T, Transform, TransformType, pack
+from ipylab.common import Fixed, HasApp, IpylabKwgs, Obj, P, SignalCallbackData, T, Transform, TransformType, pack
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator
@@ -28,6 +31,9 @@ if TYPE_CHECKING:
 
 
 __all__ = ["Ipylab", "IpylabBase", "WidgetBase"]
+
+_page_id_var = ContextVar[str]("_page_id_var", default="")
+_session_to_page = {}
 
 
 class IpylabBase(TraitType[tuple[str, str], None]):
@@ -85,10 +91,9 @@ class Ipylab(HasApp, WidgetBase):
     _model_name = Unicode("IpylabModel", help="Name of the model.", read_only=True).tag(sync=True)
     _python_class = Unicode().tag(sync=True)
     ipylab_base = IpylabBase(Obj.this, "").tag(sync=True)
-    _ready = Bool(read_only=True, help="Set to by frontend when ready").tag(sync=True)
+    _ready: Fixed[Self, dict[str, AsyncEvent]] = Fixed(dict)
     _view_count = Int().tag(sync=True)
     _on_ready_callbacks: Container[list[Callable[[Self], None | CoroutineType]]] = List(trait=traitlets.Callable())
-    _ready_event = Instance(AsyncEvent, ())
     _comm = None
     _ipylab_init_complete = False
     _pending_operations: Dict[str, Future] = Dict()
@@ -126,28 +131,43 @@ class Ipylab(HasApp, WidgetBase):
             return f"< {status}: {self.__class__.__name__}({info}) >"
         return f"{status}{self.__class__.__name__}({info})"
 
-    @observe("_ready")
-    def _observe_ready(self, _: dict) -> None:
-        if self._ready:
-            self.log.debug("ready")
-            self._ready_event.set()
-            for cb in self._on_ready_callbacks:
-                self._call_on_ready_callback(cb)
-        else:
-            self._ready_event = AsyncEvent()
-
     @override
     def close(self) -> None:
+        for ready in self._ready.values():
+            if not ready.is_set():
+                ready.set()
         if self.comm:
-            self._ipylab_send({"close": True})
+            self._ipylab_send("close", page_id="")
         super().close()
         for k in ["_on_ready_callbacks", "_signal_callbacks"]:
             if self.trait_has_value(k):
                 getattr(self, k).clear()
 
-    def _ipylab_send(self, content, buffers: list | None = None) -> None:
+    @classmethod
+    def get_page_id(cls) -> str:
+        """Gets the page_id if there is one.
+
+        Each java frontend instance is assigned a session. This is equivalent to a webbrowser page
+        and makes it possible to discriminate the page to which the current operation should be associated.
+        """
+        if (
+            not (page_id := _page_id_var.get())
+            and (job := async_kernel.utils.get_job())
+            and (session := job["msg"]["header"]["session"])
+            and (page_id := _session_to_page.get(session, ""))
+        ):
+            _page_id_var.set(page_id)
+        return page_id
+
+    def _ipylab_send(self, content, buffers: list | None = None, *, page_id: str) -> None:
         try:
-            self.send({"ipylab": json.dumps(content, default=pack)}, buffers)
+            self.send(
+                {
+                    "ipylab": json.dumps(content, default=pack),
+                    "pageId": page_id,
+                },
+                buffers,
+            )
         except Exception as e:
             self.log.exception("Send error", obj=content, exc_info=e)
             raise
@@ -189,6 +209,9 @@ class Ipylab(HasApp, WidgetBase):
         """
         if not (content := msg.get("ipylab")):
             return
+        page_id = msg["pageId"]
+        _page_id_var.set(page_id)
+        _session_to_page[async_kernel.utils.get_job()["msg"]["header"]["session"]] = page_id
         try:
             match json.loads(content):
                 case {"ipylab_PY": str(key), "error": str(error), **payload}:
@@ -198,7 +221,14 @@ class Ipylab(HasApp, WidgetBase):
                 case {"ipylab_FE": str(key), "operation": operation, "payload": payload}:
                     kwgs = {"key": key, "operation": operation, "payload": payload, "buffers": buffers}
                     self.call_later(0, "From the frontend - operation", self._do_operation_for_fe, **kwgs)
-                case {"closed": closed} if closed:
+                case {"error": msg}:
+                    self.log.error(msg)
+                case {"clientIdToPageId": {"clientId": client_id, "pageId": page_id_}}:
+                    assert page_id_ == page_id
+                    _session_to_page[client_id] = page_id_
+                case "ready":
+                    self._on_ready(page_id)
+                case "closed":
                     self.close()
                 case {"signal": {"dottedname": dottedname, **rest}}:
                     data = SignalCallbackData(owner=self, dottedname=dottedname, args=rest.get("args"))
@@ -209,14 +239,15 @@ class Ipylab(HasApp, WidgetBase):
             self.log.exception("Message processing error", obj=msg, exc_info=e)
 
     def _set_result(self, key: str, error: str | None, payload: Any) -> None:
-        if future := self._pending_operations.pop(key, None):
+        if fut := self._pending_operations.pop(key, None):
             if error is not None:
-                error_ = IpylabFrontendError(error)
-                error_.add_note(f"{payload=}")
+                msg = f"An error occurred in the frontend (javascript) {error=} {payload}"
+                error_ = IpylabFrontendError(msg)
+                error_.add_note(f"Exception request content = {fut.metadata}")
                 payload = error_
-                future.set_exception(error_)
+                fut.set_exception(error_)
             else:
-                future.set_result(payload)
+                fut.set_result(payload)
         elif not error:
             self.log.debug("Already processed key='%s' payload=%s", key, payload)
 
@@ -237,7 +268,7 @@ class Ipylab(HasApp, WidgetBase):
             content["error"] = f"{e.__class__.__name__}: {e}"
             self.log.exception("Frontend operation", obj={"operation": operation, "payload": payload}, exc_info=e)
         finally:
-            self._ipylab_send(content, buffers)
+            self._ipylab_send(content, buffers, page_id=self.get_page_id())
 
     async def _notify_signal(self, data: SignalCallbackData) -> None:
         if callbacks := self._signal_callbacks.get(data["dottedname"]):
@@ -260,15 +291,37 @@ class Ipylab(HasApp, WidgetBase):
         raise NotImplementedError(operation)
 
     async def ready(self) -> Self:
-        """Wait for the instance to be ready.
+        """Wait for the instance to be ready for the current session.
 
         Returns:
             Self: The instance itself, after it is ready.
         """
         self._check_closed()
-        if not self._ready:
-            await self._ready_event.wait()
+        if not (page_id := self.get_page_id()):
+            if self is self.app:
+                session = async_kernel.utils.get_job()["msg"]["header"]["session"]
+                while not (page_id := self.get_page_id()):
+                    self._ipylab_send({"clientIdToPageId": session}, page_id="")
+                    await anyio.sleep(1)
+                    # A custom message should be returned.
+            else:
+                await self.app.ready()
+            page_id = self.get_page_id()
+            assert page_id
+        if not (ready := self._ready.get(page_id)):
+            self._ready[page_id] = ready = AsyncEvent()
+            self._ipylab_send("checkReady", page_id=page_id)
+        await ready.wait()
+        self._check_closed()
         return self
+
+    def _on_ready(self, page_id: str):
+        if not (ready := self._ready.get(page_id)):
+            self._ready[page_id] = ready = AsyncEvent()
+        if not ready.is_set():
+            ready.set()
+            for cb in self._on_ready_callbacks:
+                self._call_on_ready_callback(cb)
 
     def on_ready(self, callback: Callable[[Self], None | CoroutineType], remove=False) -> None:
         """Register a historic callback to execute when the frontend indicates
@@ -306,6 +359,7 @@ class Ipylab(HasApp, WidgetBase):
         transform: TransformType = Transform.auto,
         toLuminoWidget: list[str] | None = None,
         toObject: list[str] | None = None,
+        page_id=None,
     ) -> Any:
         """Perform an operation in the frontend.
 
@@ -323,8 +377,9 @@ class Ipylab(HasApp, WidgetBase):
         toObject:  List[str] | None
             A list of item name mappings to convert to objects in the frontend prior
             to performing the operation.
+        page_id: The page to send the message.
+            Pass '' to broadcast to all pages. Only first response is awaited and returned.
         """
-        # validation
         await self.ready()
         if not operation or not isinstance(operation, str):
             msg = f"Invalid {operation=}"
@@ -341,10 +396,11 @@ class Ipylab(HasApp, WidgetBase):
         if toObject:
             content["toObject"] = toObject
 
-        self._pending_operations[ipylab_PY] = future = Future()
-        self._ipylab_send(content)
+        self._pending_operations[ipylab_PY] = fut = Future()
+        fut.metadata.update(content=content)
+        self._ipylab_send(content, page_id=self.get_page_id() if page_id is None else page_id)
         try:
-            return await Transform.transform_payload(transform=content["transform"], payload=await future)
+            return await Transform.transform_payload(transform=content["transform"], payload=await fut)
         except Exception as e:
             self.log.exception("Operation error", obj=content, exc_info=e)
             raise

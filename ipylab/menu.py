@@ -217,8 +217,8 @@ class ContextMenu(Menu):
 
         ref: https://jupyterlab.readthedocs.io/en/stable/extension/extension_points.html#context-menu
         """
-        app = await self.app.ready()
-        return await self._add_item(command, submenu, rank, type, args, selector or app.selector)
+        await self.ready()
+        return await self._add_item(command, submenu, rank, type, args, selector or self.app.selector)
 
     @override
     async def activate(self) -> None:

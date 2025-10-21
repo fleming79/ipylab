@@ -12,9 +12,9 @@ from ipywidgets import DOMWidget, TypedTuple, Widget
 from traitlets import Container, Instance, Unicode
 
 import ipylab
-from ipylab import Area, InsertMode, Ipylab, ShellConnection, Transform, pack
-from ipylab.common import Fixed, IpylabKwgs, Obj, Singular, TransformType
-from ipylab.ipylab import IpylabBase
+from ipylab.common import Area, Fixed, InsertMode, IpylabKwgs, Obj, Singular, Transform, TransformType, pack
+from ipylab.connection import ShellConnection
+from ipylab.ipylab import Ipylab, IpylabBase
 from ipylab.log_viewer import LogViewer
 
 if TYPE_CHECKING:
@@ -51,14 +51,15 @@ class Shell(Singular, Ipylab):
         ref: ShellConnection | None = None,
         options: dict | None = None,
         vpath: str | dict[Literal["title"], str] = "",
-        preferred_kernel: KernelName | Literal["python3"] | str = KernelName.asyncio,  # noqa: PYI051
+        preferred_kernel: KernelName | Literal["python3"] | str = KernelName.asyncio,  # noqa: PYI051,
+        page_id: str | None = None,
         **args,
     ) -> ShellConnection:
         """Add a widget to the shell.
 
         If the widget is already in the shell, it may be moved or activated.
 
-        To multiple instances of the same widget in the shell provide a new connection_id
+        To force multiple instances of the same widget in the shell provide a new `connection_id`
         with `connection_id=ShellConnection.to_id()`.
 
         Parameters
@@ -102,8 +103,9 @@ class Shell(Singular, Ipylab):
         app.shell.add("ipylab.Panel([ipw.HTML('<h1>Test')])", vpath="test")
         ```
         """
-        app = await self.app.ready()
-        vpath = vpath or app.vpath
+        await self.ready()
+        vpath = vpath or self.app.vpath
+        page_id = self.get_page_id() if page_id is None else page_id
         args["options"] = {
             "activate": activate,
             "mode": InsertMode(mode),
@@ -122,18 +124,18 @@ class Shell(Singular, Ipylab):
             if not obj._view_name:
                 msg = f"This widget does not have a view {obj}"
                 raise RuntimeError(msg)
-            if not args.get("connection_id") and reversed(self.connections):
-                for c in self.connections:
-                    if c.widget is obj:
+            if not args.get("connection_id") and self.connections:
+                for c in reversed(self.connections):
+                    if c.widget is obj and c.page_id == page_id and not c.closed:
                         args["connection_id"] = c.connection_id
                         break
             args["ipy_model"] = obj.model_id
         else:
             args["evaluate"] = pack(obj)
         if isinstance(obj, DOMWidget):
-            obj.add_class(app.selector.removeprefix("."))
+            obj.add_class(self.app.selector.removeprefix("."))
         if "evaluate" in args and isinstance(vpath, dict):
-            val = ipylab.plugin_manager.hook.vpath_getter(app=app, kwgs=vpath)
+            val = ipylab.plugin_manager.hook.vpath_getter(app=self.app, kwgs=vpath)
             while inspect.isawaitable(val):
                 val = await val
             vpath = val
@@ -144,9 +146,14 @@ class Shell(Singular, Ipylab):
             current_widget_id: str | None = await self.get_property("currentWidget.id")
             if current_widget_id and current_widget_id.startswith("launcher"):
                 sc_current = await self.connect_to_widget(current_widget_id)
-        sc: ShellConnection = await self.operation("addToShell", {"args": args}, transform=Transform.connection)
+        sc: ShellConnection = await self.operation(
+            "addToShell",
+            {"args": args},
+            transform=Transform.connection,
+            page_id=page_id,
+        )
         sc.add_to_tuple(self, "connections")
-        if vpath != app.vpath:
+        if vpath != self.app.vpath:
             sc.auto_dispose = False
         if isinstance(obj, Widget):
             sc.widget = obj

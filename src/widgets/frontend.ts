@@ -241,8 +241,8 @@ export class JupyterFrontEndModel extends IpylabModel {
   }
 
   kernelId: string;
+  kernelConnetion: Kernel.IKernelConnection;
 }
-
 IpylabModel.JFEM = JupyterFrontEndModel;
 const JFEM = JupyterFrontEndModel;
 

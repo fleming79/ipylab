@@ -60,8 +60,6 @@ export class IpylabModel extends DOMWidgetModel {
 
   initialize(attributes: any, options: any): void {
     super.initialize(attributes, options);
-    this.set('_ready', false);
-    this.save_changes();
     this.on('msg:custom', this.onCustomMessage, this);
     IpylabModel.onKernelLost(this.kernel, this.onKernelLost, this);
     if (this.widget_manager.restoredStatus || !IpylabModel.PER_KERNEL_WM) {
@@ -119,8 +117,8 @@ export class IpylabModel extends DOMWidgetModel {
    * It can be overloaded, but shouldn't be called.
    */
   setReady() {
-    this.set('_ready', true);
     this.save_changes();
+    this.ipylabSend('ready');
   }
 
   onKernelLost() {
@@ -135,7 +133,7 @@ export class IpylabModel extends DOMWidgetModel {
     this.stopListening(this, 'change:_signal_dottednames', this.update_signals);
     this.stopListening(this, 'change:_view_count', this.update_signals);
     if (!comm_closed) {
-      this.ipylabSend({ closed: true });
+      this.ipylabSend('closed');
     }
     Object.defineProperty(this, 'base', { value: null });
     return super.close(true);
@@ -168,7 +166,11 @@ export class IpylabModel extends DOMWidgetModel {
       }
       content = toJSONsubstituteCylic(content);
     }
-    this.send({ ipylab: content }, callbacks, buffers);
+    this.send(
+      { ipylab: content, pageId: IpylabModel.pageId },
+      callbacks,
+      buffers
+    );
   }
 
   /**
@@ -312,7 +314,9 @@ export class IpylabModel extends DOMWidgetModel {
    * @param msg The message received from the backend.
    */
   protected onCustomMessage(msg: any) {
-    if (msg.ipylab) {
+    if (msg.pageId && msg.pageId !== IpylabModel.pageId) {
+      return;
+    } else if (msg.ipylab) {
       this._onBackendMessage(JSON.parse(msg.ipylab));
     }
   }
@@ -359,8 +363,21 @@ export class IpylabModel extends DOMWidgetModel {
       }
     } else if (content.ipylab_PY) {
       this.doOperationForPython(content);
-    } else if (content.close) {
+    } else if (content === 'close') {
       this.close(true);
+    } else if (content === 'checkReady') {
+      this.ipylabSend('ready');
+    } else if (content.clientIdToPageId) {
+      // Look for a kernel connection that has the requested `clientId`.
+      const clientId = content.clientIdToPageId;
+      for (const kc of getNestedProperty({
+        obj: IpylabModel.app.serviceManager.kernels,
+        subpath: '_kernelConnections'
+      })) {
+        if (kc.clientId === clientId) {
+          return this.ipylabSend({clientIdToPageId:{ clientId, pageId: IpylabModel.pageId }});
+        }
+      }
     }
   }
 
@@ -576,6 +593,10 @@ export class IpylabModel extends DOMWidgetModel {
     return (this.widget_manager as any).kernel;
   }
 
+  get session(): string {
+    return (this.widget_manager as any).kernel.clientId;
+  }
+
   get commAvailable(): boolean {
     return (
       !this.kernel?.isDisposed &&
@@ -659,6 +680,9 @@ export class IpylabModel extends DOMWidgetModel {
         }
       }
       subpath = subpath ?? '';
+      if (!obj) {
+        throw new Error(`failed to locate object for value:"${value}"!`);
+      }
       return await getNestedProperty({ obj, subpath, nullIfMissing });
     }
     throw new Error(`Cannot convert this value to an object: ${value}`);
@@ -687,6 +711,9 @@ export class IpylabModel extends DOMWidgetModel {
 
   static get sessionManager(): Session.IManager {
     return IpylabModel.app.serviceManager.sessions;
+  }
+  static get pageId() {
+    return Private.pageId;
   }
   private _signalDisconnectors = new Map<string, () => boolean>();
   widget_manager: KernelWidgetManager;
@@ -747,4 +774,7 @@ namespace Private {
     IKernelConnection,
     Set<[() => any, object]>
   >();
+  export const validSessions = new Set<string>();
+  export const invalidSessions = new Set<string>();
+  export const pageId = UUID.uuid4();
 }

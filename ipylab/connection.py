@@ -7,7 +7,7 @@ import uuid
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from ipywidgets import Widget, register
-from traitlets import Bool, Dict, Instance, Unicode
+from traitlets import Bool, Dict, Instance, Unicode, default
 from typing_extensions import override
 
 from ipylab.common import Area, Singular
@@ -44,14 +44,18 @@ class Connection(Singular, Ipylab):
     _CLASS_DEFINITIONS: ClassVar[dict[str, type[Self]]] = {}
     _PREFIX = "ipylab-"
     _SEP = "|"
+    page_id = Unicode().tag(sync=True)
     prefix: ClassVar = f"{_PREFIX}Connection{_SEP}"
 
     _model_name = Unicode("ConnectionModel").tag(sync=True)
     connection_id = Unicode(read_only=True, help="connection id").tag(sync=True)
     _dispose = Bool(read_only=True).tag(sync=True)
     ipylab_base = None
-
     auto_dispose = Bool(False, read_only=True, help="Dispose of the object in frontend when closed.").tag(sync=True)
+
+    @default("page_id")
+    def _default_page_id(self):
+        return self.get_page_id()
 
     @override
     @classmethod
@@ -84,7 +88,7 @@ class Connection(Singular, Ipylab):
         args = tuple(aa for a in args if (aa := a.strip()))
         if args and args[0].startswith(cls.prefix):
             if len(args) != 1:
-                msg = "Extending a connection_id with extra args is not allowed!"
+                msg = "Extending a `connection_id` with extra args is not allowed!"
                 raise ValueError(msg)
             return args[0]
         if not args:

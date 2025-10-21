@@ -10,7 +10,7 @@ import { Widget } from '@lumino/widgets';
 /**
  * ConnectionModel provides a connection to an object using a unique 'connection_id'.
  *
- * The object to be referenced must first be registered static method
+ * The object to be referenced must first be registered with the static class method
  * `ConnectionModel.registerConnection`.
  */
 export class ConnectionModel extends IpylabModel {
@@ -24,12 +24,18 @@ export class ConnectionModel extends IpylabModel {
   async ipylabInit(base: any = null) {
     this.connection_id = this.get('connection_id');
     base = await this.getObject();
-    if (!base) {
-      this.close();
-      return;
+    if (base) {
+      base.disposed.connect(this._base_disposed, this);
+      this.set('page_id', IpylabModel.pageId);
+      await super.ipylabInit(base);
+    } else {
+      if (this.get('page_id') === IpylabModel.pageId) {
+        this.close();
+      } else {
+        // TODO: Close lost connections - how to determine
+        this.setReady();
+      }
     }
-    base.disposed.connect(this._base_disposed, this);
-    await super.ipylabInit(base);
   }
 
   _base_disposed() {
@@ -43,7 +49,11 @@ export class ConnectionModel extends IpylabModel {
     this.base?.disposed?.disconnect(this._base_disposed, this);
     if ((this.base as any)?.ipylabDisposeOnClose ?? this.get('auto_dispose')) {
       this.set('auto_dispose', false);
-      this.base?.dispose();
+      try {
+        this.base?.dispose();
+      } catch (e) {
+        //do nothing
+      }
     }
     return super.close(comm_closed);
   }
