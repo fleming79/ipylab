@@ -1,0 +1,14 @@
+{
+  "title": "Ipylab",
+  "description": "Settings for ipylab.",
+  "properties": {
+    "autostart": {
+      "type": "boolean",
+      "title": "Ipylab kernel enabled",
+      "description": "Automatically start the ipylab kernel when Jupyterlab is started. This enables plugins to use the autostart feature. Note: This feature requires a special version of Jupyterlab widgets https://github.com/jupyter-widgets/ipywidgets/pull/3922",
+      "default": false
+    }
+  },
+  "additionalProperties": false,
+  "type": "object"
+}

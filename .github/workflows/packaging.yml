@@ -2,9 +2,11 @@ name: Packaging
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   pull_request:
-    branches: '*'
+    branches:
+      - '*'
 
 env:
   PIP_DISABLE_PIP_VERSION_CHECK: 1
@@ -48,11 +50,11 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu, macos, windows]
-        python: ['3.8', '3.12']
+        python: ['3.11', '3.13']
         include:
-          - python: '3.8'
+          - python: '3.11'
             dist: 'ipylab*.tar.gz'
-          - python: '3.12'
+          - python: '3.13'
             dist: 'ipylab*.whl'
           - os: windows
             py_cmd: python

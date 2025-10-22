@@ -1,0 +1,87 @@
+{
+  // To debug jupyterlab running in a venv or conda env:
+  //   - set up Python env in your workspace as per https://code.visualstudio.com/docs/python/environments
+  //   - add an "envFile" prop to each backend config pointing to .vscode/debug.env
+  //   - configure the .vscode/debug.env file as needed
+  // https://github.com/jupyterlab/vscode-config-template/tree/main
+  // https://github.com/jupyterlab/vscode-config-template/issues/1
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python Debugger: Current File all-code",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
+      "name": "Python Debugger: Current File: just my code",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
+      "name": "Ipylab",
+      "type": "debugpy",
+      "request": "launch",
+      "args": [
+        "--notebook-dir=examples",
+        "--no-browser",
+        "--IdentityProvider.token=''",
+        "--port=9990"
+      ],
+      "cwd": "${workspaceFolder}",
+      "justMyCode": false,
+      "module": "ipylab",
+      "presentation": {
+        "hidden": false
+      }
+    },
+    {
+      "name": "IPylab frontend with Firefox",
+      "type": "firefox",
+      "request": "launch",
+      "reAttach": true,
+      "url": "http://localhost:9990",
+      "webRoot": "${workspaceFolder}",
+      "pathMappings": [
+        {
+          "url": "webpack://ipylab/src",
+          "path": "${workspaceFolder}/src"
+        }
+      ],
+      "presentation": {
+        "hidden": false
+      }
+    },
+    {
+      "name": "IPylab frontend with Chrome",
+      "type": "chrome",
+      "request": "launch",
+      "timeout": 180000,
+      "url": "http://localhost:9990",
+      // set webroot to the parent dir of your project's top level package.json
+      "webRoot": "${workspaceFolder}",
+      "pathMapping": {
+        "url": "webpack://ipylab/src",
+        "path": "${workspaceFolder}/src"
+      },
+      "presentation": {
+        "hidden": true
+      }
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Debug IPylab with Firefox",
+      "configurations": ["Ipylab", "IPylab frontend with Firefox"]
+    },
+    {
+      "name": "Debug Ipylab with Chrome",
+      "configurations": ["Ipylab", "IPylab frontend with Chrome"]
+    }
+  ]
+}

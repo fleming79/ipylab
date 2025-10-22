@@ -2,7 +2,8 @@
 # Distributed under the terms of the Modified BSD License.
 
 from ipywidgets import DOMWidget, register
-from traitlets import Unicode, Float
+from traitlets import Unicode
+
 from ._frontend import module_name, module_version
 
 
