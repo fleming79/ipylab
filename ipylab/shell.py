@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import contextlib
+import inspect
 from typing import TYPE_CHECKING, Literal, Unpack
 
 from async_kernel.kernelspec import KernelName
@@ -11,12 +12,12 @@ from ipywidgets import DOMWidget, TypedTuple, Widget
 from traitlets import Container, Instance, Unicode
 
 import ipylab
-from ipylab.common import Area, InsertMode, IpylabKwgs, Obj, Singular, Transform, TransformType, pack
+from ipylab.common import Area, Fixed, InsertMode, IpylabKwgs, Obj, Singular, Transform, TransformType, pack
 from ipylab.connection import ShellConnection
 from ipylab.ipylab import Ipylab, IpylabBase
+from ipylab.log_viewer import LogViewer
 
 if TYPE_CHECKING:
-    import inspect
     from typing import Literal
 
 
@@ -33,6 +34,8 @@ class Shell(Singular, Ipylab):
     _model_name = Unicode("ShellModel", help="Name of the model.", read_only=True).tag(sync=True)
     ipylab_base = IpylabBase(Obj.IpylabModel, "app.shell").tag(sync=True)
     current_widget_id = Unicode(read_only=True).tag(sync=True)
+
+    log_viewer = Fixed(LogViewer)
 
     connections: Container[tuple[ShellConnection, ...]] = TypedTuple(trait=Instance(ShellConnection))
     console: Instance[ConsoleConnection | None] = Instance(ConsoleConnection, default_value=None, allow_none=True)  # pyright: ignore[reportAssignmentType]
@@ -132,7 +135,10 @@ class Shell(Singular, Ipylab):
         if isinstance(obj, DOMWidget):
             obj.add_class(self.app.selector.removeprefix("."))
         if "evaluate" in args and isinstance(vpath, dict):
-            raise NotImplementedError
+            val = ipylab.plugin_manager.hook.vpath_getter(app=self.app, kwgs=vpath)
+            while inspect.isawaitable(val):
+                val = await val
+            vpath = val
         args["vpath"] = vpath
         args["preferredKernel"] = preferred_kernel
         sc_current = None
