@@ -1,175 +1,180 @@
 // Copyright (c) ipylab contributors
 // Distributed under the terms of the Modified BSD License.
 
-import { JupyterFrontEnd, ILabShell } from '@jupyterlab/application';
+import { MainAreaWidget } from '@jupyterlab/apputils';
+import { UUID } from '@lumino/coreutils';
+import { Widget } from '@lumino/widgets';
+import { IpylabModel } from './ipylab';
+import { ILabShell } from '@jupyterlab/application';
 
-import { DOMUtils } from '@jupyterlab/apputils';
+const AREAS: Array<ILabShell.Area> = [
+  'main',
+  'left',
+  'right',
+  'header',
+  'top',
+  'menu',
+  'bottom'
+];
 
-import {
-  ISerializers,
-  WidgetModel,
-  unpack_models
-} from '@jupyter-widgets/base';
-
-import { ArrayExt } from '@lumino/algorithm';
-
-import { Message, MessageLoop } from '@lumino/messaging';
-
-import { MODULE_NAME, MODULE_VERSION } from '../version';
-
-/**
- * The model for a shell.
- */
-export class ShellModel extends WidgetModel {
+export class ShellModel extends IpylabModel {
   /**
    * The default attributes.
    */
-  defaults(): any {
-    return {
-      ...super.defaults(),
-      _model_name: ShellModel.model_name,
-      _model_module: ShellModel.model_module,
-      _model_module_version: ShellModel.model_module_version,
-      _widgets: []
-    };
+  defaults(): Backbone.ObjectHash {
+    return { ...super.defaults(), _model_name: 'ShellModel' };
   }
 
-  /**
-   * Initialize a ShellModel instance.
-   *
-   * @param attributes The base attributes.
-   * @param options The initialization options.
-   */
-  initialize(attributes: any, options: any): void {
-    this._shell = ShellModel.shell;
-    this._labShell = ShellModel.labShell;
-
-    super.initialize(attributes, options);
-    this.on('msg:custom', this._onMessage.bind(this));
-
-    // restore existing widgets
-    const widgets = this.get('_widgets');
-    widgets.forEach((w: any) => this._add(w));
+  setReady(): void {
+    this.base.currentChanged.connect(this._currentChanged, this);
+    super.setReady();
   }
 
-  /**
-   * Add a widget to the application shell
-   *
-   * @param payload The payload to add
-   */
-  private async _add(payload: any): Promise<string> {
-    const { serializedWidget, area, args, id } = payload;
-    const model = await unpack_models(serializedWidget, this.widget_manager);
-    const view = await this.widget_manager.create_view(model, {});
-    const title = await unpack_models(model.get('title'), this.widget_manager);
-    const luminoWidget = view.luminoWidget;
-
-    luminoWidget.id = id ?? DOMUtils.createDomID();
-
-    MessageLoop.installMessageHook(
-      luminoWidget,
-      (handler: any, msg: Message) => {
-        switch (msg.type) {
-          case 'close-request': {
-            const widgets = this.get('_widgets').slice();
-            ArrayExt.removeAllWhere(widgets, (w: any) => w.id === handler.id);
-            this.set('_widgets', widgets);
-            this.save_changes();
-            break;
-          }
-        }
-        return true;
-      }
-    );
-
-    const updateTitle = async (): Promise<void> => {
-      luminoWidget.title.caption = title.get('caption');
-      luminoWidget.title.className = title.get('class_name');
-      luminoWidget.title.closable = title.get('closable');
-      luminoWidget.title.label = title.get('label');
-      luminoWidget.title.dataset = title.get('dataset');
-      luminoWidget.title.iconLabel = title.get('icon_label');
-
-      const icon = await unpack_models(title.get('icon'), this.widget_manager);
-      luminoWidget.title.icon = icon ? icon.labIcon : null;
-      luminoWidget.title.iconClass = icon ? null : title.get('icon_class');
-    };
-
-    title.on('change', updateTitle);
-    void updateTitle();
-
-    if ((area === 'left' || area === 'right') && this._labShell) {
-      let handler;
-      if (area === 'left') {
-        handler = this._labShell['_leftHandler'];
-      } else {
-        handler = this._labShell['_rightHandler'];
-      }
-
-      // handle tab closed event
-      handler.sideBar.tabCloseRequested.connect((sender: any, tab: any) => {
-        tab.title.owner.close();
-      });
-
-      luminoWidget.addClass('jp-SideAreaWidget');
+  _currentChanged() {
+    const id = this.base.currentWidget?.id;
+    if (id && id !== this.get('current_widget_id')) {
+      this.set('current_widget_id', id);
+      this.save_changes();
     }
-
-    this._shell.add(luminoWidget, area, args);
-    return luminoWidget.id;
   }
 
-  /**
-   * Handle a custom message from the backend.
-   *
-   * @param msg The message to handle.
-   */
-  private async _onMessage(msg: any): Promise<void> {
-    switch (msg.func) {
-      case 'add': {
-        const id = await this._add(msg.payload);
-        // keep track of the widgets added to the shell
-        const widgets = this.get('_widgets');
-        this.set(
-          '_widgets',
-          widgets.concat({
-            ...msg.payload,
-            id
-          })
-        );
-        this.save_changes();
-        break;
-      }
-      case 'expandLeft': {
-        if (this._labShell) {
-          this._labShell.expandLeft();
+  close(comm_closed?: boolean): Promise<void> {
+    this.base.currentChanged.disconnect(this._currentChanged, this);
+    return super.close(comm_closed);
+  }
+
+  async operation(op: string, payload: any): Promise<any> {
+    switch (op) {
+      case 'addToShell':
+        return await ShellModel.addToShell(payload.args);
+      case 'getWidget':
+        if (!payload.id) {
+          return this.base.currentWidget;
         }
-        break;
-      }
-      case 'expandRight': {
-        if (this._labShell) {
-          this._labShell.expandRight();
-        }
-        break;
-      }
+        return ShellModel.getLuminoWidgetFromShell(payload.id);
+      case 'getWidgetIds':
+        return ShellModel.listWidgetIds();
       default:
-        break;
+        return await super.operation(op, payload);
     }
   }
 
-  static serializers: ISerializers = {
-    ...WidgetModel.serializers
-  };
+  /**
+   * Provided for IpylabModel.tracker for restoring widgets to the shell.
+   * @param args `ipylabSettings` in 'addToShell'
+   */
+  static async restoreToShell(args: any) {
+    const sessions = ShellModel.app.serviceManager.sessions;
+    if (!args.evaluate && !(await sessions.findByPath(args.vpath))) {
+      // Don't create a kernel if a model doesn't exist.
+      return;
+    }
 
-  static model_name = 'ShellModel';
-  static model_module = MODULE_NAME;
-  static model_module_version = MODULE_VERSION;
-  static view_name: string = null;
-  static view_module: string = null;
-  static view_module_version = MODULE_VERSION;
+    await ShellModel.JFEM.getModelByVpath(args.vpath, args.preferredKernel);
+    await new Promise(resolve => {
+      setTimeout(resolve, 10000);
+      ShellModel.addToShell(args).then(resolve, e => {
+        resolve(null);
+        if (args.evaluate) {
+          throw e;
+        }
+      });
+    });
+  }
 
-  private _shell: JupyterFrontEnd.IShell;
-  private _labShell: ILabShell;
+  /**
+   * Add a widget to the application shell.
+   *
+   * This function can handle ipywidgets and native Widgets and  be used to
+   * move widgets about the shell.
+   *
+   * Ipywidgets are added to a tracker enabling restoration from a running
+   * kernel such as page refreshing and switching workspaces.
+   *
+   * Generative widget creation is supported with 'evaluate' using the same
+   * code as 'evalute'. The evaluated code MUST return a widget with a view
+   * to be valid.
+   *
+   * @param args An object with area, options, connection_id, id, vpath & evaluate.
+   */
 
-  static shell: JupyterFrontEnd.IShell;
-  static labShell: ILabShell;
+  private static async addToShell(args: any): Promise<Widget> {
+    let widget: Widget | MainAreaWidget;
+
+    try {
+      widget = await ShellModel.toLuminoWidget(args);
+      // Create a new lumino widget
+    } catch (e) {
+      if (args.evaluate) {
+        // Evaluate code in python to get a panel and then add it to the shell.
+        const jfem = await ShellModel.JFEM.getModelByVpath(
+          args.vpath,
+          args.preferredKernel
+        );
+        return await jfem.scheduleOperation('shell_eval', args, 'object');
+      } else {
+        throw e;
+      }
+    }
+    args.connection_id =
+      args.connection_id ||
+      ShellModel.ConnectionModel.new_id('ShellConnection');
+    if (args.asMainArea && !(widget instanceof MainAreaWidget)) {
+      widget.addClass('ipylab-MainArea');
+      const w = (widget = new MainAreaWidget({ content: widget }));
+      w.toolbar.dispose();
+      w.contentHeader.dispose();
+      w.id = args.connection_id;
+    }
+    ShellModel.ConnectionModel.registerConnection(args.connection_id, widget);
+
+    widget.id = widget.id || args.connection_id || UUID.uuid4();
+    ShellModel.app.shell.add(widget as any, args.area || 'main', args.options);
+
+    // Register widgets originating from IpyWidgets
+    if (args.ipy_model) {
+      if (!ShellModel.tracker.has(widget)) {
+        (widget as any).ipylabSettings = args;
+        ShellModel.tracker.add(widget);
+      } else {
+        (widget as any).ipylabSettings.area = args.area;
+        (widget as any).ipylabSettings.options = args.options;
+        ShellModel.tracker.save(widget);
+      }
+    }
+    return widget;
+  }
+
+  /**
+   * Get the lumino widget from the shell using its id.
+   *
+   * @param id
+   */
+  static getLuminoWidgetFromShell(id: string): Widget | null {
+    for (const area of AREAS) {
+      for (const widget of ShellModel.labShell.widgets(area)) {
+        if (widget.id === id) {
+          return widget;
+        }
+      }
+    }
+  }
+
+  /**
+   * Get mapping of area to array widget ids for all areas.
+   */
+  static listWidgetIds(): any {
+    const data = Object.create(null);
+    for (const area of AREAS) {
+      const items: Array<string> = [];
+      data[area] = items;
+      for (const widget of ShellModel.labShell.widgets(area)) {
+        items.push(widget.id);
+      }
+    }
+    return data;
+  }
+  readonly base: ILabShell;
 }
+
+IpylabModel.ShellModel = ShellModel;

@@ -1,51 +1,101 @@
 # Copyright (c) ipylab contributors.
 # Distributed under the terms of the Modified BSD License.
 
-from ipywidgets import VBox, Widget, register, widget_serialization
-from traitlets import Bool, Dict, Instance, Unicode
-from ._frontend import module_name, module_version
-from .icon import Icon
+from __future__ import annotations
+
+from typing import ClassVar, NotRequired, TypedDict, Unpack
+
+import anyio
+from async_kernel import Caller
+from ipywidgets import (
+    Box,
+    DOMWidget,
+    Layout,
+    TypedTuple,
+    Widget,
+    register,
+    widget_serialization,
+)
+from ipywidgets.widgets.trait_types import InstanceDict
+from traitlets import Container, Dict, Instance, Unicode, observe
+
+from ipylab.common import Area, HasApp, InsertMode
+from ipylab.connection import Connection, ShellConnection
+from ipylab.ipylab import WidgetBase
+
+
+class AddToShellType(TypedDict):
+    area: NotRequired[Area]
+    activate: NotRequired[bool]
+    mode: NotRequired[InsertMode]
+    rank: NotRequired[int | None]
+    ref: NotRequired[ShellConnection | None]
+    options: NotRequired[dict | None]
 
 
 @register
-class Title(Widget):
+class Icon(WidgetBase, DOMWidget):
+    _model_name = Unicode("IconModel").tag(sync=True)
+    _view_name = Unicode("IconView").tag(sync=True)
+
+    name = Unicode().tag(sync=True)
+    svgstr = Unicode().tag(sync=True)
+
+
+@register
+class Title(WidgetBase):
     _model_name = Unicode("TitleModel").tag(sync=True)
-    _model_module = Unicode(module_name).tag(sync=True)
-    _model_module_version = Unicode(module_version).tag(sync=True)
 
     label = Unicode().tag(sync=True)
     icon_class = Unicode().tag(sync=True)
     caption = Unicode().tag(sync=True)
     class_name = Unicode().tag(sync=True)
-    closable = Bool(True).tag(sync=True)
     dataset = Dict().tag(sync=True)
     icon_label = Unicode().tag(sync=True)
-
-    icon = Instance(Icon, allow_none=True).tag(sync=True, **widget_serialization)
+    # Widgets
+    icon: Instance[Icon] = InstanceDict(Icon, allow_none=True).tag(sync=True, **widget_serialization)
 
 
 @register
-class Panel(VBox):
+class Panel(HasApp, WidgetBase, Box):
     _model_name = Unicode("PanelModel").tag(sync=True)
-    _model_module = Unicode(module_name).tag(sync=True)
-    _model_module_version = Unicode(module_version).tag(sync=True)
+    _view_name = Unicode("PanelView").tag(sync=True)
+    title: Instance[Title] = InstanceDict(Title, ()).tag(sync=True, **widget_serialization)
 
-    title = Instance(Title).tag(sync=True, **widget_serialization)
+    connections: Container[tuple[Connection, ...]] = TypedTuple(trait=Instance(Connection))
+    add_to_shell_defaults: ClassVar = AddToShellType(mode=InsertMode.tab_after)
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, title=Title(), **kwargs)
+    async def add_to_shell(self, *, connection_id="", **kwgs: Unpack[AddToShellType]) -> ShellConnection:
+        """Add this panel to the shell."""
+        if connection_id:
+            kwgs["connection_id"] = connection_id  # pyright: ignore[reportGeneralTypeIssues]
+        return await self.app.shell.add(self, **self.add_to_shell_defaults | kwgs)
 
 
 @register
 class SplitPanel(Panel):
     _model_name = Unicode("SplitPanelModel").tag(sync=True)
-    _model_module = Unicode(module_name).tag(sync=True)
-    _model_module_version = Unicode(module_version).tag(sync=True)
     _view_name = Unicode("SplitPanelView").tag(sync=True)
-    _view_module = Unicode(module_name).tag(sync=True)
-    _view_module_version = Unicode(module_version).tag(sync=True)
-
     orientation = Unicode("vertical").tag(sync=True)
+    layout = InstanceDict(Layout, kw={"width": "100%", "height": "100%", "overflow": "hidden"}).tag(
+        sync=True, **widget_serialization
+    )
 
-    def addWidget(self, widget):
-        self.children = list(self.children) + [widget]
+    # ============== Start temp fix =============
+    # Below here is added as a temporary fix to address issue https://github.com/jtpio/ipylab/issues/129
+
+    @observe("children", "connections")
+    def _observer(self, _):
+        Caller().queue_call(self._toggle_orientation, self.children)
+
+    async def _toggle_orientation(self, children: tuple[Widget, ...]) -> None:
+        """Toggle the orientation to cause lumino_widget.parent to re-render content."""
+        await anyio.sleep(0.1)
+        if children != self.children:
+            return
+        orientation = self.orientation
+        self.orientation = "horizontal" if orientation == "vertical" else "vertical"
+        await anyio.sleep(0.001)
+        self.orientation = orientation
+
+    # ============== End temp fix =============

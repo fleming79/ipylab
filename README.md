@@ -7,9 +7,9 @@
 [![pypi](https://img.shields.io/pypi/v/ipylab.svg)](https://pypi.python.org/pypi/ipylab)
 [![npm](https://img.shields.io/npm/v/ipylab.svg)](https://www.npmjs.com/package/ipylab)
 
-Control JupyterLab from Python notebooks.
+Control JupyterLab from Python.
 
-The goal is to provide access to most of the JupyterLab environment from Python notebooks. For example:
+The goal is to provide access to most of the JupyterLab environment from the Python kernel. For example:
 
 - Adding widgets to the main area `DockPanel`, left, right or top area
 - Build more advanced interfaces leveraging `SplitPanel`, `Toolbar` and other Lumino widgets
@@ -45,12 +45,6 @@ Or with [JupyterLite](https://github.com/jupyterlite/jupyterlite):
 
 ![ipytree-example](https://user-images.githubusercontent.com/591645/80026006-b8bb1d80-84e1-11ea-87cc-86495186b938.gif)
 
-### Compatibility with RetroLab
-
-A subset of the features can be used in RetroLab:
-
-![retrolab-example](https://user-images.githubusercontent.com/591645/141700044-3c39661a-8a9a-4e6b-a031-03724e0df25b.gif)
-
 ## Installation
 
 You can install using `pip`:
@@ -59,24 +53,21 @@ You can install using `pip`:
 pip install ipylab
 ```
 
-Or with `mamba` / `conda`:
+## Dependencies
 
-```bash
-mamba install -c conda-forge ipylab
-```
+The following dependencies are provided as wheels in the pkg directory which include patches to
+improved the functionality.
 
-## Running the examples locally
+| Name                                               | Pull request                                                                                                                        | Status                     | Modification                                                                                                                              |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| traitlets                                          | [#918](https://github.com/ipython/traitlets/pull/918)                                                                               | Accepted - pending release | Improved type hints                                                                                                                       |
+| ipywidgets, jupyterlab-widgets, widgetsnbextension | [#3922](https://github.com/jupyter-widgets/ipywidgets/pull/3922) + [#3921](https://github.com/jupyter-widgets/ipywidgets/pull/3921) | Pending review             | Provides for widgets comms without needing a notebook or console to be open. Plus fixes for proper garbage collection and widget tooltips |
+| jupyter_client                                     | [#1064](https://github.com/jupyter/jupyter_client/pull/1064)                                                                        | Pending review             | Faster message serialization                                                                                                              |
 
-To try out the examples locally, the recommended way is to create a new environment with the dependencies:
+## Examples
 
-```bash
-# create a new conda environment
-conda create -n ipylab-examples -c conda-forge jupyterlab ipylab ipytree bqplot ipywidgets numpy
-conda activate ipylab-examples
+Example files can be downloaded directly from github [here](https://github.com/jtpio/ipylab/tree/main/examples).
 
-# start JupyterLab
-jupyter lab
-```
 
 ## Under the hood
 
@@ -86,22 +77,79 @@ jupyter lab
 
 ## Development
 
+The development environment is provided by [uv](https://docs.astral.sh/uv/).
+
+### Installation from source
+
+If you are working on a pull request, [make a fork] of the project and install from your fork.
+
+```shell
+git clone <repository>
+cd ipylab
+uv venv -p python@311 # or whichever environment you are targeting.
+uv sync
+# Activate the uv environment
+```
+
+### Frontend (Typescript/Javascript)
+
 ```bash
-# create a new conda environment
-mamba create -n ipylab -c conda-forge jupyter-packaging nodejs python -y
-
-# activate the environment
-conda activate ipylab
-
-# install the Python package
-python -m pip install -e ".[dev]"
-
-# link the extension files
-jupyter labextension develop . --overwrite
+# Activate the uv environment
 
 # compile the extension
-jlpm && jlpm run build
+jlpm clean
+jlpm build
+
+# **Frontend/typescript development only** link the extension files
+jupyter labextension develop . --overwrite
+
+# At this point you can run and debug. vscode configs are provided for Firefox and Chrome.
+# "Debug Ipylab with Firefox | Chrome"
 ```
+
+```bash
+# pre-commit (optional)
+pre-commit run
+
+# or, to install the git hook
+pre-commit install
+
+# Use jlpm script to lint the JS
+jlpm lint
+#or
+jlpm lint:check
+
+```
+
+!!! note
+
+    If you're developing the fronted on Windows you need to [enable developer mode](https://learn.microsoft.com/en-us/windows/apps/get-started/enable-your-device-for-development#activate-developer-mode) for symlinks to work.
+
+    [see also](https://discuss.python.org/t/add-os-junction-pathlib-path-junction-to/50394).
+
+### Upgrade files
+
+=== "Python files"
+
+    ```bash
+    uv sync -U
+    ```
+
+=== "Frontend"
+
+    TODO
+
+### Type checking
+
+Type checking is performed using [basedpyright](https://docs.basedpyright.com/).
+
+```bash
+basedpyright
+```
+
+### VS code debugging
+
+A config file is included to debug `ipylab` with Firefox or Chrome.
 
 ## Related projects
 
