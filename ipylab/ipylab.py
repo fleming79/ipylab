@@ -14,7 +14,8 @@ from typing import TYPE_CHECKING, Any
 
 import anyio
 import traitlets
-from async_kernel import AsyncEvent, Caller, Future
+from aiologic import Event
+from async_kernel import Caller, Future
 from async_kernel.caller import truncated_rep
 from IPython import get_ipython  # pyright: ignore[reportPrivateImportUsage]
 from ipywidgets import TypedTuple, Widget, register
@@ -34,6 +35,7 @@ __all__ = ["Ipylab", "IpylabBase", "WidgetBase"]
 
 _page_id_var = ContextVar[str]("_page_id_var", default="")
 _client_id_to_page = {}
+WAIT_READY = True  # Intended for testing when there is not frontend, hence ready will never be set.
 
 
 class IpylabBase(TraitType[tuple[str, str], None]):
@@ -79,7 +81,7 @@ class Ipylab(HasApp, WidgetBase):
     _model_name = Unicode("IpylabModel", help="Name of the model.", read_only=True).tag(sync=True)
     _python_class = Unicode().tag(sync=True)
     ipylab_base = IpylabBase(Obj.this, "").tag(sync=True)
-    _ready_events: Fixed[Self, dict[str, AsyncEvent]] = Fixed(dict)
+    _ready_events: Fixed[Self, dict[str, Event]] = Fixed(dict)
     _view_count = Int().tag(sync=True)
     _on_ready_callbacks: Container[list[Callable[[Self], None | CoroutineType]]] = List(trait=traitlets.Callable())
     _comm = None
@@ -288,28 +290,29 @@ class Ipylab(HasApp, WidgetBase):
     async def ready(self) -> Self:
         """Wait for the instance to be ready for the current session."""
         self._check_closed()
-        if not (page_id := self.get_page_id()):
-            if self is self.app:
-                i = 0.02
-                while not (page_id := self.get_page_id()):
-                    self._ipylab_send({"clientIdToPageId": self.get_kernel_client_id()}, page_id="")
-                    await anyio.sleep(i)
-                    i = min((i * 2, 1))
-                    # A custom message should be returned.
-            else:
-                await self.app.ready()
-            page_id = self.get_page_id()
-            assert page_id
-        if not (ready := self._ready_events.get(page_id)):
-            self._ready_events[page_id] = ready = AsyncEvent()
-            self._ipylab_send("checkReady", page_id=page_id)
-        await ready.wait()
-        self._check_closed()
+        if WAIT_READY:
+            if not (page_id := self.get_page_id()):
+                if self is self.app:
+                    i = 0.02
+                    while not (page_id := self.get_page_id()):
+                        self._ipylab_send({"clientIdToPageId": self.get_kernel_client_id()}, page_id="")
+                        await anyio.sleep(i)
+                        i = min((i * 2, 1))
+                        # A custom message should be returned.
+                else:
+                    await self.app.ready()
+                page_id = self.get_page_id()
+                assert page_id
+            if not (ready := self._ready_events.get(page_id)):
+                self._ready_events[page_id] = ready = Event()
+                self._ipylab_send("checkReady", page_id=page_id)
+            await ready
+            self._check_closed()
         return self
 
     def _on_ready(self, page_id: str):
-        if not (ready := self._ready_events.get(page_id)):
-            self._ready_events[page_id] = ready = AsyncEvent()
+        if (ready := self._ready_events.get(page_id)) is None:
+            self._ready_events[page_id] = ready = Event()
         if not ready.is_set():
             ready.set()
             for cb in self._on_ready_callbacks:

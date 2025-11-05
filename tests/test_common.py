@@ -7,10 +7,10 @@ from typing import Self
 from unittest.mock import AsyncMock, MagicMock
 
 import anyio
-import async_kernel
 import ipylab
 import ipylab.common
 import pytest
+from aiologic import Event
 from ipylab import Ipylab
 from ipylab.common import (
     Fixed,
@@ -283,7 +283,7 @@ class TestOnReady:
         callback.assert_called()
 
         callback.reset_mock()
-        obj._ready_events["123"] = async_kernel.AsyncEvent()
+        obj._ready_events["123"] = Event()
         obj._on_ready("123")
         await anyio.sleep(0.1)
         callback.assert_called()
@@ -294,7 +294,7 @@ class TestOnReady:
         assert callback not in obj._on_ready_callbacks
 
         # Simulate the ready event again, callback should not be called
-        obj._ready_events["123"] = async_kernel.AsyncEvent()
+        obj._ready_events["123"] = Event()
         await anyio.sleep(0.1)
         callback.assert_not_called()
 

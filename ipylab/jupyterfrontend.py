@@ -40,6 +40,7 @@ class JupyterFrontEnd(Singular, Ipylab):
     """
 
     DEFAULT_COMMANDS: ClassVar = {"Open console", "Show log viewer"}
+    _test_mode = False
     _model_name = Unicode("JupyterFrontEndModel").tag(sync=True)
     ipylab_base = IpylabBase(Obj.IpylabModel, "app").tag(sync=True)
     version = Unicode(read_only=True).tag(sync=True)

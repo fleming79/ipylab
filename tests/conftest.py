@@ -5,7 +5,7 @@ import ipylab
 import ipylab.ipylab
 import pytest
 from async_kernel import Caller
-from async_kernel.kernel import AsyncEvent, RunMode, SocketID
+from async_kernel.kernel import RunMode, SocketID
 
 
 @pytest.fixture(scope="session")
@@ -27,6 +27,7 @@ async def caller(anyio_backend):
 @pytest.fixture
 async def app(caller, mocker):
     app = ipylab.JupyterFrontEnd()
+    ipylab.ipylab.WAIT_READY = False
     mocker.patch.object(app, "ready")
     page_id = "123"
     client_id = "456"
@@ -62,6 +63,5 @@ async def app(caller, mocker):
         "run_mode": RunMode.thread,
     }
     async_kernel.utils._job_var.set(job)
-    mocker.patch.object(AsyncEvent, "wait")
 
     return app

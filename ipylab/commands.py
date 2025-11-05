@@ -8,7 +8,7 @@ import inspect
 import uuid
 from typing import TYPE_CHECKING, Any, ClassVar, NotRequired, TypedDict, Unpack
 
-from async_kernel.caller import AsyncLock
+from aiologic import Lock
 from ipywidgets import TypedTuple
 from traitlets import Callable as CallableTrait
 from traitlets import Container, Dict, Instance, Tuple, Unicode
@@ -167,7 +167,7 @@ class CommandRegistry(Singular, Ipylab):
     name = Unicode(APP_COMMANDS_NAME, read_only=True).tag(sync=True)
     all_commands = Tuple(read_only=True).tag(sync=True)
     connections: Container[tuple[InfoConnection, ...]] = TypedTuple(trait=Instance(InfoConnection))
-    _lock = Fixed(AsyncLock)
+    _lock = Fixed(Lock)
 
     @classmethod
     @override
