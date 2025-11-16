@@ -46,9 +46,9 @@ class CustomToolbar(Ipylab):
             name: The name to use for the command.
             command: The connection to the command.
             args: Arguments to use when calling `command`.
-            iconClass:
-            icon:
-            label:
+            iconClass: The fontawesome icon name (without 'fa' is accepted).
+            icon: An Icon to use.
+            label: The caption.
             after: The name of an existing toolbar item after which to place.
             tooltip: A tooltip for the button.
             className:
@@ -63,7 +63,7 @@ class CustomToolbar(Ipylab):
                 "commandId": str(command),
                 "args": args or {},
                 "icon": f"{pack(icon)}.labIcon" if isinstance(icon, Icon) else None,
-                "iconClass": iconClass,
+                "iconClass": "fa " + iconClass.removeprefix("fa ") if iconClass else None,
                 "label": label,
                 "tooltip": tooltip,
                 "after": after,
