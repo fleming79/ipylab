@@ -19,9 +19,12 @@ import ipylab
 from ipylab import Ipylab
 from ipylab.commands import APP_COMMANDS_NAME, CommandPalette, CommandRegistry
 from ipylab.common import IpylabKwgs, LastUpdatedDict, Obj, Singular, to_selector
+from ipylab.dialog import Dialog
 from ipylab.ipylab import IpylabBase
+from ipylab.launcher import Launcher
 from ipylab.log import IpylabLogHandler, LogLevel
 from ipylab.menu import ContextMenu, MainMenu
+from ipylab.notification import NotificationManager
 from ipylab.sessions import SessionManager
 from ipylab.shell import Shell
 from ipylab.toolbar import CustomToolbar
@@ -49,14 +52,20 @@ class JupyterFrontEnd(Singular, Ipylab):
     per_kernel_widget_manager_detected = Bool(read_only=True).tag(sync=True)
 
     shell = Fixed(Shell)
+    dialog = Fixed(Dialog)
+    notification = Fixed(NotificationManager)
     commands = Fixed(lambda _: CommandRegistry(name=APP_COMMANDS_NAME))
+    launcher = Fixed(Launcher)
     main_menu = Fixed(MainMenu)
     command_pallet = Fixed(CommandPalette)
     context_menu: Fixed[Self, ContextMenu] = Fixed(lambda c: ContextMenu(commands=c["owner"].commands))
     sessions = Fixed(SessionManager)
     toolbar = Fixed(CustomToolbar)
 
-    logging_handler: Fixed[Self, IpylabLogHandler] = Fixed(lambda c: IpylabLogHandler(c["owner"].log_level))
+    logging_handler: Fixed[Self, IpylabLogHandler] = Fixed(
+        lambda c: ipylab.plugin_manager.hook.get_logging_handler(app=c["owner"]),
+        created=lambda c: c["owner"].shell.log_viewer,
+    )
     log_level = UseEnum(LogLevel, LogLevel.ERROR)
     namespaces: Dict[str, LastUpdatedDict] = Dict(read_only=True)
 
@@ -69,6 +78,21 @@ class JupyterFrontEnd(Singular, Ipylab):
     def _observe_log_level(self, _) -> None:
         if self.logging_handler:
             self.logging_handler.setLevel(self.log_level)
+
+    def _on_ready(self, page_id: str):
+        super()._on_ready(page_id)
+        assert self._vpath, "'_vpath' must be set first."
+        ipylab.plugin_manager.hook.autostart._call_history.clear()  # pyright: ignore[reportOptionalMemberAccess]
+        try:
+            if not ipylab.plugin_manager.hook.autostart_once._call_history:
+                ipylab.plugin_manager.hook.autostart_once.call_historic(
+                    kwargs={"app": self}, result_callback=self._autostart_callback
+                )
+            ipylab.plugin_manager.hook.autostart.call_historic(
+                kwargs={"app": self}, result_callback=self._autostart_callback
+            )
+        except Exception as e:
+            self.log.exception("Error with autostart", exc_info=e)
 
     def _autostart_callback(self, result) -> None:
         if inspect.iscoroutine(result):
@@ -151,6 +175,8 @@ class JupyterFrontEnd(Singular, Ipylab):
         ns = self.namespaces.get(namespace_id)
         if ns is None:
             self.namespaces[namespace_id] = ns = LastUpdatedDict()
+            for objs in ipylab.plugin_manager.hook.default_namespace_objects(namespace_id=namespace_id, app=self):
+                ns.update(objs)
         if objects:
             ns.update(objects)
         if namespace_id == "" and (kernel := getattr(self.comm, "kernel", None)):
