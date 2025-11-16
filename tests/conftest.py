@@ -1,4 +1,5 @@
 import datetime
+import threading
 
 import async_kernel
 import ipylab
@@ -20,7 +21,7 @@ async def anyio_backend_autouse(anyio_backend):
 
 @pytest.fixture
 async def caller(anyio_backend):
-    async with Caller(create=True) as caller:
+    async with Caller(thread=threading.current_thread()) as caller:
         yield caller
 
 

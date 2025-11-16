@@ -15,15 +15,16 @@ from typing import TYPE_CHECKING, Any
 import anyio
 import traitlets
 from aiologic import Event
-from async_kernel import Caller, Future
+from async_kernel import Caller, Pending
 from async_kernel.caller import truncated_rep
+from async_kernel.common import Fixed
 from IPython import get_ipython  # pyright: ignore[reportPrivateImportUsage]
 from ipywidgets import TypedTuple, Widget, register
 from traitlets import Container, Dict, Int, List, TraitType, Unicode, observe
 from typing_extensions import override
 
 import ipylab._frontend as _fe
-from ipylab.common import Fixed, HasApp, IpylabKwgs, Obj, P, SignalCallbackData, T, Transform, TransformType, pack
+from ipylab.common import HasApp, IpylabKwgs, Obj, P, SignalCallbackData, T, Transform, TransformType, pack
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator
@@ -86,7 +87,7 @@ class Ipylab(HasApp, WidgetBase):
     _on_ready_callbacks: Container[list[Callable[[Self], None | CoroutineType]]] = List(trait=traitlets.Callable())
     _comm = None
     _ipylab_init_complete = False
-    _pending_operations: Dict[str, Future] = Dict()
+    _pending_operations: Dict[str, Pending] = Dict()
     _signal_dottednames = TypedTuple().tag(sync=True)
     _signal_callbacks: Dict[str, list[Callable[[SignalCallbackData], None | CoroutineType]]] = Dict()
 
@@ -179,18 +180,18 @@ class Ipylab(HasApp, WidgetBase):
         /,
         *args: P.args,
         **kwargs: P.kwargs,
-    ) -> Future[T]:
+    ) -> Pending[T]:
         "Schedule `func` to be called in the event loop of the main thread with a `delay`."
         self.log.debug("Calling %s (%s)", func, description)
-        fut = Caller.get_instance().call_later(delay, func, *args, **kwargs)
-        fut.add_done_callback(functools.partial(self.on_done_log, description=description))
-        return fut
+        pen = Caller.get().call_later(delay, func, *args, **kwargs)
+        pen.add_done_callback(functools.partial(self.on_done_log, description=description))
+        return pen
 
-    def on_done_log(self, fut: Future, description=""):
+    def on_done_log(self, pen: Pending, description=""):
         "A done callback used by `Ipylab.call_later`"
-        if fut.cancelled():
-            self.log.debug("Cancelled %s", fut)
-        if e := fut.exception():
+        if pen.cancelled():
+            self.log.debug("Cancelled %s", pen)
+        if e := pen.exception():
             self.log.exception(description, exc_info=e)
 
     def _on_custom_msg(self, _, msg: dict, buffers: list) -> None:
@@ -236,15 +237,15 @@ class Ipylab(HasApp, WidgetBase):
             self.log.exception("Message processing error", obj=msg, exc_info=e)
 
     def _set_result(self, key: str, error: str | None, payload: Any) -> None:
-        if fut := self._pending_operations.pop(key, None):
+        if pen := self._pending_operations.pop(key, None):
             if error is not None:
                 msg = f"An error occurred in the frontend (javascript) {error=} {payload}"
                 error_ = IpylabFrontendError(msg)
-                error_.add_note(f"Exception request content = {fut.metadata}")
+                error_.add_note(f"Exception request content = {pen.metadata}")
                 payload = error_
-                fut.set_exception(error_)
+                pen.set_exception(error_)
             else:
-                fut.set_result(payload)
+                pen.set_result(payload)
         elif not error:
             self.log.debug("Already processed key='%s' payload=%s", key, payload)
 
@@ -393,11 +394,11 @@ class Ipylab(HasApp, WidgetBase):
         if toObject:
             content["toObject"] = toObject
 
-        self._pending_operations[ipylab_PY] = fut = Future()
-        fut.metadata.update(content=content)
+        self._pending_operations[ipylab_PY] = pen = Pending()
+        pen.metadata.update(content=content)
         self._ipylab_send(content, page_id=self.get_page_id() if page_id is None else page_id)
         try:
-            return await Transform.transform_payload(transform=content["transform"], payload=await fut)
+            return await Transform.transform_payload(transform=content["transform"], payload=await pen)
         except Exception as e:
             self.log.exception("Operation error", obj=content, exc_info=e)
             raise

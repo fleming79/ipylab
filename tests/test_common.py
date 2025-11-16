@@ -3,18 +3,13 @@
 
 from __future__ import annotations
 
-from typing import Self
 from unittest.mock import AsyncMock, MagicMock
 
 import anyio
-import ipylab
-import ipylab.common
 import pytest
 from aiologic import Event
 from ipylab import Ipylab
 from ipylab.common import (
-    Fixed,
-    FixedCreated,
     LastUpdatedDict,
     Singular,
     Transform,
@@ -211,60 +206,6 @@ class TestLimited:
         assert obj4 is obj3
         assert obj5 is not obj6
         assert obj5 not in KeyedSingle._singular_instances.values()
-
-
-class TestFixed:
-    def test_readonly_basic(self):
-        class TestOwner:
-            test_instance = Fixed(CommonTestClass)
-
-        owner = TestOwner()
-        assert isinstance(owner.test_instance, CommonTestClass)
-        assert owner.test_instance.value == 1
-
-    def test_readonly_create_function(self, app: ipylab.JupyterFrontEnd):
-        class TestOwner:
-            app = Fixed(lambda _: ipylab.JupyterFrontEnd())
-            app1: Fixed[Self, ipylab.JupyterFrontEnd] = Fixed("ipylab.JupyterFrontEnd")
-
-        owner = TestOwner()
-        assert owner.app is app
-        assert owner.app1 is app
-
-    def test_readonly_create_invalid(self, app):
-        with pytest.raises(TypeError):
-            assert Fixed(123)  # pyright: ignore[reportArgumentType]
-
-    def test_readonly_created_callback_method(self):
-        class TestOwner:
-            test_instance: Fixed[Self, CommonTestClass] = Fixed(
-                lambda _: CommonTestClass(value=300),
-                created=lambda c: c["owner"].instance_created(c),
-            )
-
-            def instance_created(self, info: FixedCreated):
-                assert isinstance(info["obj"], CommonTestClass)
-                assert info["obj"].value == 300
-                assert info["owner"] is self
-
-        owner = TestOwner()
-        assert isinstance(owner.test_instance, CommonTestClass)
-        assert owner.test_instance.value == 300
-
-    def test_readonly_forbidden_set(self):
-        class TestOwner:
-            test_instance = Fixed[Self, CommonTestClass](CommonTestClass)
-
-        owner = TestOwner()
-        with pytest.raises(AttributeError, match="test_instance is forbidden"):
-            owner.test_instance = (  # pyright: ignore[reportAttributeAccessIssue]
-                CommonTestClass()
-            )  #  Note: This type should be ignored because it is a fixed value. Removing indicates a problem.
-
-    def test_function_to_eval(self):
-        eval_str = ipylab.common.module_obj_to_import_string(test_last_updated_dict)
-        obj = eval(eval_str, {"import_item": ipylab.common.import_item})
-        assert obj is test_last_updated_dict
 
 
 class TestOnReady:

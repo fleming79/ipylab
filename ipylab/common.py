@@ -10,7 +10,6 @@ import textwrap
 import typing
 import weakref
 from collections import OrderedDict
-from collections.abc import Callable
 from enum import StrEnum
 from typing import (
     TYPE_CHECKING,
@@ -30,6 +29,7 @@ from typing import (
 import anyio
 import pluggy
 import traitlets
+from async_kernel.common import Fixed
 from ipywidgets import TypedTuple, Widget, widget_serialization
 from traitlets import Any as AnyTrait
 from traitlets import Bool, Container, HasTraits, Instance, default, observe
@@ -38,16 +38,13 @@ from typing_extensions import override
 import ipylab
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable, Hashable
+    from collections.abc import Awaitable, Hashable
 
     from ipylab.ipylab import Ipylab
     from ipylab.log import IpylabLoggerAdapter
 
 __all__ = [
     "Area",
-    "Fixed",
-    "FixedCreate",
-    "FixedCreated",
     "HasApp",
     "InsertMode",
     "IpylabKwgs",
@@ -353,82 +350,6 @@ class LastUpdatedDict(OrderedDict):
             super().update(m, **kwargs)
         finally:
             self._updating = False
-
-
-class FixedCreate(TypedDict, Generic[S]):
-    "A TypedDict relevant to Fixed."
-
-    name: str
-    owner: S
-
-
-class FixedCreated(TypedDict, Generic[S, T]):
-    "A TypedDict relevant to Fixed."
-
-    name: str
-    owner: S
-    obj: T
-
-
-class Fixed(Generic[S, T]):
-    """
-    A descriptor factory for creating and caching an instance of a class equivalent
-    to a cached property.
-
-    The ``Fixed`` descriptor provisions for each instance of the owner class
-    to dynamically load or import the managed class.  The managed instance
-    is created on first access and then cached for subsequent access.
-
-    Type Hints:
-        ``S``: Type of the owner class.
-        ``T``: Type of the managed class.
-    """
-
-    __slots__ = ["create", "created", "instances", "name"]
-
-    def __init__(
-        self,
-        obj: type[T] | Callable[[FixedCreate[S]], T] | str,
-        /,
-        *,
-        created: Callable[[FixedCreated[S, T]]] | None = None,
-    ):
-        if inspect.isclass(obj):
-            self.create = lambda _: obj()
-        elif callable(obj):
-            self.create = obj
-        elif isinstance(obj, str):
-            self.create = lambda _: import_item(obj)()
-        else:
-            msg = f"{obj=} is invalid. Wrap it with a lambda to make it 'constant'. Eg. lambda _: {obj}"
-            raise TypeError(msg)
-        self.created = created
-        self.instances = weakref.WeakKeyDictionary()
-
-    def __set_name__(self, owner_cls: type[S], name: str):
-        self.name = name
-
-    def __get__(self, obj: S, objtype: type[S] | None = None) -> T:
-        if obj is None:
-            return self  # pyright: ignore[reportReturnType]
-        try:
-            return self.instances[obj]
-        except KeyError:
-            instance: T = self.create(FixedCreate(name=self.name, owner=obj))  # pyright: ignore[reportAssignmentType]
-            self.instances[obj] = instance
-            if self.created:
-                try:
-                    self.created(FixedCreated(owner=obj, obj=instance, name=self.name))
-                except Exception:
-                    if log := getattr(obj, "log", None):
-                        msg = f"Callback `created` failed for {obj.__class__}.{self.name}"
-                        log.exception(msg, extra={"obj": self.created})
-            return instance
-
-    def __set__(self, obj: S, value: Self):
-        # Note: above we use `Self` for the `value` type hint to give a useful typing error
-        msg = f"Setting `Fixed` parameter {obj.__class__.__name__}.{self.name} is forbidden!"
-        raise AttributeError(msg)
 
 
 class HasApp(HasTraits):

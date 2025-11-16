@@ -5,12 +5,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Self
 
+from async_kernel.common import Fixed
 from ipywidgets import TypedTuple
 from traitlets import Container, Instance, Union
 from typing_extensions import override
 
 from ipylab.commands import APP_COMMANDS_NAME, CommandConnection, CommandRegistry
-from ipylab.common import Fixed, Obj, Singular
+from ipylab.common import Obj, Singular
 from ipylab.connection import InfoConnection
 from ipylab.ipylab import Ipylab, IpylabBase, Transform
 

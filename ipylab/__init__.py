@@ -5,16 +5,7 @@ from __future__ import annotations
 
 from ipylab import common, log, menu, widgets
 from ipylab._frontend import module_version as __version__
-from ipylab.common import (
-    Area,
-    Fixed,
-    InsertMode,
-    Obj,
-    Transform,
-    hookimpl,
-    pack,
-    to_selector,
-)
+from ipylab.common import Area, InsertMode, Obj, Transform, hookimpl, pack, to_selector
 from ipylab.connection import Connection, ShellConnection
 from ipylab.ipylab import Ipylab
 from ipylab.jupyterfrontend import JupyterFrontEnd
@@ -23,7 +14,6 @@ from ipylab.widgets import Icon, Panel, SplitPanel
 __all__ = [
     "Area",
     "Connection",
-    "Fixed",
     "Icon",
     "InsertMode",
     "Ipylab",

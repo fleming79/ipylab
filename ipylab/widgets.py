@@ -86,7 +86,7 @@ class SplitPanel(Panel):
 
     @observe("children", "connections")
     def _observer(self, _):
-        Caller().queue_call(self._toggle_orientation, self.children)
+        Caller.get(name="MainThread").queue_call(self._toggle_orientation, self.children)
 
     async def _toggle_orientation(self, children: tuple[Widget, ...]) -> None:
         """Toggle the orientation to cause lumino_widget.parent to re-render content."""

@@ -8,12 +8,12 @@ import weakref
 from enum import IntEnum, StrEnum
 from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
+from async_kernel.common import Fixed
 from IPython.core.ultratb import FormattedTB
 from ipywidgets import CallbackDispatcher
 from typing_extensions import override
 
 import ipylab
-from ipylab.common import Fixed
 
 if TYPE_CHECKING:
     from collections.abc import Callable, MutableMapping

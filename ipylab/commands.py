@@ -9,13 +9,14 @@ import uuid
 from typing import TYPE_CHECKING, Any, ClassVar, NotRequired, TypedDict, Unpack
 
 from aiologic import Lock
+from async_kernel.common import Fixed
 from ipywidgets import TypedTuple
 from traitlets import Callable as CallableTrait
 from traitlets import Container, Dict, Instance, Tuple, Unicode
 from typing_extensions import override
 
 import ipylab
-from ipylab.common import Fixed, IpylabKwgs, Obj, Singular, TransformType, pack
+from ipylab.common import IpylabKwgs, Obj, Singular, TransformType, pack
 from ipylab.connection import InfoConnection, ShellConnection
 from ipylab.ipylab import Ipylab, IpylabBase, Transform, register
 from ipylab.widgets import Icon
