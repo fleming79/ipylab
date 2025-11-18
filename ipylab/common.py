@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import contextlib
-import importlib
 import inspect
 import textwrap
 import typing
@@ -29,7 +28,7 @@ from typing import (
 import anyio
 import pluggy
 import traitlets
-from async_kernel.common import Fixed
+from async_kernel.common import Fixed, import_item
 from ipywidgets import TypedTuple, Widget, widget_serialization
 from traitlets import Any as AnyTrait
 from traitlets import Bool, Container, HasTraits, Instance, default, observe
@@ -104,18 +103,6 @@ def to_selector(*args, prefix="ipylab"):
         suffix = suffix.replace("--", "-")
     suffix = suffix.strip(" -")
     return f".{prefix}-{suffix}"
-
-
-def import_item(dottedname: str):
-    """Import an item from a module, given its dotted name.
-
-    Example:
-        ```python
-        import_item("os.path.join")
-        ```
-    """
-    modulename, objname = dottedname.rsplit(".", maxsplit=1)
-    return getattr(importlib.import_module(modulename), objname)
 
 
 def module_obj_to_import_string(obj):

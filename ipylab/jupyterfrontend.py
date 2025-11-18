@@ -9,13 +9,12 @@ import inspect
 import os
 from typing import TYPE_CHECKING, Any, Literal, Self, Unpack, final
 
-from async_kernel.common import Fixed
+from async_kernel.common import Fixed, import_item
 from async_kernel.kernelspec import KernelName
 from ipywidgets import Widget, register
 from traitlets import Bool, Dict, Unicode, UseEnum, observe
 from typing_extensions import override
 
-import ipylab
 from ipylab import Ipylab
 from ipylab.commands import APP_COMMANDS_NAME, CommandPalette, CommandRegistry
 from ipylab.common import IpylabKwgs, LastUpdatedDict, Obj, Singular, to_selector
@@ -173,7 +172,7 @@ class JupyterFrontEnd(Singular, Ipylab):
             for row in evaluate:
                 name, expression = ("payload", row) if isinstance(row, str) else row
                 if expression.startswith("import_item(dottedname="):
-                    result = eval(expression, {"import_item": ipylab.common.import_item})
+                    result = eval(expression, {"import_item": import_item})
                 else:
                     try:
                         source = compile(expression, "-- Evaluate --", "eval")
