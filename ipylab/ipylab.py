@@ -183,7 +183,7 @@ class Ipylab(HasApp, WidgetBase):
     ) -> Pending[T]:
         "Schedule `func` to be called in the event loop of the main thread with a `delay`."
         self.log.debug("Calling %s (%s)", func, description)
-        pen = Caller.get().call_later(delay, func, *args, **kwargs)
+        pen = Caller.get("MainThread").call_later(delay, func, *args, **kwargs)
         pen.add_done_callback(functools.partial(self.on_done_log, description=description))
         return pen
 
