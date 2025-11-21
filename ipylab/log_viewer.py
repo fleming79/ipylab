@@ -7,13 +7,14 @@ import collections
 import contextlib
 from typing import TYPE_CHECKING, Self
 
+from async_kernel.common import Fixed
 from IPython.display import HTML as IPD_HTML
 from ipywidgets import HTML, BoundedIntText, Button, Checkbox, Combobox, Dropdown, HBox, Select, VBox
 from traitlets import directional_link, link, observe
 from typing_extensions import override
 
 import ipylab
-from ipylab.common import SVGSTR_TEST_TUBE, Fixed, InsertMode
+from ipylab.common import SVGSTR_TEST_TUBE, InsertMode
 from ipylab.log import LogLevel
 from ipylab.simple_output import AutoScroll, SimpleOutput
 from ipylab.widgets import AddToShellType, Icon, Panel

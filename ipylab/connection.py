@@ -4,13 +4,14 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, Generic
 
 from ipywidgets import Widget, register
 from traitlets import Bool, Dict, Instance, Unicode, default
+from traitlets.traitlets import Instance
 from typing_extensions import override
 
-from ipylab.common import Area, Singular
+from ipylab.common import Area, Singular, T
 from ipylab.ipylab import Ipylab
 
 if TYPE_CHECKING:
@@ -133,13 +134,13 @@ class InfoConnection(Connection):
     auto_dispose = Bool(True).tag(sync=True)
 
 
-class ShellConnection(Connection):
+class ShellConnection(Connection, Generic[T]):
     "A connection to a widget loaded in the shell."
 
     _model_name: Unicode[str, str | bytes] = Unicode("ShellConnectionModel").tag(sync=True)
     auto_dispose = Bool(True).tag(sync=True)
 
-    widget = Instance(Widget, allow_none=True, default_value=None, help="The widget that has the view")
+    widget: Instance[T] = Instance(Widget, allow_none=True, default_value=None, help="The widget that has the view")  # pyright: ignore[reportAssignmentType]
 
     def __del__(self) -> None:
         """Object disposal"""
