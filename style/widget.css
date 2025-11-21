@@ -27,3 +27,23 @@
   width: 100%;
   display: flex;
 }
+
+.ipylab-CodeEditor {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+}
+
+.ipylab-SimpleOutput {
+  box-sizing: border-box;
+  flex-direction: column;
+  overflow: auto;
+  display: flex;
+}
+
+.ipylab-ResizeBox {
+  box-sizing: border-box;
+  display: inline-block;
+  resize: both;
+  overflow: auto;
+}
