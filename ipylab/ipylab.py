@@ -322,7 +322,10 @@ class Ipylab(HasApp, WidgetBase):
 
     def is_ready(self) -> bool:
         "Will return `True` when it is ready considering the current browser page context."
-        return bool((page_id := self.get_page_id()) and self._ready_events.get(page_id) and self._repr_mimebundle_)
+        try:
+            return bool((page_id := self.get_page_id()) and self._ready_events.get(page_id) and self._repr_mimebundle_)
+        except Exception:
+            return False
 
     def on_ready(self, callback: Callable[[Self], None | CoroutineType], remove=False) -> None:
         """
