@@ -8,6 +8,7 @@ import typing
 from typing import TYPE_CHECKING, Any, NotRequired, Self, TypedDict
 
 import anyio
+from async_kernel.common import Fixed
 from IPython.core import completer as IPC
 from IPython.utils.tokenutil import token_at_cursor
 from ipywidgets import Layout, register, widget_serialization
@@ -18,12 +19,13 @@ from traitlets import Callable, Dict, Instance, Int, TraitType, Unicode, default
 from typing_extensions import override
 
 import ipylab
-from ipylab.common import Fixed, LastUpdatedDict
 from ipylab.ipylab import Ipylab
 
 if TYPE_CHECKING:
     from IPython.core.interactiveshell import InteractiveShell
     from IPython.core.oinspect import Bundle
+
+    from ipylab.common import LastUpdatedDict
 
     __all__ = ["CodeEditor", "CodeEditorOptions"]
 

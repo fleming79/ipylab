@@ -7,12 +7,13 @@ import contextlib
 import inspect
 from typing import TYPE_CHECKING, Literal, Unpack
 
+from async_kernel.common import Fixed
 from async_kernel.kernelspec import KernelName
 from ipywidgets import DOMWidget, TypedTuple, Widget
 from traitlets import Container, Instance, Unicode
 
 import ipylab
-from ipylab.common import Area, Fixed, InsertMode, IpylabKwgs, Obj, Singular, Transform, TransformType, pack
+from ipylab.common import Area, InsertMode, IpylabKwgs, Obj, Singular, T, Transform, TransformType, pack
 from ipylab.connection import ShellConnection
 from ipylab.ipylab import Ipylab, IpylabBase
 from ipylab.log_viewer import LogViewer
@@ -42,7 +43,7 @@ class Shell(Singular, Ipylab):
 
     async def add(
         self,
-        obj: Widget | inspect._SourceObjectType,
+        obj: T | Widget | inspect._SourceObjectType,
         *,
         area: Area = Area.main,
         activate: bool = True,
@@ -54,7 +55,7 @@ class Shell(Singular, Ipylab):
         preferred_kernel: KernelName | Literal["python3"] | str = KernelName.asyncio,  # noqa: PYI051,
         page_id: str | None = None,
         **args,
-    ) -> ShellConnection:
+    ) -> ShellConnection[T]:
         """
         Add a widget to the shell.
 
