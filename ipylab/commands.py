@@ -316,3 +316,16 @@ class CommandRegistry(Singular, Ipylab):
             mc.commands = self
             mc.add_to_tuple(self, "connections")
             return mc
+
+    async def described_by(self, command_id: str | CommandConnection) -> dict[str, Any]:
+        "Get a description of a specific command [ref](https://lumino.readthedocs.io/en/latest/api/classes/commands.CommandRegistry-1.html#describedBy)."
+
+        await self.ready()
+        id_ = str(command_id)
+        if id_ not in self.all_commands:
+            id_ = CommandConnection.to_id(self.name, self.app.vpath, id_)
+            if id_ not in self.all_commands:
+                msg = f"Command '{command_id}' not registered!"
+                raise ValueError(msg)
+
+        return await self.execute_method("describedBy", (id_,))
