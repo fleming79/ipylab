@@ -170,21 +170,19 @@ class Ipylab(HasApp, WidgetBase):
             raise
 
     def _call_on_ready_callback(self, callback: Callable[[Self], None | CoroutineType]):
-        self.call_later(0, "On ready", callback, self)
+        self.call_later(0, callback, self)
 
     def call_later(
         self,
         delay: float,
-        description: str,
         func: Callable[P, T | CoroutineType[Any, Any, T]],
         /,
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> Pending[T]:
         "Schedule `func` to be called in the event loop of the main thread with a `delay`."
-        self.log.debug("Calling %s (%s)", func, description)
-        pen = Caller.get("MainThread").call_later(delay, func, *args, **kwargs)
-        pen.add_done_callback(functools.partial(self.on_done_log, description=description))
+        pen = Caller("MainThread").call_later(delay, func, *args, **kwargs)
+        pen.add_done_callback(functools.partial(self.on_done_log))
         return pen
 
     def on_done_log(self, pen: Pending, description=""):
@@ -218,7 +216,7 @@ class Ipylab(HasApp, WidgetBase):
                     self._set_result(key=key, error=None, payload=rest.get("payload"))
                 case {"ipylab_FE": str(key), "operation": operation, "payload": payload}:
                     kwgs = {"key": key, "operation": operation, "payload": payload, "buffers": buffers}
-                    self.call_later(0, "From the frontend - operation", self._do_operation_for_fe, **kwgs)
+                    self.call_later(0, self._do_operation_for_fe, **kwgs)
                 case {"error": msg}:
                     self.log.error(msg)
                 case {"clientIdToPageId": {"clientId": client_id, "pageId": page_id_}}:
@@ -230,7 +228,7 @@ class Ipylab(HasApp, WidgetBase):
                     self.close()
                 case {"signal": {"dottedname": dottedname, **rest}}:
                     data = SignalCallbackData(owner=self, dottedname=dottedname, args=rest.get("args"))
-                    self.call_later(0, "From the frontend -signal", self._notify_signal, data=data)
+                    self.call_later(0, self._notify_signal, data=data)
                 case _ as data:
                     self.log.error(f"Unhandled custom message {data=}", obj=data)  # noqa: G004
         except Exception as e:

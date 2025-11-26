@@ -6,7 +6,7 @@ from __future__ import annotations
 import contextlib
 from typing import TYPE_CHECKING, Literal, Unpack
 
-from async_kernel.kernelspec import KernelName
+from async_kernel.typing import KernelName
 from ipywidgets import DOMWidget, TypedTuple, Widget
 from traitlets import Container, Instance, Unicode
 

@@ -10,7 +10,7 @@ import os
 from typing import TYPE_CHECKING, Any, Literal, Self, Unpack, final
 
 from async_kernel.common import Fixed, import_item
-from async_kernel.kernelspec import KernelName
+from async_kernel.typing import KernelName
 from ipywidgets import Widget, register
 from traitlets import Bool, Dict, Unicode, UseEnum, observe
 from typing_extensions import override
@@ -71,7 +71,7 @@ class JupyterFrontEnd(Singular, Ipylab):
 
     def _autostart_callback(self, result) -> None:
         if inspect.iscoroutine(result):
-            self.call_later(0, "Autostart callback await", lambda: result)
+            self.call_later(0, lambda: result)
 
     @property
     def repr_info(self) -> dict[str, str]:

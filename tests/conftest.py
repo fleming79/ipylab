@@ -20,7 +20,7 @@ async def anyio_backend_autouse(anyio_backend):
 
 @pytest.fixture
 async def caller(anyio_backend):
-    async with Caller("new") as caller:
+    async with Caller("manual") as caller:
         yield caller
 
 

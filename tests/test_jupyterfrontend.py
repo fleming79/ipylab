@@ -71,7 +71,7 @@ async def test_app_evaluate(app: ipylab.JupyterFrontEnd, kw: dict[str, Any], res
     ready = mocker.patch.object(app, "ready")
     send = mocker.patch.object(app, "send")
 
-    app.call_later(0, "Evaluate test", app.evaluate, **kw, vpath="irrelevant")
+    app.call_later(0, app.evaluate, **kw, vpath="irrelevant")
     await anyio.sleep(0.01)
     assert ready.call_count == 2
     assert send.call_count == 1
