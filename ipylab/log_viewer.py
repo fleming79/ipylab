@@ -137,7 +137,7 @@ class LogViewer(Panel):
         if self.connections:
             self.output.push(record.output)  # pyright: ignore[reportAttributeAccessIssue]
         if record.levelno >= LogLevel.ERROR and self.app._ready_events:
-            self.app.call_later(0, "Notify exception", self._notify_exception, record)
+            self.app.call_later(0, self._notify_exception, record)
 
     async def _notify_exception(self, record: logging.LogRecord) -> None:
         "Create a notification that an error occurred."
@@ -171,7 +171,7 @@ class LogViewer(Panel):
     def _button_on_click(self, b) -> None:
         if b is self.button_show_send_dialog:
             b.disabled = True
-            self.app.call_later(0, "LogViewer", self._show_send_dialog, b)
+            self.app.call_later(0, self._show_send_dialog, b)
         elif b is self.button_clear:
             self._records.clear()
             self.output.push(clear=True)
@@ -191,9 +191,7 @@ class LogViewer(Panel):
             "obj": getattr(record, "obj", None),
         }
         b = Button(description="Send to console", tooltip="Send `record`, `owner` and `obj` to the console")
-        b.on_click(
-            lambda _: self.app.call_later(0, "LogViewer open console", self.app.shell.open_console, objects=objects)
-        )
+        b.on_click(lambda _: self.app.call_later(0, self.app.shell.open_console, objects=objects))
         out.push(b)
         p = Panel([out])
         p.title.label = record.levelname.capitalize()

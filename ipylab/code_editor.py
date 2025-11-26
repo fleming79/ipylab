@@ -249,7 +249,7 @@ class CodeEditor(Ipylab, _String):
             # We use throttling to ensure there isn't a backlog of changes to synchronise.
             # When the value is set in Python, we the shared model in the frontend should exactly reflect it.
 
-            self.call_later(0, "Update value", self._send_value)
+            self.call_later(0, self._send_value)
 
     async def _send_value(self) -> None:
         self._sending = True

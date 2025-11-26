@@ -15,6 +15,7 @@ from ipywidgets import Widget, register
 from traitlets import Bool, Dict, Unicode, UseEnum, observe
 from typing_extensions import override
 
+import ipylab
 from ipylab import Ipylab
 from ipylab.commands import APP_COMMANDS_NAME, CommandPalette, CommandRegistry
 from ipylab.common import IpylabKwgs, LastUpdatedDict, Obj, Singular, to_selector
