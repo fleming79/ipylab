@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any, ClassVar, Generic
 
 from ipywidgets import Widget, register
 from traitlets import Bool, Dict, Instance, Unicode, default
-from traitlets.traitlets import Instance
 from typing_extensions import override
 
 from ipylab.common import Area, Singular, T
