@@ -28,15 +28,11 @@ classifiers = [
 ]
 
 dependencies = [
-  "async-kernel[kernel]>=0.9,<0.10",
+  "async-kernel>=0.9.1,<0.10",
   "jupyterlab>=4.3",
-  "ipywidgets>=8.1.5",
-  "ipython>=8.32",
+  "ipywidgets>=8.1.8",
   "jupyterlab_widgets>=3.0.11",
   "typing_extensions",
-  "ipykernel>=7.0.1,<8.0",
-  "traitlets",
-  "jupyter_client",
 ]
 dynamic = ["version", "description", "authors", "urls", "keywords"]
 
