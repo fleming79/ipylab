@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import functools
 import inspect
 import os
@@ -12,7 +11,7 @@ from typing import TYPE_CHECKING, Any, Literal, Self, Unpack, final
 from async_kernel.common import Fixed, import_item
 from async_kernel.typing import KernelName
 from ipywidgets import Widget, register
-from traitlets import Bool, Dict, Unicode
+from traitlets import Bool, Unicode
 from typing_extensions import override
 
 from ipylab import Ipylab
@@ -54,7 +53,7 @@ class JupyterFrontEnd(Singular, Ipylab):
     sessions = Fixed(SessionManager)
     toolbar = Fixed(CustomToolbar)
 
-    namespaces: Dict[str, LastUpdatedDict] = Dict(read_only=True)
+    namespace = Fixed(LastUpdatedDict)
 
     @override
     def close(self, *, force=False) -> None:
@@ -114,36 +113,6 @@ class JupyterFrontEnd(Singular, Ipylab):
         "Start the 'ipylab' Python kernel."
         return self.operation("startIyplabKernel", {"restart": restart})
 
-    def get_namespace(self, namespace_id="", **objects) -> LastUpdatedDict:
-        """
-        Get the namespace corresponding to `namespace_id`.
-
-        The namespace is a `LastUpdatedDict` that maintains the order by which
-        items are added.
-
-        Default oubjects are added to the namespace via the plugin hook
-        `default_namespace_objects`.
-
-        Note:
-            To remove a namespace call `app.namespaces.pop('my-namespace-id')`.
-
-        The default namespace `""` will also load objects from `shell.user_ns` if
-        the kernel is an ipykernel (the default kernel provided in Jupyterlab).
-
-        Args:
-            namespace_id: The identifier for the namespace to use in this kernel.
-            objects: Additional objects to add to the namespace.
-        """
-        ns = self.namespaces.get(namespace_id)
-        if ns is None:
-            self.namespaces[namespace_id] = ns = LastUpdatedDict()
-        if objects:
-            ns.update(objects)
-        if namespace_id == "" and (kernel := getattr(self.comm, "kernel", None)):
-            with contextlib.suppress(AttributeError):
-                ns.update(kernel.shell.user_ns)
-        return ns
-
     async def _evaluate(self, options: dict[str, Any], buffers: list) -> dict[str, Any]:
         """
         Evaluate code for `evaluate`.
@@ -154,8 +123,8 @@ class JupyterFrontEnd(Singular, Ipylab):
             evaluate = options["evaluate"]
             if isinstance(evaluate, str):
                 evaluate = (evaluate,)
-            namespace_id = options.get("namespace_id", "")
-            ns = self.get_namespace(namespace_id, buffers=buffers)
+            ns = self.namespace
+            ns["buffers"] = buffers
             for row in evaluate:
                 name, expression = ("payload", row) if isinstance(row, str) else row
                 if expression.startswith("import_item(dottedname="):
@@ -192,8 +161,6 @@ class JupyterFrontEnd(Singular, Ipylab):
             if payload is not None:
                 ns["_call_count"] = n = ns.get("_call_count", 0) + 1
                 ns[f"payload_{n}"] = payload
-            if namespace_id == "":
-                self.shell.add_objects_to_ipython_namespace(ns)
         except BaseException as e:
             if isinstance(e, NameError):
                 e.add_note("Tip: Check for missing an imports?")
@@ -206,7 +173,6 @@ class JupyterFrontEnd(Singular, Ipylab):
         evaluate: str | inspect._SourceObjectType | Iterable[str | tuple[str, str | inspect._SourceObjectType]],
         *,
         vpath: str,
-        namespace_id="",
         preferred_kernel: KernelName | Literal["python3"] | str = KernelName.asyncio,  # noqa: PYI051
         kwgs: None | dict = None,
         **kwargs: Unpack[IpylabKwgs],
@@ -253,10 +219,6 @@ class JupyterFrontEnd(Singular, Ipylab):
                 The path of kernel session where the evaluation should take place.
             preferred_kernel:
                 The name of the kernel to use if a new kernel is started.
-            namespace_id:
-                The namespace where to perform evaluation.
-                The default namespace will also update the shell.user_ns after
-                successful evaluation.
             kwgs: dict | None
                 Specify kwgs that may be used when calling a callable.
                 Note:The namespace is also searched.
@@ -295,6 +257,5 @@ class JupyterFrontEnd(Singular, Ipylab):
             "evaluate": evaluate,
             "vpath": vpath or self.vpath,
             "preferredKernel": preferred_kernel,
-            "namespace_id": namespace_id,
         }
         return await self.operation("evaluate", kwgs=kwgs, **kwargs)
