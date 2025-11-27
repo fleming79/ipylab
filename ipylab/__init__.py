@@ -3,9 +3,9 @@
 
 from __future__ import annotations
 
-from ipylab import common, log, menu, widgets
+from ipylab import common, menu, widgets
 from ipylab._frontend import module_version as __version__
-from ipylab.common import Area, InsertMode, Obj, Transform, hookimpl, pack, to_selector
+from ipylab.common import Area, InsertMode, Obj, Transform, pack, to_selector
 from ipylab.connection import Connection, ShellConnection
 from ipylab.ipylab import Ipylab
 from ipylab.jupyterfrontend import JupyterFrontEnd
@@ -26,8 +26,6 @@ __all__ = [
     "__version__",
     "_jupyter_labextension_paths",
     "common",
-    "hookimpl",
-    "log",
     "menu",
     "pack",
     "to_selector",

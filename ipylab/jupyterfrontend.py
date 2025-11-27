@@ -12,14 +12,13 @@ from typing import TYPE_CHECKING, Any, Literal, Self, Unpack, final
 from async_kernel.common import Fixed, import_item
 from async_kernel.typing import KernelName
 from ipywidgets import Widget, register
-from traitlets import Bool, Dict, Unicode, UseEnum, observe
+from traitlets import Bool, Dict, Unicode
 from typing_extensions import override
 
 from ipylab import Ipylab
 from ipylab.commands import APP_COMMANDS_NAME, CommandPalette, CommandRegistry
 from ipylab.common import IpylabKwgs, LastUpdatedDict, Obj, Singular, to_selector
 from ipylab.ipylab import IpylabBase
-from ipylab.log import IpylabLogHandler, LogLevel
 from ipylab.menu import ContextMenu, MainMenu
 from ipylab.sessions import SessionManager
 from ipylab.shell import Shell
@@ -55,19 +54,12 @@ class JupyterFrontEnd(Singular, Ipylab):
     sessions = Fixed(SessionManager)
     toolbar = Fixed(CustomToolbar)
 
-    logging_handler: Fixed[Self, IpylabLogHandler] = Fixed(lambda c: IpylabLogHandler(c["owner"].log_level))
-    log_level = UseEnum(LogLevel, LogLevel.ERROR)
     namespaces: Dict[str, LastUpdatedDict] = Dict(read_only=True)
 
     @override
     def close(self, *, force=False) -> None:
         if force:
             super().close()
-
-    @observe("log_level")
-    def _observe_log_level(self, _) -> None:
-        if self.logging_handler:
-            self.logging_handler.setLevel(self.log_level)
 
     def _autostart_callback(self, result) -> None:
         if inspect.iscoroutine(result):
@@ -76,11 +68,6 @@ class JupyterFrontEnd(Singular, Ipylab):
     @property
     def repr_info(self) -> dict[str, str]:
         return {"vpath": self._vpath, "session name": self.session_name}
-
-    @property
-    def repr_log(self) -> str:
-        "A representation to use when logging"
-        return self.__class__.__name__
 
     @property
     def vpath(self) -> str:
