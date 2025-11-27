@@ -44,14 +44,12 @@ async def example_async_callable(c):
         (
             {
                 "evaluate": ["a='simple callable'", ("b", example_callable), "b"],  # payload is b
-                "namespace_id": "ns1",
             },
             "simple callable",
         ),
         (
             {
                 "evaluate": example_callable,
-                "namespace_id": "ns2",
                 "kwgs": {"a": "ns2 variable"},
             },
             "ns2 variable",
