@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import functools
 import inspect
 import uuid
 from typing import TYPE_CHECKING, Any, ClassVar, NotRequired, TypedDict, Unpack
@@ -17,7 +16,7 @@ from typing_extensions import override
 
 import ipylab
 from ipylab.common import IpylabKwgs, Obj, Singular, TransformType, pack
-from ipylab.connection import InfoConnection, ShellConnection
+from ipylab.connection import InfoConnection
 from ipylab.ipylab import Ipylab, IpylabBase, Transform, register
 from ipylab.widgets import Icon
 
@@ -62,7 +61,6 @@ class CommandConnection(InfoConnection):
 
     args = Dict()
     python_command = CallableTrait(allow_none=False)
-    namespace_id = Unicode("")
 
     _config_options: ClassVar = tuple(CommandOptions.__annotations__)
     commands: Instance[CommandRegistry] = Instance("ipylab.commands.CommandRegistry")
@@ -186,43 +184,17 @@ class CommandRegistry(Singular, Ipylab):
     async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list) -> Any:
         match operation:
             case "execute":
-                return await self._execute_for_frontend(payload, buffers)
+                cmd_id = payload["id"]
+                if not CommandConnection.exists(cmd_id):
+                    msg = f'Invalid command "{cmd_id}"'
+                    raise TypeError(msg)
+                conn = await CommandConnection(cmd_id).ready()
+                args = conn.args | (payload.get("args") or {})
+                result = conn.python_command(**args)
+                if inspect.iscoroutine(result):
+                    result = await result
+                return result
         return await super()._do_operation_for_frontend(operation, payload, buffers)
-
-    async def _execute_for_frontend(self, payload: dict, buffers: list):
-        cmd_id = payload["id"]
-        if not CommandConnection.exists(cmd_id):
-            msg = f'Invalid command "{cmd_id}"'
-            raise TypeError(msg)
-        conn = await CommandConnection(cmd_id).ready()
-        cmd = conn.python_command
-        args = conn.args | (payload.get("args") or {})
-
-        ns = self.app.get_namespace(conn.namespace_id)
-        kwgs = {}
-        for n, p in inspect.signature(cmd).parameters.items():
-            if n == "ref":
-                connection_id = payload.get("connection_id")
-                kwgs[n] = ShellConnection(connection_id) if connection_id else None
-            elif n in args:
-                kwgs[n] = args[n]
-            elif n in ns:
-                kwgs[n] = ns[n]
-            elif p.kind is p.VAR_KEYWORD:
-                kwgs = args
-                break
-            elif n == "args":
-                kwgs[n] = args
-            elif n == "buffers":
-                kwgs[n] = buffers
-            elif p.default is p.empty:
-                msg = f"Required parameter '{n}' missing for {cmd} of {conn}"
-                raise NameError(msg)
-        ns["_to_eval"] = functools.partial(cmd, **kwgs)
-        result = eval("_to_eval()", ns)
-        while inspect.isawaitable(result):
-            result = await result
-        return result
 
     async def add_command(
         self,
@@ -234,7 +206,6 @@ class CommandRegistry(Singular, Ipylab):
         icon_class: str | None = None,
         icon: Icon | None = None,
         args: dict | None = None,
-        namespace_id="",
         **kwgs,
     ) -> CommandConnection:
         """
@@ -244,7 +215,6 @@ class CommandRegistry(Singular, Ipylab):
             name: The name to use when forming the command id.
             execute: The python callback.
             args: A mapping of default arguments to provide when executing the command.
-            namespace_id: The namespace where the command should be executed.
             kwgs:
                 Additional ICommandOptions can be passed as kwgs.
         """
@@ -269,7 +239,6 @@ class CommandRegistry(Singular, Ipylab):
             )
             self.close_with_self(cc)
             cc.commands = self
-            cc.namespace_id = namespace_id
             cc.python_command = execute
             cc.args = args or {}
             cc.info = kwgs
