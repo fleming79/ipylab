@@ -1,11 +1,17 @@
+from __future__ import annotations
+
 import datetime
+from typing import TYPE_CHECKING
 
 import async_kernel
 import ipylab
 import ipylab.ipylab
 import pytest
-from async_kernel import Caller
-from async_kernel.kernel import RunMode, SocketID
+from async_kernel.typing import SocketID
+
+if TYPE_CHECKING:
+    from async_kernel.caller import Caller
+    from ipylab.jupyterfrontend import JupyterFrontEnd
 
 
 @pytest.fixture(scope="session")
@@ -18,16 +24,22 @@ async def anyio_backend_autouse(anyio_backend):
     return anyio_backend
 
 
-@pytest.fixture
-async def caller(anyio_backend):
-    async with Caller("manual") as caller:
-        yield caller
+@pytest.fixture(scope="session")
+async def kernel(anyio_backend):
+    async with async_kernel.Kernel() as kernel:
+        yield kernel
 
 
 @pytest.fixture
-async def app(caller, mocker):
+async def caller(kernel: async_kernel.Kernel) -> Caller:
+    return kernel.caller
+
+
+@pytest.fixture
+async def app(kernel: async_kernel.Kernel, mocker) -> JupyterFrontEnd:
     app = ipylab.JupyterFrontEnd()
     ipylab.ipylab.WAIT_READY = False
+    app.set_trait("_vpath", "testing_vpath")
     mocker.patch.object(app, "ready")
     page_id = "123"
     client_id = "456"
@@ -41,7 +53,6 @@ async def app(caller, mocker):
 
     job = {
         "socket_id": SocketID.shell,
-        "socket": None,
         "ident": [b"3e829a23-efc115ccfdfa9f2a9bb11e67"],
         "msg": {
             "header": {
@@ -60,8 +71,7 @@ async def app(caller, mocker):
             "buffers": [],
         },
         "received_time": 275786.487449944,
-        "run_mode": RunMode.thread,
     }
-    async_kernel.utils._job_var.set(job)
+    async_kernel.utils._job_var.set(job)  # pyright: ignore[reportArgumentType]
 
     return app

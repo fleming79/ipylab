@@ -28,13 +28,13 @@ classifiers = [
 ]
 
 dependencies = [
-  "async-kernel>=0.9.2,<0.10",
+  "async-kernel>=0.10.0,<0.11",
   "jupyterlab>=4.5",
-  "jupyterlab_widgets>=3.0.11",
+  'orjson',
   "typing_extensions",
   "ipykernel>=7.0.1,<8.0",
   "traitlets @ https://github.com/fleming79/ipylab/releases/download/v2.0.1/traitlets-5.14.3-py3-none-any.whl#sha256:bcc8fc5a21d9b996de216eb01f360d717356779c864249ca376fc59f59d58377",
-  "jupyter_client @ https://github.com/fleming79/ipylab/releases/download/v2.0.1/jupyter_client-8.6.3-py3-none-any.whl#sha256:6533dbfdf3aacbd1dfd8556b94fb2a1445fc23ef59fbc12acd3f475212511b1c",
+  "jupyter_client @ https://github.com/fleming79/ipylab/releases/download/v2.0.8/jupyter_client-8.7.1.dev0-py3-none-any.whl#sha256:45889ae39135efb5f1536140d10a4e627331b9c32926d1d7e7521dbcc45b5a48",
   "widgetsnbextension @ https://github.com/fleming79/ipylab/releases/download/v2.0.3/widgetsnbextension-4.0.14-py3-none-any.whl#sha256:sha256:cd4d6bdfb17e99c9a09e8e79c4703be410630e71a7c344dffe241b562d89cea4",
   "jupyterlab_widgets @ https://github.com/fleming79/ipylab/releases/download/v2.0.3/jupyterlab_widgets-3.0.15-py3-none-any.whl#sha256:sha256:944acef727c9314e4c50ebd2ecb25535df61ee00a593b6b6c1f87481b96cb7d9",
   "ipywidgets @ https://github.com/fleming79/ipylab/releases/download/v2.0.3/ipywidgets-8.1.7-py3-none-any.whl#sha256:sha256:29e75b4bb5c9ef51784673d6a5180fd5e2d61cdd47dcf0e393a235754975370e",

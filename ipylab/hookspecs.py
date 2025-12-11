@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import pluggy
 
@@ -46,11 +46,6 @@ async def autostart(app: ipylab.JupyterFrontEnd) -> None | Awaitable[None]:
     This plugin is historic so will be called when a plugin is registered if the
     app is already ready.
     """
-
-
-@hookspec
-def default_namespace_objects(namespace_id: str, app: ipylab.JupyterFrontEnd) -> dict[str, Any]:  # pyright: ignore[reportReturnType]
-    "A hook to specify additional namespace objects when a namespace is loaded."
 
 
 @hookspec(firstresult=True)
