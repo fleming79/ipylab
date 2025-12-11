@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-import functools
 import inspect
 import json
 import uuid
@@ -15,7 +14,7 @@ from typing import TYPE_CHECKING, Any
 import anyio
 import traitlets
 from aiologic import Event
-from async_kernel import Caller, Pending
+from async_kernel import Pending
 from async_kernel.caller import truncated_rep
 from async_kernel.common import Fixed
 from IPython import get_ipython  # pyright: ignore[reportPrivateImportUsage]
@@ -24,7 +23,7 @@ from traitlets import Container, Dict, Int, List, TraitType, Unicode, observe
 from typing_extensions import override
 
 import ipylab._frontend as _fe
-from ipylab.common import HasApp, IpylabKwgs, Obj, P, SignalCallbackData, T, Transform, TransformType, pack
+from ipylab.common import HasApp, IpylabKwgs, Obj, P, SignalCallbackData, T, Transform, TransformType, json_default
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator
@@ -158,13 +157,7 @@ class Ipylab(HasApp, WidgetBase):
 
     def _ipylab_send(self, content, buffers: list | None = None, *, page_id: str) -> None:
         try:
-            self.send(
-                {
-                    "ipylab": json.dumps(content, default=pack),
-                    "pageId": page_id,
-                },
-                buffers,
-            )
+            self.send({"ipylab": json.dumps(content, default=json_default), "pageId": page_id}, buffers)
         except Exception as e:
             self.log.exception("Send error", obj=content, exc_info=e)
             raise
@@ -181,16 +174,16 @@ class Ipylab(HasApp, WidgetBase):
         **kwargs: P.kwargs,
     ) -> Pending[T]:
         "Schedule `func` to be called in the event loop of the main thread with a `delay`."
-        pen = Caller("MainThread").call_later(delay, func, *args, **kwargs)
-        pen.add_done_callback(functools.partial(self.on_done_log))
+        pen = self.app.caller.call_later(delay, func, *args, **kwargs)
+        pen.add_done_callback(self.on_done_log)
         return pen
 
-    def on_done_log(self, pen: Pending, description=""):
+    def on_done_log(self, pen: Pending):
         "A done callback used by `Ipylab.call_later`"
         if pen.cancelled():
             self.log.debug("Cancelled %s", pen)
         if e := pen.exception():
-            self.log.exception(description, exc_info=e)
+            self.log.exception("Exception in call later %s", pen, exc_info=e)
 
     def _on_custom_msg(self, _, msg: dict, buffers: list) -> None:
         """Handle incoming custom messages.

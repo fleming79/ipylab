@@ -3,10 +3,10 @@
 
 from __future__ import annotations
 
-import inspect
 import uuid
 from typing import TYPE_CHECKING, Any, ClassVar, NotRequired, TypedDict, Unpack
 
+import async_kernel
 from aiologic import Lock
 from async_kernel.common import Fixed
 from ipywidgets import TypedTuple
@@ -15,7 +15,7 @@ from traitlets import Container, Dict, Instance, Tuple, Unicode
 from typing_extensions import override
 
 import ipylab
-from ipylab.common import IpylabKwgs, Obj, Singular, TransformType, pack
+from ipylab.common import IpylabKwgs, Obj, Singular, TransformType, execute_using_shells_namespace, pack
 from ipylab.connection import InfoConnection
 from ipylab.ipylab import Ipylab, IpylabBase, Transform, register
 from ipylab.widgets import Icon
@@ -189,11 +189,12 @@ class CommandRegistry(Singular, Ipylab):
                     msg = f'Invalid command "{cmd_id}"'
                     raise TypeError(msg)
                 conn = await CommandConnection(cmd_id).ready()
-                args = conn.args | (payload.get("args") or {})
-                result = conn.python_command(**args)
-                if inspect.iscoroutine(result):
-                    result = await result
-                return result
+                options = conn.args | (payload.get("args") or {})
+                with async_kernel.utils.subshell_context(options.get("subshell_id")):
+                    return await execute_using_shells_namespace(
+                        conn.python_command, self.app.kernel.shell, options, connection_id=payload.get("connection_id")
+                    )
+
         return await super()._do_operation_for_frontend(operation, payload, buffers)
 
     async def add_command(
@@ -245,6 +246,15 @@ class CommandRegistry(Singular, Ipylab):
             cc.add_to_tuple(self, "connections")
             return cc
 
+    async def validate_command_id(self, cmd: str | CommandConnection) -> str:
+        cmd = str(cmd)
+        if cmd not in self.all_commands:
+            cmd = CommandConnection.to_id(self.name, self.app.vpath, cmd)
+            if cmd not in self.all_commands:
+                msg = f"Command '{cmd}' not registered!"
+                raise ValueError(msg)
+        return cmd
+
     async def execute(
         self, command_id: str | CommandConnection, args: dict | None = None, **kwargs: Unpack[IpylabKwgs]
     ) -> Any:
@@ -258,12 +268,8 @@ class CommandRegistry(Singular, Ipylab):
             args: `args` are used when executing.
         """
         await self.ready()
-        id_ = str(command_id)
-        if id_ not in self.all_commands:
-            id_ = CommandConnection.to_id(self.name, self.app.vpath, id_)
-            if id_ not in self.all_commands:
-                msg = f"Command '{command_id}' not registered!"
-                raise ValueError(msg)
+
+        id_ = await self.validate_command_id(str(command_id))
         return await self.operation("execute", {"id": id_, "args": args or {}}, **kwargs)
 
     async def create_menu(self, label: str, rank: int = 500) -> MenuConnection:
@@ -288,13 +294,5 @@ class CommandRegistry(Singular, Ipylab):
 
     async def described_by(self, command_id: str | CommandConnection) -> dict[str, Any]:
         "Get a description of a specific command [ref](https://lumino.readthedocs.io/en/latest/api/classes/commands.CommandRegistry-1.html#describedBy)."
-
-        await self.ready()
-        id_ = str(command_id)
-        if id_ not in self.all_commands:
-            id_ = CommandConnection.to_id(self.name, self.app.vpath, id_)
-            if id_ not in self.all_commands:
-                msg = f"Command '{command_id}' not registered!"
-                raise ValueError(msg)
-
+        id_ = await self.validate_command_id(command_id)
         return await self.execute_method("describedBy", (id_,))

@@ -3,10 +3,11 @@
 
 from __future__ import annotations
 
-import contextlib
 import inspect
 from typing import TYPE_CHECKING, Literal, Unpack
 
+import anyio
+from aiologic import BinarySemaphore
 from async_kernel.common import Fixed
 from async_kernel.typing import KernelName
 from ipywidgets import DOMWidget, TypedTuple, Widget
@@ -28,6 +29,13 @@ __all__ = ["ConsoleConnection", "Shell"]
 class ConsoleConnection(ShellConnection):
     "A connection intended for a JupyterConsole."
 
+    subshell_id = Unicode(None, allow_none=True)
+
+    async def inject(self, code: str, **metadata) -> None:
+        "Inject and execute code in the console"
+        # Use a task to avoid deadlocking if called from a console.
+        await self.app.caller.call_soon(self.execute_method, "console.inject", (code, metadata))
+
 
 class Shell(Singular, Ipylab):
     """Provides access to the shell."""
@@ -36,10 +44,12 @@ class Shell(Singular, Ipylab):
     ipylab_base = IpylabBase(Obj.IpylabModel, "app.shell").tag(sync=True)
     current_widget_id = Unicode(read_only=True).tag(sync=True)
 
+    _lock = Fixed(BinarySemaphore)
+
     log_viewer = Fixed(LogViewer)
 
     connections: Container[tuple[ShellConnection, ...]] = TypedTuple(trait=Instance(ShellConnection))
-    console: Instance[ConsoleConnection | None] = Instance(ConsoleConnection, default_value=None, allow_none=True)  # pyright: ignore[reportAssignmentType]
+    consoles: Container[tuple[ConsoleConnection, ...]] = TypedTuple(trait=Instance(ConsoleConnection))
 
     async def add(
         self,
@@ -154,13 +164,6 @@ class Shell(Singular, Ipylab):
             await sc.activate()
         return sc
 
-    def add_objects_to_ipython_namespace(self, objects: dict, *, reset=False) -> None:
-        "Load objects into the IPython/console namespace."
-        with contextlib.suppress(AttributeError):
-            if reset:
-                self.comm.kernel.shell.reset()  # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
-            self.comm.kernel.shell.push(objects)  # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
-
     async def open_console(
         self,
         *,
@@ -168,7 +171,7 @@ class Shell(Singular, Ipylab):
         activate=True,
         ref: ShellConnection | str = "",
         objects: dict | None = None,
-        reset_shell=False,
+        subshell_id: str | None = None,
     ) -> ConsoleConnection:
         """
         Open/activate a Jupyterlab console for this python kernel shell (path=app.vpath).
@@ -178,20 +181,30 @@ class Shell(Singular, Ipylab):
             activate: If the console widget should be activated in the frontend.
             ref: The ShellConnection or `id` of the widget in the shell to set as `ref` in the namespace.
             objects: Objects to load into the user namespace (shell.user_ns). By default `ref` as a `ShellConnection` is loaded.
-            reset_shell: Set true to reset the shell (clear the namespace).
         """
         await self.ready()
         app = await self.app.ready()
-        ref_ = ref or self.current_widget_id
-        if not isinstance(ref_, ShellConnection):
-            ref_ = await self.connect_to_widget(ref_)
-        objects_ = {"ref": ref_} | (objects or {})
-        args = {"path": app.vpath, "insertMode": InsertMode(mode), "activate": activate, "ref": f"{pack(ref_)}.id"}
-        tf: TransformType = {"transform": Transform.connection, "connection_id": ConsoleConnection.to_id(app.vpath)}
-        cc: ConsoleConnection = await app.commands.execute("console:open", args, toObject=["args[ref]"], transform=tf)
-        self.console = cc
-        cc.add_to_tuple(self, "connections")
-        self.add_objects_to_ipython_namespace(objects_, reset=reset_shell)
+        with anyio.fail_after(1), self._lock:
+            ref_ = ref or self.current_widget_id
+            if not isinstance(ref_, ShellConnection):
+                ref_ = await self.connect_to_widget(ref_)
+            objects_ = {"ref": ref_} | (objects or {})
+            if cc_ := next((c for c in self.consoles if c.subshell_id == subshell_id), None):
+                cc = cc_
+            else:
+                args = {"path": app.vpath, "insertMode": InsertMode(mode), "activate": False, "ref": f"{pack(ref_)}.id"}
+                connection_id = ConsoleConnection.to_id(app.vpath, f"{subshell_id=}")
+                tf: TransformType = {"transform": Transform.connection, "connection_id": connection_id}
+                cc: ConsoleConnection = await app.commands.execute(
+                    "console:create", args, toObject=["args[ref]"], transform=tf
+                )
+                cc.add_to_tuple(self, "consoles")
+                cc.add_to_tuple(self, "connections")
+                await cc.set_property("sessionContext.session.kernel.subshellId", subshell_id)
+                cc.subshell_id = subshell_id
+            self.app.add_objects_to_user_ns(subshell_id, **objects_)
+        if activate:
+            await cc.activate()
         return cc
 
     async def expand_left(self) -> None:

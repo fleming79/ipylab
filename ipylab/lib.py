@@ -5,14 +5,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import ipywidgets
-
-import ipylab
 from ipylab.common import hookimpl
 from ipylab.log import IpylabLogFormatter, IpylabLogHandler
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable
+
+    import ipylab
 
 
 @hookimpl
@@ -46,11 +45,6 @@ async def autostart_once(app: ipylab.JupyterFrontEnd) -> None:
 @hookimpl
 async def vpath_getter(app: ipylab.JupyterFrontEnd, kwgs: dict) -> str:
     return await app.dialog.get_text(**kwgs)
-
-
-@hookimpl
-def default_namespace_objects(namespace_id: str, app: ipylab.JupyterFrontEnd) -> dict:
-    return {"ipylab": ipylab, "ipw": ipywidgets, "app": app, "namespace_id": namespace_id}
 
 
 @hookimpl

@@ -7,10 +7,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import anyio
 import pytest
-from aiologic.lowlevel import create_async_event
+from aiologic import Event
 from ipylab import Ipylab
 from ipylab.common import (
-    LastUpdatedDict,
     Singular,
     Transform,
     TransformDictAdvanced,
@@ -26,22 +25,6 @@ from typing_extensions import override
 class CommonTestClass:
     def __init__(self, value=1):
         self.value = value
-
-
-def test_last_updated_dict():
-    d = LastUpdatedDict()
-    d["a"] = 1
-    d["b"] = 2
-    assert list(d.keys()) == ["a", "b"]
-    d["a"] = 3
-    assert list(d.keys()) == ["b", "a"]
-
-    d = LastUpdatedDict(mode="first")
-    d["a"] = 1
-    d["b"] = 2
-    assert list(d.keys()) == ["b", "a"]
-    d["a"] = 3
-    assert list(d.keys()) == ["a", "b"]
 
 
 class TestTransformValidate:
@@ -224,7 +207,7 @@ class TestOnReady:
         callback.assert_called()
 
         callback.reset_mock()
-        obj._ready_events["123"] = create_async_event()
+        obj._ready_events["123"] = Event()
         obj._on_ready("123")
         await anyio.sleep(0.1)
         callback.assert_called()
@@ -235,7 +218,7 @@ class TestOnReady:
         assert callback not in obj._on_ready_callbacks
 
         # Simulate the ready event again, callback should not be called
-        obj._ready_events["123"] = create_async_event()
+        obj._ready_events["123"] = Event()
         await anyio.sleep(0.1)
         callback.assert_not_called()
 
