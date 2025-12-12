@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, NotRequired, TypedDict
 
 import anyio
 import async_kernel
+import traitlets
 from ipywidgets import Layout, register, widget_serialization
 from ipywidgets.widgets.trait_types import InstanceDict
 from ipywidgets.widgets.widget_description import DescriptionStyle
@@ -85,6 +86,7 @@ class CodeEditor(Ipylab, HasSubshell, _String):
     value = Unicode()
     _setting_value = False
     _sending = False
+    evaluate = traitlets.Callable()
 
     @default("key_bindings")
     def _default_key_bindings(self) -> dict[str, list[str]]:
@@ -95,6 +97,10 @@ class CodeEditor(Ipylab, HasSubshell, _String):
             "undo": ["Ctrl Z"],
             "redo": ["Ctrl Shift Z"],
         }
+
+    @default("evaluate")
+    def _default_evaluate(self):
+        return self.evaluate_builtin
 
     @observe("value")
     def _observe_value(self, change):
@@ -118,7 +124,7 @@ class CodeEditor(Ipylab, HasSubshell, _String):
                 case "requestInspect":
                     return await self.app.kernel.shell.inspect_request(**payload)
                 case "evaluateCode":
-                    return await self.evaluate(payload["code"] or self.value)
+                    return await self.evaluate(payload["code"])
                     return True
                 case "setValue":
                     # Only set the value when a valid sync is provided
@@ -137,10 +143,16 @@ class CodeEditor(Ipylab, HasSubshell, _String):
         "Load the value - overload as required."
         self.value = value
 
-    async def evaluate(self, code: str) -> None:
+    async def evaluate_builtin(self, code: str = "", *, console=True, objects: dict | None = None) -> None:
         "Evalue code - overload as required."
-        cc = await self.app.shell.open_console(subshell_id=self.subshell_id)
-        await cc.inject(code)
+        with async_kernel.utils.subshell_context(self.subshell_id):
+            if objects is not None:
+                self.app.kernel.shell.user_ns.update(objects)
+            if console:
+                cc = await self.app.shell.open_console(subshell_id=self.subshell_id)
+                await cc.inject(code or self.value)
+            else:
+                await self.app.kernel.shell.execute_request(code=code or self.value, silent=True)
 
     async def clear_undo_history(self) -> None:
         ""
