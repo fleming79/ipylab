@@ -35,9 +35,9 @@ dependencies = [
   "ipykernel>=7.0.1,<8.0",
   "traitlets @ https://github.com/fleming79/ipylab/releases/download/v2.0.1/traitlets-5.14.3-py3-none-any.whl#sha256:bcc8fc5a21d9b996de216eb01f360d717356779c864249ca376fc59f59d58377",
   "jupyter_client @ https://github.com/fleming79/ipylab/releases/download/v2.0.8/jupyter_client-8.7.1.dev0-py3-none-any.whl#sha256:86a7a065a430c6b71a7dbf2494740c652adced218053aef0d243775cbd86290a",
-  "widgetsnbextension @ https://github.com/fleming79/ipylab/releases/download/v2.0.3/widgetsnbextension-4.0.14-py3-none-any.whl#sha256:sha256:cd4d6bdfb17e99c9a09e8e79c4703be410630e71a7c344dffe241b562d89cea4",
-  "jupyterlab_widgets @ https://github.com/fleming79/ipylab/releases/download/v2.0.3/jupyterlab_widgets-3.0.15-py3-none-any.whl#sha256:sha256:944acef727c9314e4c50ebd2ecb25535df61ee00a593b6b6c1f87481b96cb7d9",
-  "ipywidgets @ https://github.com/fleming79/ipylab/releases/download/v2.0.3/ipywidgets-8.1.7-py3-none-any.whl#sha256:sha256:29e75b4bb5c9ef51784673d6a5180fd5e2d61cdd47dcf0e393a235754975370e",
+  "widgetsnbextension @ https://github.com/fleming79/ipylab/releases/download/v2.0.9/widgetsnbextension-4.0.15-py3-none-any.whl#sha256:ba287f050d6c36535ec155e1150f6749cfc1160aa16745a6b68d5e2bb985c811",
+  "jupyterlab_widgets @ https://github.com/fleming79/ipylab/releases/download/v2.0.9/jupyterlab_widgets-3.0.16-py3-none-any.whl#sha256:f26f773da8f38938f74bbe7475b65b2c5c02677e6c4a0170b4676bc981f8b184",
+  "ipywidgets @ https://github.com/fleming79/ipylab/releases/download/v2.0.9/ipywidgets-8.1.8-py3-none-any.whl#sha256:81523b61ff9ed0ff7a2a4c444cc49dc1784e7f9338f11b7ee6a56184eeab341c",
 ]
 dynamic = ["version", "description", "authors", "urls", "keywords"]
 
