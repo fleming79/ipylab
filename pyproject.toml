@@ -31,14 +31,13 @@ dependencies = [
   "async-kernel>=0.10.0,<0.11",
   "jupyterlab>=4.5",
   'orjson',
-  'orjson',
   "typing_extensions",
   "ipykernel>=7.0.1,<8.0",
   "traitlets @ https://github.com/fleming79/ipylab/releases/download/v2.0.1/traitlets-5.14.3-py3-none-any.whl#sha256:bcc8fc5a21d9b996de216eb01f360d717356779c864249ca376fc59f59d58377",
-  "jupyter_client @ https://github.com/fleming79/ipylab/releases/download/v2.0.8/jupyter_client-8.7.1.dev0-py3-none-any.whl#sha256:86a7a065a430c6b71a7dbf2494740c652adced218053aef0d243775cbd86290a",
+  "jupyter_client @ https://github.com/fleming79/ipylab/releases/download/v2.0.9/jupyter_client-8.7.1.dev0-py3-none-any.whl#sha256:2b3d008a7b96defc663e049867d798d526296c7644b53b8a62fbf2ef8aaacf1b",
   "widgetsnbextension @ https://github.com/fleming79/ipylab/releases/download/v2.0.9/widgetsnbextension-4.0.15-py3-none-any.whl#sha256:ba287f050d6c36535ec155e1150f6749cfc1160aa16745a6b68d5e2bb985c811",
   "jupyterlab_widgets @ https://github.com/fleming79/ipylab/releases/download/v2.0.9/jupyterlab_widgets-3.0.16-py3-none-any.whl#sha256:f26f773da8f38938f74bbe7475b65b2c5c02677e6c4a0170b4676bc981f8b184",
-  "ipywidgets @ https://github.com/fleming79/ipylab/releases/download/v2.0.9/ipywidgets-8.1.8-py3-none-any.whl#sha256:81523b61ff9ed0ff7a2a4c444cc49dc1784e7f9338f11b7ee6a56184eeab341c",
+  "ipywidgets @ https://github.com/fleming79/ipylab/releases/download/v2.0.9/ipywidgets-8.1.8-py3-none-any.whl#sha256:ba287f050d6c36535ec155e1150f6749cfc1160aa16745a6b68d5e2bb985c811",
 ]
 dynamic = ["version", "description", "authors", "urls", "keywords"]
 

@@ -962,7 +962,7 @@ requires-dist = [
     { name = "async-kernel", specifier = ">=0.10.0,<0.11" },
     { name = "ipykernel", specifier = ">=7.0.1,<8.0" },
     { name = "ipywidgets", url = "https://github.com/fleming79/ipylab/releases/download/v2.0.9/ipywidgets-8.1.8-py3-none-any.whl" },
-    { name = "jupyter-client", url = "https://github.com/fleming79/ipylab/releases/download/v2.0.8/jupyter_client-8.7.1.dev0-py3-none-any.whl" },
+    { name = "jupyter-client", url = "https://github.com/fleming79/ipylab/releases/download/v2.0.9/jupyter_client-8.7.1.dev0-py3-none-any.whl" },
     { name = "jupyterlab", specifier = ">=4.5" },
     { name = "jupyterlab-widgets", url = "https://github.com/fleming79/ipylab/releases/download/v2.0.9/jupyterlab_widgets-3.0.16-py3-none-any.whl" },
     { name = "orjson" },
@@ -1198,7 +1198,7 @@ wheels = [
 [[package]]
 name = "jupyter-client"
 version = "8.7.1.dev0"
-source = { url = "https://github.com/fleming79/ipylab/releases/download/v2.0.8/jupyter_client-8.7.1.dev0-py3-none-any.whl" }
+source = { url = "https://github.com/fleming79/ipylab/releases/download/v2.0.9/jupyter_client-8.7.1.dev0-py3-none-any.whl" }
 dependencies = [
     { name = "jupyter-core" },
     { name = "python-dateutil" },
@@ -1207,7 +1207,7 @@ dependencies = [
     { name = "traitlets" },
 ]
 wheels = [
-    { url = "https://github.com/fleming79/ipylab/releases/download/v2.0.8/jupyter_client-8.7.1.dev0-py3-none-any.whl", hash = "sha256:45889ae39135efb5f1536140d10a4e627331b9c32926d1d7e7521dbcc45b5a48" },
+    { url = "https://github.com/fleming79/ipylab/releases/download/v2.0.9/jupyter_client-8.7.1.dev0-py3-none-any.whl", hash = "sha256:2b3d008a7b96defc663e049867d798d526296c7644b53b8a62fbf2ef8aaacf1b" },
 ]
 
 [package.metadata]
