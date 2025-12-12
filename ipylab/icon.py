@@ -16,5 +16,7 @@ class Icon(DOMWidget):
     _view_module = Unicode(module_name).tag(sync=True)
     _view_module_version = Unicode(module_version).tag(sync=True)
 
-    name = Unicode().tag(sync=True)
-    svgstr = Unicode().tag(sync=True)
+    name = Unicode("my-icon").tag(sync=True)
+    svgstr = Unicode(
+        """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle class="jp-icon-selectable jp-icon3" cx="12" cy="12" r="12" fill="#616161" /></svg>"""
+    ).tag(sync=True)
