@@ -40,16 +40,7 @@ async def app(kernel: async_kernel.Kernel, mocker) -> JupyterFrontEnd:
     app = ipylab.JupyterFrontEnd()
     ipylab.ipylab.WAIT_READY = False
     app.set_trait("_vpath", "testing_vpath")
-    mocker.patch.object(app, "ready")
-    page_id = "123"
-    client_id = "456"
-    ipylab.ipylab._page_id_var.set(page_id)
-    ipylab.ipylab._client_id_to_page[client_id] = page_id
-
-    def get_kernel_client_id():
-        return client_id
-
-    mocker.patch.object(app, "get_kernel_client_id", get_kernel_client_id)
+    mocker.patch.object(app, "wait_ready")
 
     job = {
         "socket_id": SocketID.shell,

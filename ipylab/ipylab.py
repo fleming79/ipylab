@@ -7,7 +7,6 @@ from __future__ import annotations
 import inspect
 import json
 import uuid
-from contextvars import ContextVar
 from types import CoroutineType
 from typing import TYPE_CHECKING, Any
 
@@ -33,8 +32,6 @@ if TYPE_CHECKING:
 
 __all__ = ["Ipylab", "IpylabBase", "WidgetBase"]
 
-_page_id_var = ContextVar[str]("_page_id_var", default="")
-_client_id_to_page = {}
 WAIT_READY = True  # Intended for testing when there is not frontend, hence ready will never be set.
 
 
@@ -81,7 +78,7 @@ class Ipylab(HasApp, WidgetBase):
     _model_name = Unicode("IpylabModel", help="Name of the model.", read_only=True).tag(sync=True)
     _python_class = Unicode().tag(sync=True)
     ipylab_base = IpylabBase(Obj.this, "").tag(sync=True)
-    _ready_events: Fixed[Self, dict[str, Event]] = Fixed(dict)
+    ready: Fixed[Self, Event] = Fixed(Event)
     _view_count = Int().tag(sync=True)
     _on_ready_callbacks: Container[list[Callable[[Self], None | CoroutineType]]] = List(trait=traitlets.Callable())
     _comm = None
@@ -109,7 +106,7 @@ class Ipylab(HasApp, WidgetBase):
     def __repr__(self) -> str:
         if not self._repr_mimebundle_:
             status = "CLOSED"
-        elif not self.is_ready():
+        elif not self.ready:
             status = "Not ready"
         else:
             status = ""
@@ -124,11 +121,9 @@ class Ipylab(HasApp, WidgetBase):
     @override
     def close(self) -> None:
         if self.comm:
-            self._ipylab_send("close", page_id="")
+            self._ipylab_send("close")
         super().close()
-        for ready in self._ready_events.values():
-            if not ready:
-                ready.set()
+        self.ready.set()
         for k in ["_on_ready_callbacks", "_signal_callbacks"]:
             if self.trait_has_value(k):
                 getattr(self, k).clear()
@@ -140,24 +135,14 @@ class Ipylab(HasApp, WidgetBase):
         This can be used to determine the kernel connection from which the message originated."""
         return get_ipython().kernel.get_parent()["header"]["session"]  # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
 
-    @classmethod
-    def get_page_id(cls) -> str:
-        """Get the `page_id` if there is one.
-
-        The `page_id` is created when the frontend starts (web page). The page_id will change if
-        the webbrowser is refreshed or when there is more than one browser page connected.
-        """
-        if (
-            not (page_id := _page_id_var.get())
-            and (session := cls.get_kernel_client_id())
-            and (page_id := _client_id_to_page.get(session, ""))
-        ):
-            _page_id_var.set(page_id)
-        return page_id
-
-    def _ipylab_send(self, content, buffers: list | None = None, *, page_id: str) -> None:
+    def _ipylab_send(self, content, buffers: list | None = None) -> None:
         try:
-            self.send({"ipylab": json.dumps(content, default=json_default), "pageId": page_id}, buffers)
+            self.send(
+                {
+                    "ipylab": json.dumps(content, default=json_default),
+                },
+                buffers,
+            )
         except Exception as e:
             self.log.exception("Send error", obj=content, exc_info=e)
             raise
@@ -198,9 +183,6 @@ class Ipylab(HasApp, WidgetBase):
         """
         if not (content := msg.get("ipylab")):
             return
-        page_id = msg["pageId"]
-        _page_id_var.set(page_id)
-        _client_id_to_page[self.get_kernel_client_id()] = page_id
         try:
             match json.loads(content):
                 case {"ipylab_PY": str(key), "error": str(error), **payload}:
@@ -212,11 +194,8 @@ class Ipylab(HasApp, WidgetBase):
                     self.call_later(0, self._do_operation_for_fe, **kwgs)
                 case {"error": msg}:
                     self.log.error(msg)
-                case {"clientIdToPageId": {"clientId": client_id, "pageId": page_id_}}:
-                    assert page_id_ == page_id
-                    _client_id_to_page[client_id] = page_id_
                 case "ready":
-                    self._on_ready(page_id)
+                    self.call_later(0, self._set_ready)
                 case "closed":
                     self.close()
                 case {"signal": {"dottedname": dottedname, **rest}}:
@@ -226,6 +205,11 @@ class Ipylab(HasApp, WidgetBase):
                     self.log.error(f"Unhandled custom message {data=}", obj=data)  # noqa: G004
         except Exception as e:
             self.log.exception("Message processing error", obj=msg, exc_info=e)
+
+    async def _set_ready(self) -> None:
+        self.ready.set()
+        for cb in self._on_ready_callbacks:
+            self._call_on_ready_callback(cb)
 
     def _set_result(self, key: str, error: str | None, payload: Any) -> None:
         if pen := self._pending_operations.pop(key, None):
@@ -242,7 +226,7 @@ class Ipylab(HasApp, WidgetBase):
 
     async def _do_operation_for_fe(self, key: str, operation: str, payload: dict, buffers: list | None) -> None:
         """Handle operation requests from the frontend and reply with a result."""
-        await self.ready()
+        await self.wait_ready()
         content: dict[str, Any] = {"ipylab_FE": key}
         buffers = []
         try:
@@ -257,7 +241,7 @@ class Ipylab(HasApp, WidgetBase):
             content["error"] = f"{e.__class__.__name__}: {e}"
             self.log.exception("Frontend operation", obj={"operation": operation, "payload": payload}, exc_info=e)
         finally:
-            self._ipylab_send(content, buffers, page_id=self.get_page_id())
+            self._ipylab_send(content, buffers)
 
     async def _notify_signal(self, data: SignalCallbackData) -> None:
         if callbacks := self._signal_callbacks.get(data["dottedname"]):
@@ -270,7 +254,7 @@ class Ipylab(HasApp, WidgetBase):
                     self.log.exception("Signal callback", obj={"callback": callback, "data": data}, exc_info=e)
 
     async def _obj_operation(self, base: Obj, subpath: str, operation: str, kwgs, kwargs: IpylabKwgs) -> Any:
-        await self.ready()
+        await self.wait_ready()
         kwgs |= {"genericOperation": operation, "basename": base, "subpath": subpath}
         return await self.operation("genericOperation", kwgs=kwgs, **kwargs)
 
@@ -279,44 +263,15 @@ class Ipylab(HasApp, WidgetBase):
         # Overload as required
         raise NotImplementedError(operation)
 
-    async def ready(self) -> Self:
-        """Wait for the instance to be ready for the current session."""
+    async def wait_ready(self) -> Self:
+        """Wait for the instance to be ready."""
         self._check_closed()
         if WAIT_READY:
-            if not (page_id := self.get_page_id()):
-                if self is self.app:
-                    i = 0.02
-                    while not (page_id := self.get_page_id()):
-                        self._ipylab_send({"clientIdToPageId": self.get_kernel_client_id()}, page_id="")
-                        await anyio.sleep(i)
-                        i = min((i * 2, 1))
-                        # A custom message should be returned.
-                else:
-                    await self.app.ready()
-                page_id = self.get_page_id()
-                assert page_id
-            if (ready := self._ready_events.get(page_id)) is None:
-                self._ready_events[page_id] = ready = Event()
-                self._ipylab_send("checkReady", page_id=page_id)
-            if not ready:
-                await ready
+            if self is not self.app:
+                await self.app.wait_ready()
+            await self.ready
             self._check_closed()
         return self
-
-    def _on_ready(self, page_id: str):
-        if (ready := self._ready_events.get(page_id)) is None:
-            self._ready_events[page_id] = ready = Event()
-        if not ready:
-            ready.set()
-            for cb in self._on_ready_callbacks:
-                self._call_on_ready_callback(cb)
-
-    def is_ready(self) -> bool:
-        "Will return `True` when it is ready considering the current browser page context."
-        try:
-            return bool((page_id := self.get_page_id()) and self._ready_events.get(page_id) and self._repr_mimebundle_)
-        except Exception:
-            return False
 
     def on_ready(self, callback: Callable[[Self], None | CoroutineType], remove=False) -> None:
         """
@@ -339,7 +294,7 @@ class Ipylab(HasApp, WidgetBase):
         """
         if not remove and callback not in self._on_ready_callbacks:
             self._on_ready_callbacks.append(callback)
-            if self._ready_events:
+            if self.ready:
                 self._call_on_ready_callback(callback)
         elif callback in self._on_ready_callbacks:
             self._on_ready_callbacks.remove(callback)
@@ -352,7 +307,6 @@ class Ipylab(HasApp, WidgetBase):
         transform: TransformType = Transform.auto,
         toLuminoWidget: list[str] | None = None,
         toObject: list[str] | None = None,
-        page_id=None,
     ) -> Any:
         """
         Perform an operation in the frontend.
@@ -365,10 +319,8 @@ class Ipylab(HasApp, WidgetBase):
                 prior to performing the operation.
             toObject: A list of item name mappings to convert to objects in the frontend prior
                 to performing the operation.
-            page_id: The page to send the message.
-                Pass '' to broadcast to all pages. Only first response is awaited and returned.
         """
-        await self.ready()
+        await self.wait_ready()
         if not operation or not isinstance(operation, str):
             msg = f"Invalid {operation=}"
             raise ValueError(msg)
@@ -386,11 +338,11 @@ class Ipylab(HasApp, WidgetBase):
 
         self._pending_operations[ipylab_PY] = pen = Pending()
         pen.metadata.update(content=content)
-        self._ipylab_send(content, page_id=self.get_page_id() if page_id is None else page_id)
+        self._ipylab_send(content)
         try:
             return await Transform.transform_payload(transform=content["transform"], payload=await pen)
         except Exception as e:
-            self.log.exception("Operation error", obj=content, exc_info=e)
+            self.log.exception("Operation error", exc_info=e)
             raise
 
     async def execute_method(self, subpath: str, args: tuple = (), obj=Obj.base, **kwargs: Unpack[IpylabKwgs]) -> Any:

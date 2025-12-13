@@ -30,9 +30,9 @@ class Launcher(Singular, Ipylab):
 
         ref: https://jupyterlab.readthedocs.io/en/latest/api/interfaces/launcher.ILauncher.IItemOptions.html
         """
-        await self.ready()
-        await cmd.ready()
-        commands = await self.app.commands.ready()
+        await self.wait_ready()
+        await cmd.wait_ready()
+        commands = await self.app.commands.wait_ready()
         if str(cmd) not in commands.all_commands:
             msg = f"{cmd=} is not registered in app command registry app.commands!"
             raise RuntimeError(msg)

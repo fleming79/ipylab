@@ -57,7 +57,7 @@ class NotificationConnection(InfoConnection):
         auto_close: float | Literal[False] | None = None,
         actions: Iterable[NotifyAction | ActionConnection] = (),
     ) -> bool:
-        await self.ready()
+        await self.wait_ready()
         args = {
             "id": f"{pack(self)}.id",
             "message": message,
@@ -96,7 +96,7 @@ class NotificationManager(Singular, Ipylab):
         match operation:
             case "action_callback":
                 action = ActionConnection(payload["connection_id"])
-                await action.ready()
+                await action.wait_ready()
                 callback = action.callback
                 result = callback()
                 while inspect.isawaitable(result):
@@ -107,7 +107,7 @@ class NotificationManager(Singular, Ipylab):
     async def _ensure_action(self, value: ActionConnection | NotifyAction) -> ActionConnection:
         "Create a new action."
         if isinstance(value, ActionConnection):
-            await value.ready()
+            await value.wait_ready()
             return value
         return await self.new_action(**value)
 
@@ -130,7 +130,7 @@ class NotificationManager(Singular, Ipylab):
             keep_open: NotRequired[bool]
             caption: NotRequired[str]
         """
-        await self.ready()
+        await self.wait_ready()
         options = {"autoClose": auto_close}
         kwgs = {"type": NotificationType(type), "message": message, "options": options}
         actions_ = [await self._ensure_action(v) for v in actions]
@@ -157,7 +157,7 @@ class NotificationManager(Singular, Ipylab):
         caption: str = "",
     ) -> ActionConnection:
         "Create an action to use in a notification."
-        await self.ready()
+        await self.wait_ready()
         connection_id = ActionConnection.to_id()
         kwgs = {
             "label": label,

@@ -26,15 +26,9 @@ export class ConnectionModel extends IpylabModel {
     base = await this.getObject();
     if (base) {
       base.disposed.connect(this._base_disposed, this);
-      this.set('page_id', IpylabModel.pageId);
       await super.ipylabInit(base);
     } else {
-      if (this.get('page_id') === IpylabModel.pageId) {
-        this.close();
-      } else {
-        // TODO: Close lost connections - how to determine
-        this.setReady();
-      }
+      this.close();
     }
   }
 

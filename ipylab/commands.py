@@ -69,7 +69,7 @@ class CommandConnection(InfoConnection):
     @classmethod
     @override
     def to_id(cls, command_registry: str, vpath: str, name: str) -> str:  # pyright: ignore[reportIncompatibleMethodOverride]
-        return super().to_id(command_registry, vpath, name, cls.get_page_id())
+        return super().to_id(command_registry, vpath, name)
 
     @property
     @override
@@ -77,7 +77,7 @@ class CommandConnection(InfoConnection):
         return {"info": self.info}
 
     async def configure(self, *, emit=True, **kwgs: Unpack[CommandOptions]) -> CommandOptions:
-        await self.ready()
+        await self.wait_ready()
         if diff := set(kwgs).difference(self._config_options):
             msg = f"The following useless configuration options were detected for {diff} in {self}"
             raise KeyError(msg)
@@ -91,7 +91,7 @@ class CommandConnection(InfoConnection):
         self, keys: list, selector="", args: dict | None = None, *, prevent_default=True
     ) -> KeybindingConnection:
         "Add a key binding for this command and selector."
-        await self.ready()
+        await self.wait_ready()
         args = args or {} | {
             "keys": keys,
             "preventDefault": prevent_default,
@@ -142,8 +142,8 @@ class CommandPalette(Singular, Ipylab):
             rank: The rank is used as a tie-breaker when ordering command items for display.
             args: The args to use when calling the command.
         """
-        await self.ready()
-        await command.ready()
+        await self.wait_ready()
+        await command.wait_ready()
         if str(command) not in self.app.commands.all_commands:
             msg = f"{command=} is not registered in app command registry app.commands!"
             raise RuntimeError(msg)
@@ -188,7 +188,7 @@ class CommandRegistry(Singular, Ipylab):
                 if not CommandConnection.exists(cmd_id):
                     msg = f'Invalid command "{cmd_id}"'
                     raise TypeError(msg)
-                conn = await CommandConnection(cmd_id).ready()
+                conn = await CommandConnection(cmd_id).wait_ready()
                 options = conn.args | (payload.get("args") or {})
                 with async_kernel.utils.subshell_context(options.get("subshell_id")):
                     return await execute_using_shells_namespace(
@@ -220,7 +220,7 @@ class CommandRegistry(Singular, Ipylab):
                 Additional ICommandOptions can be passed as kwgs.
         """
 
-        await self.ready()
+        await self.wait_ready()
         async with self._lock:
             connection_id = CommandConnection.to_id(self.name, self.app.vpath, name)
             CommandConnection.close_if_exists(connection_id)
@@ -267,14 +267,14 @@ class CommandRegistry(Singular, Ipylab):
             command_id: The id of the command in the command registry or the `CommandConnection` of a previously added command.
             args: `args` are used when executing.
         """
-        await self.ready()
+        await self.wait_ready()
 
         id_ = await self.validate_command_id(str(command_id))
         return await self.operation("execute", {"id": id_, "args": args or {}}, **kwargs)
 
     async def create_menu(self, label: str, rank: int = 500) -> MenuConnection:
         "Create a new menu that can be used anywhere a menu is required."
-        await self.ready()
+        await self.wait_ready()
         connection_id = ipylab.menu.MenuConnection.to_id()
         async with self._lock:
             ipylab.menu.MenuConnection.close_if_exists(connection_id)

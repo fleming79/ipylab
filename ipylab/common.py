@@ -63,6 +63,7 @@ S = TypeVar("S")
 R = TypeVar("R")
 B = TypeVar("B", bound=object)
 L = TypeVar("L", bound="Ipylab")
+W = TypeVar("W", bound="Widget")
 P = ParamSpec("P")
 PosArgsT = TypeVarTuple("PosArgsT")
 
@@ -128,13 +129,13 @@ async def execute_using_shells_namespace(
             kwgs[arg] = options[arg]
         elif (param.default is param.empty) and (param.kind is not param.VAR_KEYWORD):
             if arg == "ref":
-                kwgs[arg] = ipylab.connection.ShellConnection(connection_id) if connection_id else None
-            if arg in shell.user_ns:
+                kwgs["ref"] = ipylab.connection.ShellConnection(connection_id) if connection_id else None
+            elif arg in shell.user_ns:
                 kwgs[arg] = shell.user_ns[arg]
             elif arg in shell.user_global_ns:
                 kwgs[arg] = shell.user_global_ns[arg]
             elif arg == "app":
-                kwgs[arg] = ipylab.JupyterFrontEnd()
+                kwgs["app"] = ipylab.JupyterFrontEnd()
             else:
                 msg = f"Unable to locate parameter {param!r} for {func}"
                 raise ValueError(msg)
@@ -279,7 +280,7 @@ class Transform(StrEnum):
                     if transform_ == Transform.connection:
                         raise
                 else:
-                    return await conn.ready()
+                    return await conn.wait_ready()
         return payload
 
 
@@ -328,12 +329,6 @@ class IpylabKwgs(TypedDict):
     "A list of arguments that should be replaced with a Lumino widget in the frontend."
     toObject: NotRequired[list[str] | None]
     "A list of arguments that should be replaced with an object in the frontend."
-    page_id: NotRequired[str | None]
-    """
-    The specific page to which the operation/message should be associated.
-
-    Pass an empty string to *broadcast* to all browser pages.
-    """
 
 
 class HasApp(HasTraits):

@@ -7,10 +7,10 @@ import uuid
 from typing import TYPE_CHECKING, Any, ClassVar, Generic
 
 from ipywidgets import Widget, register
-from traitlets import Bool, Dict, Instance, Unicode, default
+from traitlets import Bool, Dict, Instance, Unicode
 from typing_extensions import override
 
-from ipylab.common import Area, Singular, T
+from ipylab.common import Area, Singular, W
 from ipylab.ipylab import Ipylab
 
 if TYPE_CHECKING:
@@ -45,7 +45,6 @@ class Connection(Singular, Ipylab):
     _CLASS_DEFINITIONS: ClassVar[dict[str, type[Self]]] = {}
     _PREFIX = "ipylab-"
     _SEP = "|"
-    page_id = Unicode().tag(sync=True)
     prefix: ClassVar = f"{_PREFIX}Connection{_SEP}"
 
     _model_name = Unicode("ConnectionModel").tag(sync=True)
@@ -53,10 +52,6 @@ class Connection(Singular, Ipylab):
     _dispose = Bool(read_only=True).tag(sync=True)
     ipylab_base = None
     auto_dispose = Bool(False, read_only=True, help="Dispose of the object in frontend when closed.").tag(sync=True)
-
-    @default("page_id")
-    def _default_page_id(self):
-        return self.get_page_id()
 
     @override
     @classmethod
@@ -133,13 +128,13 @@ class InfoConnection(Connection):
     auto_dispose = Bool(True).tag(sync=True)
 
 
-class ShellConnection(Connection, Generic[T]):
+class ShellConnection(Connection, Generic[W]):
     "A connection to a widget loaded in the shell."
 
     _model_name: Unicode[str, str | bytes] = Unicode("ShellConnectionModel").tag(sync=True)
     auto_dispose = Bool(True).tag(sync=True)
 
-    widget: Instance[T] = Instance(Widget, allow_none=True, default_value=None, help="The widget that has the view")  # pyright: ignore[reportAssignmentType]
+    widget: Instance[W] = Instance(Widget, allow_none=True, default_value=None, help="The widget that has the view")  # pyright: ignore[reportAssignmentType]
 
     def __del__(self) -> None:
         """Object disposal"""

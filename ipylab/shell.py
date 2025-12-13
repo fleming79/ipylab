@@ -6,7 +6,6 @@ from __future__ import annotations
 import inspect
 from typing import TYPE_CHECKING, Literal, Unpack
 
-import anyio
 from aiologic import BinarySemaphore
 from async_kernel.common import Fixed
 from async_kernel.typing import KernelName
@@ -14,12 +13,13 @@ from ipywidgets import DOMWidget, TypedTuple, Widget
 from traitlets import Container, Instance, Unicode
 
 import ipylab
-from ipylab.common import Area, InsertMode, IpylabKwgs, Obj, Singular, T, Transform, TransformType, pack
+from ipylab.common import Area, InsertMode, IpylabKwgs, Obj, Singular, Transform, TransformType, W, pack
 from ipylab.connection import ShellConnection
 from ipylab.ipylab import Ipylab, IpylabBase
 from ipylab.log_viewer import LogViewer
 
 if TYPE_CHECKING:
+    from types import FunctionType
     from typing import Literal
 
 
@@ -32,9 +32,10 @@ class ConsoleConnection(ShellConnection):
     subshell_id = Unicode(None, allow_none=True)
 
     async def inject(self, code: str, **metadata) -> None:
-        "Inject and execute code in the console"
-        # Use a task to avoid deadlocking if called from a console.
-        await self.app.caller.call_soon(self.execute_method, "console.inject", (code, metadata))
+        """Inject and execute code in the console."""
+        # Specify a task in case this is called from an execute request from the same shell.
+        metadata["tags"] = [*metadata.get("tags", ()), "task"]
+        await self.execute_method("console.inject", (code, metadata))
 
 
 class Shell(Singular, Ipylab):
@@ -53,7 +54,7 @@ class Shell(Singular, Ipylab):
 
     async def add(
         self,
-        obj: T | Widget | inspect._SourceObjectType,
+        obj: W | FunctionType,
         *,
         area: Area = Area.main,
         activate: bool = True,
@@ -63,9 +64,8 @@ class Shell(Singular, Ipylab):
         options: dict | None = None,
         vpath: str | dict[Literal["title"], str] = "",
         preferred_kernel: KernelName | Literal["python3"] | str = KernelName.asyncio,  # noqa: PYI051,
-        page_id: str | None = None,
         **args,
-    ) -> ShellConnection[T]:
+    ) -> ShellConnection[W]:
         """
         Add a widget to the shell.
 
@@ -102,9 +102,8 @@ class Shell(Singular, Ipylab):
             app.shell.add("ipylab.Panel([ipw.HTML('<h1>Test')])", vpath="test")
             ```
         """
-        await self.ready()
+        await self.wait_ready()
         vpath = vpath or self.app.vpath
-        page_id = self.get_page_id() if page_id is None else page_id
         args["options"] = {
             "activate": activate,
             "mode": InsertMode(mode),
@@ -125,7 +124,7 @@ class Shell(Singular, Ipylab):
                 raise RuntimeError(msg)
             if not args.get("connection_id") and self.connections:
                 for c in reversed(self.connections):
-                    if c.widget is obj and c.page_id == page_id and not c.closed:
+                    if c.widget is obj and not c.closed:
                         args["connection_id"] = c.connection_id
                         break
             args["ipy_model"] = obj.model_id
@@ -135,7 +134,7 @@ class Shell(Singular, Ipylab):
             obj.add_class(self.app.selector.removeprefix("."))
         if "evaluate" in args and isinstance(vpath, dict):
             val = ipylab.plugin_manager.hook.vpath_getter(app=self.app, kwgs=vpath)
-            while inspect.isawaitable(val):
+            if inspect.iscoroutine(val):
                 val = await val
             vpath = val
         args["vpath"] = vpath
@@ -149,7 +148,6 @@ class Shell(Singular, Ipylab):
             "addToShell",
             {"args": args},
             transform=Transform.connection,
-            page_id=page_id,
         )
         sc.add_to_tuple(self, "connections")
         if vpath != self.app.vpath:
@@ -167,11 +165,12 @@ class Shell(Singular, Ipylab):
     async def open_console(
         self,
         *,
-        mode=InsertMode.split_bottom,
-        activate=True,
         ref: ShellConnection | str = "",
         objects: dict | None = None,
         subshell_id: str | None = None,
+        activate=True,
+        mode=InsertMode.split_bottom,
+        **args,
     ) -> ConsoleConnection:
         """
         Open/activate a Jupyterlab console for this python kernel shell (path=app.vpath).
@@ -182,18 +181,27 @@ class Shell(Singular, Ipylab):
             ref: The ShellConnection or `id` of the widget in the shell to set as `ref` in the namespace.
             objects: Objects to load into the user namespace (shell.user_ns). By default `ref` as a `ShellConnection` is loaded.
         """
-        await self.ready()
-        app = await self.app.ready()
-        with anyio.fail_after(1), self._lock:
+        await self.wait_ready()
+        app = await self.app.wait_ready()
+        if subshell_id:
+            # Validate the subshell_id.
+            self.app.kernel.subshell_manager.get_shell(subshell_id)
+        with self._lock:
             ref_ = ref or self.current_widget_id
             if not isinstance(ref_, ShellConnection):
                 ref_ = await self.connect_to_widget(ref_)
+                ref_.auto_dispose = False
             objects_ = {"ref": ref_} | (objects or {})
             if cc_ := next((c for c in self.consoles if c.subshell_id == subshell_id), None):
                 cc = cc_
             else:
-                args = {"path": app.vpath, "insertMode": InsertMode(mode), "activate": False, "ref": f"{pack(ref_)}.id"}
-                connection_id = ConsoleConnection.to_id(app.vpath, f"{subshell_id=}")
+                args = args | {
+                    "path": app.vpath,
+                    "insertMode": InsertMode(mode),
+                    "activate": False,
+                    "ref": f"{pack(ref_)}.id",
+                }
+                connection_id = ConsoleConnection.to_id(app.vpath, f"{subshell_id=!s}")
                 tf: TransformType = {"transform": Transform.connection, "connection_id": connection_id}
                 cc: ConsoleConnection = await app.commands.execute(
                     "console:create", args, toObject=["args[ref]"], transform=tf

@@ -80,8 +80,9 @@ class JupyterFrontEnd(Singular, Ipylab):
         if self.logging_handler:
             self.logging_handler.setLevel(self.log_level)
 
-    def _on_ready(self, page_id: str):
-        super()._on_ready(page_id)
+    @override
+    async def _set_ready(self) -> None:
+        await super()._set_ready()
         assert self._vpath, "'_vpath' must be set first."
         ipylab.plugin_manager.hook.autostart._call_history.clear()  # pyright: ignore[reportOptionalMemberAccess]
         try:
@@ -116,7 +117,7 @@ class JupyterFrontEnd(Singular, Ipylab):
         `vpath` is equivalent to the session `path` in the frontend and cannot be changed.
         """
         if not (vpath := self._vpath):
-            msg = "`vpath` Has not yet been set! Tip: Use await app.ready() (or the Ipylab object `ready` method) to avoid this error."
+            msg = "`vpath` Has not yet been set! Tip: Use await app.wait_ready() (or the Ipylab object `ready` method) to avoid this error."
             raise RuntimeError(msg)
         return vpath
 
@@ -278,7 +279,7 @@ class JupyterFrontEnd(Singular, Ipylab):
                 # Task result should be a ShellConnection
                 ```
         """
-        await self.ready()
+        await self.wait_ready()
         kwgs = (kwgs or {}) | {
             "evaluate": evaluate,
             "vpath": vpath or self.vpath,
