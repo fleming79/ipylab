@@ -3,10 +3,10 @@
 
 from __future__ import annotations
 
-import inspect
 import uuid
 from typing import TYPE_CHECKING, Any, ClassVar, NotRequired, TypedDict, Unpack
 
+import async_kernel
 from aiologic import Lock
 from async_kernel.common import Fixed
 from ipywidgets import TypedTuple
@@ -15,7 +15,7 @@ from traitlets import Container, Dict, Instance, Tuple, Unicode
 from typing_extensions import override
 
 import ipylab
-from ipylab.common import IpylabKwgs, Obj, Singular, TransformType, pack
+from ipylab.common import IpylabKwgs, Obj, Singular, TransformType, execute_using_shells_namespace, pack
 from ipylab.connection import InfoConnection
 from ipylab.ipylab import Ipylab, IpylabBase, Transform, register
 from ipylab.widgets import Icon
@@ -69,7 +69,7 @@ class CommandConnection(InfoConnection):
     @classmethod
     @override
     def to_id(cls, command_registry: str, vpath: str, name: str) -> str:  # pyright: ignore[reportIncompatibleMethodOverride]
-        return super().to_id(command_registry, vpath, name, cls.get_page_id())
+        return super().to_id(command_registry, vpath, name)
 
     @property
     @override
@@ -77,7 +77,7 @@ class CommandConnection(InfoConnection):
         return {"info": self.info}
 
     async def configure(self, *, emit=True, **kwgs: Unpack[CommandOptions]) -> CommandOptions:
-        await self.ready()
+        await self.wait_ready()
         if diff := set(kwgs).difference(self._config_options):
             msg = f"The following useless configuration options were detected for {diff} in {self}"
             raise KeyError(msg)
@@ -91,7 +91,7 @@ class CommandConnection(InfoConnection):
         self, keys: list, selector="", args: dict | None = None, *, prevent_default=True
     ) -> KeybindingConnection:
         "Add a key binding for this command and selector."
-        await self.ready()
+        await self.wait_ready()
         args = args or {} | {
             "keys": keys,
             "preventDefault": prevent_default,
@@ -142,8 +142,8 @@ class CommandPalette(Singular, Ipylab):
             rank: The rank is used as a tie-breaker when ordering command items for display.
             args: The args to use when calling the command.
         """
-        await self.ready()
-        await command.ready()
+        await self.wait_ready()
+        await command.wait_ready()
         if str(command) not in self.app.commands.all_commands:
             msg = f"{command=} is not registered in app command registry app.commands!"
             raise RuntimeError(msg)
@@ -188,12 +188,13 @@ class CommandRegistry(Singular, Ipylab):
                 if not CommandConnection.exists(cmd_id):
                     msg = f'Invalid command "{cmd_id}"'
                     raise TypeError(msg)
-                conn = await CommandConnection(cmd_id).ready()
-                args = conn.args | (payload.get("args") or {})
-                result = conn.python_command(**args)
-                if inspect.iscoroutine(result):
-                    result = await result
-                return result
+                conn = await CommandConnection(cmd_id).wait_ready()
+                options = conn.args | (payload.get("args") or {})
+                with async_kernel.utils.subshell_context(options.get("subshell_id")):
+                    return await execute_using_shells_namespace(
+                        conn.python_command, self.app.kernel.shell, options, connection_id=payload.get("connection_id")
+                    )
+
         return await super()._do_operation_for_frontend(operation, payload, buffers)
 
     async def add_command(
@@ -219,7 +220,7 @@ class CommandRegistry(Singular, Ipylab):
                 Additional ICommandOptions can be passed as kwgs.
         """
 
-        await self.ready()
+        await self.wait_ready()
         async with self._lock:
             connection_id = CommandConnection.to_id(self.name, self.app.vpath, name)
             CommandConnection.close_if_exists(connection_id)
@@ -245,6 +246,15 @@ class CommandRegistry(Singular, Ipylab):
             cc.add_to_tuple(self, "connections")
             return cc
 
+    async def validate_command_id(self, cmd: str | CommandConnection) -> str:
+        cmd = str(cmd)
+        if cmd not in self.all_commands:
+            cmd = CommandConnection.to_id(self.name, self.app.vpath, cmd)
+            if cmd not in self.all_commands:
+                msg = f"Command '{cmd}' not registered!"
+                raise ValueError(msg)
+        return cmd
+
     async def execute(
         self, command_id: str | CommandConnection, args: dict | None = None, **kwargs: Unpack[IpylabKwgs]
     ) -> Any:
@@ -257,18 +267,14 @@ class CommandRegistry(Singular, Ipylab):
             command_id: The id of the command in the command registry or the `CommandConnection` of a previously added command.
             args: `args` are used when executing.
         """
-        await self.ready()
-        id_ = str(command_id)
-        if id_ not in self.all_commands:
-            id_ = CommandConnection.to_id(self.name, self.app.vpath, id_)
-            if id_ not in self.all_commands:
-                msg = f"Command '{command_id}' not registered!"
-                raise ValueError(msg)
+        await self.wait_ready()
+
+        id_ = await self.validate_command_id(str(command_id))
         return await self.operation("execute", {"id": id_, "args": args or {}}, **kwargs)
 
     async def create_menu(self, label: str, rank: int = 500) -> MenuConnection:
         "Create a new menu that can be used anywhere a menu is required."
-        await self.ready()
+        await self.wait_ready()
         connection_id = ipylab.menu.MenuConnection.to_id()
         async with self._lock:
             ipylab.menu.MenuConnection.close_if_exists(connection_id)
@@ -288,13 +294,5 @@ class CommandRegistry(Singular, Ipylab):
 
     async def described_by(self, command_id: str | CommandConnection) -> dict[str, Any]:
         "Get a description of a specific command [ref](https://lumino.readthedocs.io/en/latest/api/classes/commands.CommandRegistry-1.html#describedBy)."
-
-        await self.ready()
-        id_ = str(command_id)
-        if id_ not in self.all_commands:
-            id_ = CommandConnection.to_id(self.name, self.app.vpath, id_)
-            if id_ not in self.all_commands:
-                msg = f"Command '{command_id}' not registered!"
-                raise ValueError(msg)
-
+        id_ = await self.validate_command_id(command_id)
         return await self.execute_method("describedBy", (id_,))

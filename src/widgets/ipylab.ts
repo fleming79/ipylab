@@ -167,11 +167,7 @@ export class IpylabModel extends DOMWidgetModel {
       }
       content = toJSONsubstituteCylic(content);
     }
-    this.send(
-      { ipylab: content, pageId: IpylabModel.pageId },
-      callbacks,
-      buffers
-    );
+    this.send({ ipylab: content }, callbacks, buffers);
   }
 
   /**
@@ -315,9 +311,7 @@ export class IpylabModel extends DOMWidgetModel {
    * @param msg The message received from the backend.
    */
   protected onCustomMessage(msg: any) {
-    if (msg.pageId && msg.pageId !== IpylabModel.pageId) {
-      return;
-    } else if (msg.ipylab) {
+    if (msg.ipylab) {
       this._onBackendMessage(JSON.parse(msg.ipylab));
     }
   }
@@ -368,19 +362,6 @@ export class IpylabModel extends DOMWidgetModel {
       this.close(true);
     } else if (content === 'checkReady') {
       this.ipylabSend('ready');
-    } else if (content.clientIdToPageId) {
-      // Look for a kernel connection that has the requested `clientId`.
-      const clientId = content.clientIdToPageId;
-      for (const kc of getNestedProperty({
-        obj: IpylabModel.app.serviceManager.kernels,
-        subpath: '_kernelConnections'
-      })) {
-        if (kc.clientId === clientId) {
-          return this.ipylabSend({
-            clientIdToPageId: { clientId, pageId: IpylabModel.pageId }
-          });
-        }
-      }
     }
   }
 
@@ -715,9 +696,6 @@ export class IpylabModel extends DOMWidgetModel {
   static get sessionManager(): Session.IManager {
     return IpylabModel.app.serviceManager.sessions;
   }
-  static get pageId() {
-    return Private.pageId;
-  }
   private _signalDisconnectors = new Map<string, () => boolean>();
   widget_manager: KernelWidgetManager;
   private _pendingOperations = new Map<string, PromiseDelegate<any>>();
@@ -780,5 +758,4 @@ namespace Private {
   >();
   export const validSessions = new Set<string>();
   export const invalidSessions = new Set<string>();
-  export const pageId = UUID.uuid4();
 }

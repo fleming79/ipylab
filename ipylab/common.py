@@ -3,13 +3,12 @@
 
 from __future__ import annotations
 
-import contextlib
+import functools
 import inspect
 import logging
 import textwrap
 import typing
 import weakref
-from collections import OrderedDict
 from enum import StrEnum
 from typing import (
     TYPE_CHECKING,
@@ -28,16 +27,18 @@ from typing import (
 
 import anyio
 import traitlets
-from async_kernel.common import Fixed, import_item
+from async_kernel.common import Fixed
 from ipywidgets import TypedTuple, Widget, widget_serialization
 from traitlets import Any as AnyTrait
 from traitlets import Bool, Container, HasTraits, Instance, default, observe
-from typing_extensions import override
 
 import ipylab
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Hashable
+    from collections.abc import Awaitable, Callable, Hashable
+    from types import CoroutineType, FunctionType
+
+    from async_kernel.asyncshell import AsyncInteractiveShell, AsyncInteractiveSubshell
 
     from ipylab.ipylab import Ipylab
 
@@ -46,7 +47,6 @@ __all__ = [
     "HasApp",
     "InsertMode",
     "IpylabKwgs",
-    "LastUpdatedDict",
     "Obj",
     "Singular",
     "Transform",
@@ -60,6 +60,7 @@ S = TypeVar("S")
 R = TypeVar("R")
 B = TypeVar("B", bound=object)
 L = TypeVar("L", bound="Ipylab")
+W = TypeVar("W", bound="Widget")
 P = ParamSpec("P")
 PosArgsT = TypeVarTuple("PosArgsT")
 
@@ -67,7 +68,7 @@ PosArgsT = TypeVarTuple("PosArgsT")
 SVGSTR_TEST_TUBE = '<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 392.493 392.493" xml:space="preserve" fill="#000000"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <polygon style="fill:#FFFFFF;" points="83.2,99.123 169.697,185.62 300.477,185.62 148.687,33.701 "></polygon> <g> <path style="fill:#56ACE0;" d="M21.851,348.917c0,12.024,9.826,21.786,21.786,21.786s21.786-9.826,21.786-21.786 c0-7.111-10.214-25.794-21.786-43.184C32,323.123,21.851,341.806,21.851,348.917z"></path> <path style="fill:#56ACE0;" d="M31.677,218.59c0,6.594,5.301,11.895,11.895,11.895s11.895-5.301,11.895-11.895 c-0.065-3.491-5.042-13.382-11.895-24.113C36.784,205.143,31.741,215.034,31.677,218.59z"></path> </g> <path style="fill:#194F82;" d="M372.622,226.864L164.073,18.315c3.943-4.267,3.879-10.925-0.323-15.063 c-3.62-3.556-10.02-5.042-15.451,0L52.687,98.864c-4.267,4.267-4.267,11.119,0,15.451c4.202,4.202,10.796,4.267,15.063,0.323 l208.549,208.55c25.471,27.345,73.503,25.729,96.259,0C399.127,296.618,399.127,253.499,372.622,226.864z M83.2,99.123 l65.422-65.358l151.919,151.919h-130.78L83.2,99.123z M357.172,307.737c-15.321,16.356-44.8,19.846-65.358,0L191.483,207.406 h130.844l34.844,34.844C375.208,260.351,375.208,289.701,357.172,307.737z"></path> <path style="fill:#FFC10D;" d="M357.172,307.737c18.036-18.036,18.036-47.386,0-65.422l-34.844-34.909H191.483l100.331,100.331 C312.436,327.584,341.851,324.093,357.172,307.737z"></path> <g> <path style="fill:#194F82;" d="M34.844,280.327C29.026,288.149,0,328.295,0,348.917c0,24.048,19.653,43.572,43.636,43.572 s43.572-19.523,43.572-43.572c0-20.622-29.026-60.768-34.844-68.59C48.291,274.767,39.046,274.767,34.844,280.327z M43.636,370.767 c-12.024,0-21.786-9.826-21.786-21.786c0-7.111,10.214-25.794,21.786-43.184c11.572,17.325,21.786,36.008,21.786,43.184 C65.422,360.941,55.661,370.767,43.636,370.767z"></path> <path style="fill:#194F82;" d="M43.636,252.335c18.618,0,33.745-15.127,33.745-33.681c0-15.063-19.071-41.956-24.954-49.842 c-4.073-5.56-13.382-5.56-17.519,0c-5.883,7.887-24.954,34.78-24.954,49.842C9.891,237.272,25.018,252.335,43.636,252.335z M43.636,194.541c6.853,10.731,11.895,20.622,11.895,24.113c0,6.594-5.301,11.895-11.895,11.895s-11.96-5.301-11.96-11.895 C31.741,215.163,36.784,205.272,43.636,194.541z"></path> </g> </g></svg>'
 
 
-def pack(obj: Widget | inspect._SourceObjectType):
+def pack(obj: Widget | FunctionType):
     """Pack obj in a format usable in the frontend.
 
     Only widgets and source are packed, all other objects are passed without
@@ -83,12 +84,18 @@ def pack(obj: Widget | inspect._SourceObjectType):
 
     if isinstance(obj, Widget):
         return widget_serialization["to_json"](obj, None)
-    if inspect.isfunction(obj) or inspect.ismodule(obj) or inspect.isclass(obj):
-        with contextlib.suppress(BaseException):
-            return module_obj_to_import_string(obj)
+    if inspect.isfunction(obj) or inspect.ismodule(obj):
         return textwrap.dedent(inspect.getsource(obj))
     msg = f"Unable pack this type of object {type(obj)}: {obj!r}"
     raise TypeError(msg)
+
+
+def json_default(obj: Any):
+    "Handle non-json objects."
+    try:
+        return pack(obj)
+    except TypeError:
+        return repr(obj)
 
 
 def to_selector(*args, prefix="ipylab"):
@@ -101,21 +108,39 @@ def to_selector(*args, prefix="ipylab"):
     return f".{prefix}-{suffix}"
 
 
-def module_obj_to_import_string(obj):
-    """Convert a module object to an import string compatible with `JupyterFrontend.evaluate`.
-
-    Args:
-        obj: The module object to convert.
+async def execute_using_shells_namespace(
+    func: Callable[..., T | CoroutineType[Any, Any, T]],
+    shell: AsyncInteractiveShell | AsyncInteractiveSubshell,
+    options: dict,
+    *,
+    connection_id: str | None = None,
+) -> T:
     """
-    dottedname = f"{obj.__module__}.{obj.__qualname__}"
-    if dottedname.startswith("__main__"):
-        msg = f"{obj=} won't be importable from a new kernel"
-        raise TypeError(msg)
-    item = import_item(dottedname)
-    if item is not obj:
-        msg = "Failed to import item correctly"
-        raise TypeError(msg)
-    return f"import_item({dottedname=})"
+    Execute func loading the arguments from kwgs, shells user_ns and use_global_ns.
+    """
+    kwgs = {}
+    for arg, param in inspect.signature(func).parameters.items():
+        if arg in options:
+            kwgs[arg] = options[arg]
+        elif (param.default is param.empty) and (param.kind is not param.VAR_KEYWORD):
+            if arg == "ref":
+                kwgs["ref"] = ipylab.connection.ShellConnection(connection_id) if connection_id else None
+            elif arg in shell.user_ns:
+                kwgs[arg] = shell.user_ns[arg]
+            elif arg in shell.user_global_ns:
+                kwgs[arg] = shell.user_global_ns[arg]
+            elif arg == "app":
+                kwgs["app"] = ipylab.JupyterFrontEnd()
+            else:
+                msg = f"Unable to locate parameter {param!r} for {func}"
+                raise ValueError(msg)
+    # We use a partial so that we can evaluate with the same namespace.
+    shell.user_ns["ipylab_call"] = functools.partial(func, **kwgs)
+    source = compile("ipylab_call()", "-- Result call --", "eval")
+    result = eval(source, shell.user_global_ns, shell.user_ns)
+    if inspect.iscoroutine(result):
+        return await result
+    return result
 
 
 class Obj(StrEnum):
@@ -250,7 +275,7 @@ class Transform(StrEnum):
                     if transform_ == Transform.connection:
                         raise
                 else:
-                    return await conn.ready()
+                    return await conn.wait_ready()
         return payload
 
 
@@ -299,40 +324,6 @@ class IpylabKwgs(TypedDict):
     "A list of arguments that should be replaced with a Lumino widget in the frontend."
     toObject: NotRequired[list[str] | None]
     "A list of arguments that should be replaced with an object in the frontend."
-    page_id: NotRequired[str | None]
-    """
-    The specific page to which the operation/message should be associated.
-
-    Pass an empty string to *broadcast* to all browser pages.
-    """
-
-
-class LastUpdatedDict(OrderedDict):
-    """
-    Store items in the order the keys were last added [ref](https://docs.python.org/3/library/collections.html#ordereddict-examples-and-recipes).
-
-    Args:
-        mode:The end to shift the last added key."""
-
-    _updating = False
-    _last = True
-
-    def __init__(self, *args, mode: Literal["first", "last"] = "last", **kwargs) -> None:
-        self._last = mode == "last"
-        super().__init__(*args, **kwargs)
-
-    def __setitem__(self, key, value):
-        super().__setitem__(key, value)
-        if not self._updating:
-            self.move_to_end(key, self._last)
-
-    @override
-    def update(self, m, /, **kwargs) -> None:  # pyright: ignore[reportIncompatibleMethodOverride]
-        self._updating = True
-        try:
-            super().update(m, **kwargs)
-        finally:
-            self._updating = False
 
 
 class HasApp(HasTraits):
@@ -422,7 +413,7 @@ class HasApp(HasTraits):
         try:
             await aw
         except BaseException as e:
-            self.log.exception(f"Calling {aw}", obj={"aw": aw}, exc_info=e)  # noqa: G004
+            self.log.exception(f"Calling {aw}", exc_info=e)  # noqa: G004
 
 
 class _SingularInstances(HasTraits, Generic[T]):

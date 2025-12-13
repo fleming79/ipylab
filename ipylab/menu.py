@@ -34,6 +34,7 @@ class RankedMenu(Ipylab):
     """
 
     connections: Container[tuple[MenuItemConnection, ...]] = TypedTuple(trait=Instance(MenuItemConnection))
+    commands = Instance(CommandRegistry)
 
     async def add_item(
         self,
@@ -74,7 +75,7 @@ class RankedMenu(Ipylab):
                 if not command:
                     msg = "command is required"
                     raise ValueError(msg)
-                info["command"] = str(command)
+                info["command"] = await self.commands.validate_command_id(command)
                 info["args"] = args
             case "separator":
                 pass
@@ -115,22 +116,21 @@ class RankedMenu(Ipylab):
 
 
 class BuiltinMenu(RankedMenu):
+    commands: Fixed[Self, CommandRegistry] = Fixed(lambda c: c["owner"].app.commands)
+
     @override
     async def activate(self) -> None:
         name = self.ipylab_base[-1].removeprefix("mainMenu.").lower()
-        await self.app.commands.execute(f"{name}:open")
+        await self.commands.execute(f"{name}:open")
 
 
 class MenuConnection(InfoConnection, RankedMenu):
     """A connection to a custom menu."""
 
-    commands = Instance(CommandRegistry)
-
 
 class Menu(Singular, RankedMenu):
     ipylab_base = IpylabBase(Obj.IpylabModel, "palette").tag(sync=True)
 
-    commands = Instance(CommandRegistry)
     connections: Container[tuple[MenuConnection, ...]] = TypedTuple(  # pyright: ignore[reportIncompatibleVariableOverride]
         trait=Union([Instance(MenuConnection), Instance(MenuItemConnection)])
     )
@@ -225,7 +225,7 @@ class ContextMenu(Menu):
 
         ref: https://jupyterlab.readthedocs.io/en/stable/extension/extension_points.html#context-menu
         """
-        await self.ready()
+        await self.wait_ready()
         return await self._add_item(command, submenu, rank, type, args, selector or self.app.selector)
 
     @override

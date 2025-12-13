@@ -3,12 +3,13 @@
 
 from __future__ import annotations
 
-import functools
 import inspect
 import os
 from typing import TYPE_CHECKING, Any, Literal, Self, Unpack, final
 
-from async_kernel.common import Fixed, import_item
+import async_kernel
+from async_kernel import Caller, Kernel
+from async_kernel.common import Fixed
 from async_kernel.typing import KernelName
 from ipywidgets import Widget, register
 from traitlets import Bool, Unicode
@@ -16,7 +17,7 @@ from typing_extensions import override
 
 from ipylab import Ipylab
 from ipylab.commands import APP_COMMANDS_NAME, CommandPalette, CommandRegistry
-from ipylab.common import IpylabKwgs, LastUpdatedDict, Obj, Singular, to_selector
+from ipylab.common import IpylabKwgs, Obj, Singular, execute_using_shells_namespace, to_selector
 from ipylab.ipylab import IpylabBase
 from ipylab.menu import ContextMenu, MainMenu
 from ipylab.sessions import SessionManager
@@ -45,6 +46,9 @@ class JupyterFrontEnd(Singular, Ipylab):
     _vpath = Unicode(read_only=True).tag(sync=True)
     per_kernel_widget_manager_detected = Bool(read_only=True).tag(sync=True)
 
+    kernel = Fixed(Kernel)
+    caller: Fixed[Self, Caller] = Fixed(lambda c: getattr(c["owner"].kernel, "caller", None) or Caller("MainThread"))
+
     shell = Fixed(Shell)
     commands = Fixed(lambda _: CommandRegistry(name=APP_COMMANDS_NAME))
     main_menu = Fixed(MainMenu)
@@ -52,8 +56,6 @@ class JupyterFrontEnd(Singular, Ipylab):
     context_menu: Fixed[Self, ContextMenu] = Fixed(lambda c: ContextMenu(commands=c["owner"].commands))
     sessions = Fixed(SessionManager)
     toolbar = Fixed(CustomToolbar)
-
-    namespace = Fixed(LastUpdatedDict)
 
     @override
     def close(self, *, force=False) -> None:
@@ -76,7 +78,7 @@ class JupyterFrontEnd(Singular, Ipylab):
         `vpath` is equivalent to the session `path` in the frontend and cannot be changed.
         """
         if not (vpath := self._vpath):
-            msg = "`vpath` Has not yet been set! Tip: Use await app.ready() (or the Ipylab object `ready` method) to avoid this error."
+            msg = "`vpath` Has not yet been set! Tip: Use await app.wait_ready() (or the Ipylab object `ready` method) to avoid this error."
             raise RuntimeError(msg)
         return vpath
 
@@ -94,9 +96,9 @@ class JupyterFrontEnd(Singular, Ipylab):
     async def _do_operation_for_frontend(self, operation: str, payload: dict, buffers: list) -> Any:
         match operation:
             case "evaluate":
-                return await self._evaluate(payload, buffers)
+                return await self._evaluate(payload)
             case "shell_eval":
-                result = await self._evaluate(payload, buffers)
+                result = await self._evaluate(payload)
                 widget = result.get("payload")
                 if not isinstance(widget, Widget):
                     msg = f"Expected an Widget but got {type(widget)}"
@@ -113,66 +115,52 @@ class JupyterFrontEnd(Singular, Ipylab):
         "Start the 'ipylab' Python kernel."
         return self.operation("startIyplabKernel", {"restart": restart})
 
-    async def _evaluate(self, options: dict[str, Any], buffers: list) -> dict[str, Any]:
+    async def _evaluate(self, payload: dict[str, Any]) -> dict[str, Any]:
         """
         Evaluate code for `evaluate`.
 
         A call to this method should originate from a call to `evaluate` from
         app in another kernel. The call is sent as a message via the frontend."""
-        try:
-            evaluate = options["evaluate"]
+
+        evaluate = payload["evaluate"]
+        subshell_id = payload.get("subshell_id")
+        with async_kernel.utils.subshell_context(subshell_id):
+            shell = self.kernel.shell
+            user_ns = shell.user_ns
+            user_global_ns = shell.user_global_ns
             if isinstance(evaluate, str):
                 evaluate = (evaluate,)
-            ns = self.namespace
-            ns["buffers"] = buffers
             for row in evaluate:
                 name, expression = ("payload", row) if isinstance(row, str) else row
-                if expression.startswith("import_item(dottedname="):
-                    result = eval(expression, {"import_item": import_item})
+                try:
+                    source = compile(expression, "-- Evaluate --", "eval")
+                except SyntaxError:
+                    source = compile(expression, "-- Expression --", "exec")
+                    exec(source, user_global_ns, user_ns)
+                    result = next(reversed(user_ns.values()))  # Requires: LastUpdatedDict
                 else:
-                    try:
-                        source = compile(expression, "-- Evaluate --", "eval")
-                    except SyntaxError:
-                        source = compile(expression, "-- Expression --", "exec")
-                        exec(source, ns)
-                        result = next(reversed(ns.values()))  # Requires: LastUpdatedDict
-                    else:
-                        result = eval(source, ns)
+                    result = eval(source, user_global_ns, user_ns)
                 if not name:
                     continue
                 if callable(result):
-                    kwgs = {}
-                    for p in inspect.signature(result).parameters:
-                        if p in options:
-                            kwgs[p] = options[p]
-                        elif p in ns:
-                            kwgs[p] = ns[p]
-                    # We use a partial so that we can evaluate with the same namespace.
-                    ns["_partial_call"] = functools.partial(result, **kwgs)
-                    source = compile("_partial_call()", "-- Result call --", "eval")
-                    result = eval(source, ns)
-                    ns.pop("_partial_call")
+                    result = await execute_using_shells_namespace(
+                        result, shell, payload, connection_id=payload.get("connection_id")
+                    )
                 if inspect.iscoroutine(result):
                     result = await result
                 if name:
-                    ns[name] = result
-            buffers = ns.pop("buffers", [])
-            payload = ns.pop("payload", None)
-            if payload is not None:
-                ns["_call_count"] = n = ns.get("_call_count", 0) + 1
-                ns[f"payload_{n}"] = payload
-        except BaseException as e:
-            if isinstance(e, NameError):
-                e.add_note("Tip: Check for missing an imports?")
-            raise
-        else:
-            return {"payload": payload, "buffers": buffers}
+                    user_ns[name] = result
+        payload = user_ns.pop("payload", None)
+        if payload is not None:
+            user_ns["_call_count"] = name = user_ns.get("_call_count", 0) + 1
+            user_ns[f"payload_{name}"] = payload
+        return {"payload": payload}
 
     async def evaluate(
         self,
         evaluate: str | inspect._SourceObjectType | Iterable[str | tuple[str, str | inspect._SourceObjectType]],
         *,
-        vpath: str,
+        vpath: str = "",
         preferred_kernel: KernelName | Literal["python3"] | str = KernelName.asyncio,  # noqa: PYI051
         kwgs: None | dict = None,
         **kwargs: Unpack[IpylabKwgs],
@@ -252,10 +240,18 @@ class JupyterFrontEnd(Singular, Ipylab):
                 # Task result should be a ShellConnection
                 ```
         """
-        await self.ready()
+        await self.wait_ready()
         kwgs = (kwgs or {}) | {
             "evaluate": evaluate,
             "vpath": vpath or self.vpath,
             "preferredKernel": preferred_kernel,
         }
+        if vpath == self.vpath:
+            return await self._evaluate(kwgs)
         return await self.operation("evaluate", kwgs=kwgs, **kwargs)
+
+    def add_objects_to_user_ns(self, subshell_id: str | None, /, **objects) -> None:
+        "Load objects into the user namespace."
+
+        with async_kernel.utils.subshell_context(subshell_id):
+            self.kernel.shell.user_ns.update(objects)

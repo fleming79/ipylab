@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from ipylab import common, menu, widgets
+from ipylab import common, connection, menu, widgets
 from ipylab._frontend import module_version as __version__
 from ipylab.common import Area, InsertMode, Obj, Transform, pack, to_selector
 from ipylab.connection import Connection, ShellConnection
@@ -26,6 +26,7 @@ __all__ = [
     "__version__",
     "_jupyter_labextension_paths",
     "common",
+    "connection",
     "menu",
     "pack",
     "to_selector",
