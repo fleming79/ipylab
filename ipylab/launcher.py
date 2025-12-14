@@ -32,10 +32,7 @@ class Launcher(Singular, Ipylab):
         """
         await self.wait_ready()
         await cmd.wait_ready()
-        commands = await self.app.commands.wait_ready()
-        if str(cmd) not in commands.all_commands:
-            msg = f"{cmd=} is not registered in app command registry app.commands!"
-            raise RuntimeError(msg)
+        await self.app.commands.validate_command_id(cmd)
         connection_id = LauncherConnection.to_id(cmd, category)
         args = {"command": str(cmd), "category": category, "rank": rank, "args": args}
         transform: TransformType = {"transform": Transform.connection, "connection_id": connection_id}
