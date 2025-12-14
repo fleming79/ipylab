@@ -254,23 +254,17 @@ class Transform(StrEnum):
         return transform_
 
     @classmethod
-    async def transform_payload(cls, transform: TransformType, payload: Any) -> Any:
+    def transform_payload(cls, transform: TransformType, payload: Any) -> Any:
         """Transform the payload according to the transform."""
         transform_ = transform["transform"] if isinstance(transform, dict) else transform
         match transform_:
             case Transform.advanced:
                 mappings = typing.cast("TransformDictAdvanced", transform)["mappings"]
-                return {key: await cls.transform_payload(mappings[key], payload[key]) for key in mappings}
+                return {key: cls.transform_payload(mappings[key], payload[key]) for key in mappings}
             case Transform.connection | Transform.auto if isinstance(payload, dict) and (
                 connection_id := payload.get("connection_id")
             ):
-                try:
-                    conn = ipylab.Connection.get_connection(connection_id)
-                except KeyError:
-                    if transform_ == Transform.connection:
-                        raise
-                else:
-                    return await conn.wait_ready()
+                return ipylab.Connection.get_connection(connection_id)
         return payload
 
 

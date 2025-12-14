@@ -123,7 +123,7 @@ class TestTransformPayload:
             "key1": {"id": "test_id"},
             "key2": {"connection_id": "ipylab-Connection"},
         }
-        result = await Transform.transform_payload(transform, payload)
+        result = Transform.transform_payload(transform, payload)
         assert isinstance(result, dict)
         assert "key1" in result
         assert "key2" in result
@@ -134,19 +134,19 @@ class TestTransformPayload:
             "connection_id": "ipylab-Connection",
         }
         payload = {"connection_id": "ipylab-Connection"}
-        result = await Transform.transform_payload(transform, payload)
+        result = Transform.transform_payload(transform, payload)
         assert isinstance(result, Connection)
 
     async def test_transform_payload_auto(self, app):
         transform = Transform.auto
         payload = {"connection_id": "ipylab-Connection"}
-        result = await Transform.transform_payload(transform, payload)
+        result = Transform.transform_payload(transform, payload)
         assert isinstance(result, Connection)
 
     async def test_transform_payload_no_transform(self, app):
         transform = Transform.null
         payload = {"key": "value"}
-        result = await Transform.transform_payload(transform, payload)
+        result = Transform.transform_payload(transform, payload)
         assert result == payload
 
 
