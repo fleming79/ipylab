@@ -139,11 +139,6 @@ class Shell(Singular, Ipylab):
             vpath = val
         args["vpath"] = vpath
         args["preferredKernel"] = preferred_kernel
-        sc_current = None
-        if activate and area == Area.main:
-            current_widget_id: str | None = await self.get_property("currentWidget.id")
-            if current_widget_id and current_widget_id.startswith("launcher"):
-                sc_current = await self.connect_to_widget(current_widget_id)
         sc: ShellConnection = await self.operation(
             "addToShell",
             {"args": args},
@@ -156,8 +151,6 @@ class Shell(Singular, Ipylab):
             sc.widget = obj
             if isinstance(obj, ipylab.Panel):
                 sc.add_to_tuple(obj, "connections")
-        if sc_current:
-            sc_current.close()
         if activate:
             await sc.activate()
         return sc
@@ -208,6 +201,7 @@ class Shell(Singular, Ipylab):
                 )
                 cc.add_to_tuple(self, "consoles")
                 cc.add_to_tuple(self, "connections")
+                await cc.get_property("sessionContext.ready")
                 await cc.set_property("sessionContext.session.kernel.subshellId", subshell_id)
                 cc.subshell_id = subshell_id
             self.app.add_objects_to_user_ns(subshell_id, **objects_)

@@ -4,18 +4,11 @@
 from __future__ import annotations
 
 from typing import ClassVar, NotRequired, Self, TypedDict, Unpack
+from uuid import uuid4
 
 import anyio
 from async_kernel import Caller
-from ipywidgets import (
-    Box,
-    DOMWidget,
-    Layout,
-    TypedTuple,
-    Widget,
-    register,
-    widget_serialization,
-)
+from ipywidgets import Box, DOMWidget, Layout, TypedTuple, Widget, register, widget_serialization
 from ipywidgets.widgets.trait_types import InstanceDict
 from traitlets import Container, Dict, Instance, Tuple, Unicode, observe
 
@@ -39,8 +32,12 @@ class Icon(WidgetBase, DOMWidget):
     _model_name = Unicode("IconModel").tag(sync=True)
     _view_name = Unicode("IconView").tag(sync=True)
 
-    name = Unicode().tag(sync=True)
+    name = Unicode(read_only=True).tag(sync=True)
     svgstr = Unicode().tag(sync=True)
+
+    def __init__(self, name: str = "", **kwargs):
+        self.set_trait("name", name or f"ipylab-icon-{uuid4()!s}")
+        super().__init__(**kwargs)
 
 
 @register

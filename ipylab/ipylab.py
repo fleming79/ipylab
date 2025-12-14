@@ -99,9 +99,9 @@ class Ipylab(HasApp, WidgetBase):
             if self.has_trait(k):
                 self.set_trait(k, v)
         self.set_trait("_python_class", self.__class__.__name__)
+        self.on_msg(self._on_custom_msg)
         super().__init__()
         self._ipylab_init_complete = True
-        self.on_msg(self._on_custom_msg)
 
     def __repr__(self) -> str:
         if not self._repr_mimebundle_:

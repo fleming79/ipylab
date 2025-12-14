@@ -53,6 +53,11 @@ export class IconModel extends DOMWidgetModel {
    */
   initialize(attributes: any, options: any): void {
     super.initialize(attributes, options);
+    let name = this.get('name');
+    let svgstr =
+      this.get('svgstr') ||
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle class="jp-icon-selectable jp-icon3" cx="12" cy="12" r="12" fill="#616161" /></svg>';
+    this._labIcon = new LabIcon({ name, svgstr });
     this.on('change:name change:svgstr', this.updateIcon);
     this.updateIcon();
   }
@@ -65,13 +70,11 @@ export class IconModel extends DOMWidgetModel {
    * Update the LabIcon when model changes occur
    */
   updateIcon() {
-    const name = this.get('name');
-    const svgstr = this.get('svgstr');
-    if (!this._labIcon || this._labIcon.name !== name) {
-      this._labIcon = new LabIcon({ name, svgstr });
+    let svgstr: string = this.get('svgstr');
+    if (svgstr) {
+      this._labIcon.svgstr = svgstr;
+      this.trigger('change');
     }
-    this._labIcon.svgstr = svgstr;
-    this.trigger('change');
   }
 
   protected _labIcon: LabIcon;
