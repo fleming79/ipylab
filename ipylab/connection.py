@@ -73,6 +73,9 @@ class Connection(Singular, Ipylab):
         super().__init_subclass__(**kwargs)
 
     def __init__(self, connection_id: str, **kwgs) -> None:
+        if not connection_id.startswith(self._PREFIX):
+            msg = f"Not a connection id {connection_id}"
+            raise NameError(msg)
         super().__init__(connection_id=connection_id, **kwgs)
 
     def __str__(self):
