@@ -28,7 +28,7 @@ classifiers = [
 ]
 
 dependencies = [
-  "async-kernel>=0.10,<0.11",
+  "async-kernel>=0.10.1,<0.11",
   "jupyterlab>=4.5",
   'orjson',
   "typing_extensions",
