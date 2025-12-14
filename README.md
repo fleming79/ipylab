@@ -52,12 +52,12 @@ You can install using `pip`:
 ```bash
 pip install ipylab
 ```
+
                                                                                                        |
 
 ## Examples
 
 Example files can be downloaded directly from github [here](https://github.com/jtpio/ipylab/tree/main/examples).
-
 
 ## Under the hood
 
