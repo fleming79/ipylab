@@ -129,7 +129,14 @@ export class ShellModel extends IpylabModel {
     ShellModel.ConnectionModel.registerConnection(args.connection_id, widget);
 
     widget.id = widget.id || args.connection_id || UUID.uuid4();
+
+    const currentWidget = ShellModel.app.shell?.currentWidget;
     ShellModel.app.shell.add(widget as any, args.area || 'main', args.options);
+
+    // Close the launcher
+    if (currentWidget?.id?.startsWith('launcher')) {
+      currentWidget?.dispose();
+    }
 
     // Register widgets originating from IpyWidgets
     if (args.ipy_model) {
