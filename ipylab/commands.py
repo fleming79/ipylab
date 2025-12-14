@@ -143,13 +143,10 @@ class CommandPalette(Singular, Ipylab):
             args: The args to use when calling the command.
         """
         await self.wait_ready()
-        await command.wait_ready()
-        if str(command) not in self.app.commands.all_commands:
-            msg = f"{command=} is not registered in app command registry app.commands!"
-            raise RuntimeError(msg)
+        cmd = await self.app.commands.validate_command_id(command)
         connection_id = CommandPalletItemConnection.to_id(command, category)
         CommandPalletItemConnection.close_if_exists(connection_id)
-        info = {"args": args, "category": category, "command": str(command), "rank": rank}
+        info = {"args": args, "category": category, "command": cmd, "rank": rank}
         transform: TransformType = {"transform": Transform.connection, "connection_id": connection_id}
         cpc: CommandPalletItemConnection = await self.execute_method("addItem", (info,), transform=transform)
         self.close_with_self(cpc)
