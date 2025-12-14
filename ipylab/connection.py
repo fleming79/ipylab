@@ -10,7 +10,7 @@ from ipywidgets import Widget, register
 from traitlets import Bool, Dict, Instance, Unicode
 from typing_extensions import override
 
-from ipylab.common import Area, Singular, W
+from ipylab.common import Area, Singular, W_co
 from ipylab.ipylab import Ipylab
 
 if TYPE_CHECKING:
@@ -131,13 +131,13 @@ class InfoConnection(Connection):
     auto_dispose = Bool(True).tag(sync=True)
 
 
-class ShellConnection(Connection, Generic[W]):
+class ShellConnection(Connection, Generic[W_co]):
     "A connection to a widget loaded in the shell."
 
     _model_name: Unicode[str, str | bytes] = Unicode("ShellConnectionModel").tag(sync=True)
     auto_dispose = Bool(True).tag(sync=True)
 
-    widget: Instance[W] = Instance(Widget, allow_none=True, default_value=None, help="The widget that has the view")  # pyright: ignore[reportAssignmentType]
+    widget: Instance[W_co] = Instance(Widget, allow_none=True, default_value=None, help="The widget that has the view")  # pyright: ignore[reportAssignmentType]
 
     def __del__(self) -> None:
         """Object disposal"""
