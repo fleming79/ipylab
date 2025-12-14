@@ -20,7 +20,6 @@ from typing import (
     Self,
     TypedDict,
     TypeVar,
-    TypeVarTuple,
     final,
 )
 
@@ -59,13 +58,9 @@ __all__ = [
 
 
 T = TypeVar("T")
-S = TypeVar("S")
-R = TypeVar("R")
-B = TypeVar("B", bound=object)
-L = TypeVar("L", bound="Ipylab")
-W = TypeVar("W", bound="Widget")
+L_co = TypeVar("L_co", bound="Ipylab", covariant=True)
+W_co = TypeVar("W_co", bound="Widget", covariant=True)
 P = ParamSpec("P")
-PosArgsT = TypeVarTuple("PosArgsT")
 
 
 hookimpl = pluggy.HookimplMarker("ipylab")  # Used for plugins
@@ -314,12 +309,12 @@ class TransformDictConnection(TypedDict):
 TransformType = Transform | TransformDictAdvanced | TransformDictFunction | TransformDictConnection
 
 
-class SignalCallbackData(TypedDict, Generic[L]):
+class SignalCallbackData(TypedDict, Generic[L_co]):
     ""
 
     dottedname: str
     args: dict | str | float | int | None
-    owner: L
+    owner: L_co
 
 
 class IpylabKwgs(TypedDict):

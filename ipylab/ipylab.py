@@ -243,7 +243,7 @@ class Ipylab(HasApp, WidgetBase):
         finally:
             self._ipylab_send(content, buffers)
 
-    async def _notify_signal(self, data: SignalCallbackData) -> None:
+    async def _notify_signal(self, data: SignalCallbackData[Self]) -> None:
         if callbacks := self._signal_callbacks.get(data["dottedname"]):
             for callback in callbacks:
                 try:
@@ -434,7 +434,7 @@ class Ipylab(HasApp, WidgetBase):
                     yield from cls._list_signals(v, prefix=f"{prefix}.{k}".strip("."))
 
     def register_signal_callback(
-        self, dottedname: str, callback: Callable[[SignalCallbackData], None | CoroutineType], *, remove=False
+        self, dottedname: str, callback: Callable[[SignalCallbackData[Self]], None | CoroutineType], *, remove=False
     ) -> None:
         """
         Registers a callback function to be executed when a specific signal is emitted.

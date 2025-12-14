@@ -13,7 +13,7 @@ from ipywidgets import DOMWidget, TypedTuple, Widget
 from traitlets import Container, Instance, Unicode
 
 import ipylab
-from ipylab.common import Area, InsertMode, IpylabKwgs, Obj, Singular, Transform, TransformType, W, pack
+from ipylab.common import Area, InsertMode, IpylabKwgs, Obj, Singular, Transform, TransformType, W_co, pack
 from ipylab.connection import ShellConnection
 from ipylab.ipylab import Ipylab, IpylabBase
 from ipylab.log_viewer import LogViewer
@@ -54,7 +54,7 @@ class Shell(Singular, Ipylab):
 
     async def add(
         self,
-        obj: W | FunctionType,
+        obj: W_co | FunctionType,
         *,
         area: Area = Area.main,
         activate: bool = True,
@@ -65,7 +65,7 @@ class Shell(Singular, Ipylab):
         vpath: str | dict[Literal["title"], str] = "",
         preferred_kernel: KernelName | Literal["python3"] | str = KernelName.asyncio,  # noqa: PYI051,
         **args,
-    ) -> ShellConnection[W]:
+    ) -> ShellConnection[W_co]:
         """
         Add a widget to the shell.
 
