@@ -244,6 +244,8 @@ class CommandRegistry(Singular, Ipylab):
             return cc
 
     async def validate_command_id(self, cmd: str | CommandConnection) -> str:
+        if isinstance(cmd, CommandConnection):
+            await cmd.wait_ready()
         cmd = str(cmd)
         if cmd not in self.all_commands:
             cmd = CommandConnection.to_id(self.name, self.app.vpath, cmd)
