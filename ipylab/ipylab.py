@@ -79,7 +79,7 @@ class Ipylab(HasApp, WidgetBase):
     _model_name = Unicode("IpylabModel", help="Name of the model.", read_only=True).tag(sync=True)
     _python_class = Unicode().tag(sync=True)
     ipylab_base = IpylabBase(Obj.this, "").tag(sync=True)
-    _ready_event: Fixed[Self, Event] = Fixed(Event)
+    ready: Fixed[Self, Event] = Fixed(Event)
     _view_count = Int().tag(sync=True)
     _on_ready_callbacks: Container[list[Callable[[Self], None | CoroutineType]]] = List(trait=traitlets.Callable())
     _comm = None
@@ -107,7 +107,7 @@ class Ipylab(HasApp, WidgetBase):
     def __repr__(self) -> str:
         if not self._repr_mimebundle_:
             status = "CLOSED"
-        elif not self._ready_event:
+        elif not self.ready:
             status = "Not ready"
         else:
             status = ""
@@ -124,7 +124,7 @@ class Ipylab(HasApp, WidgetBase):
         if self.comm:
             self._ipylab_send("close")
         super().close()
-        self._ready_event.set()
+        self.ready.set()
         for k in ["_on_ready_callbacks", "_signal_callbacks"]:
             if self.trait_has_value(k):
                 getattr(self, k).clear()
@@ -195,6 +195,9 @@ class Ipylab(HasApp, WidgetBase):
                     self.call_later(0, self._do_operation_for_fe, **kwgs)
                 case {"error": msg}:
                     self.log.error(msg)
+                case "initializing":
+                    if self.ready.is_set():
+                        self.ready.clear()
                 case "ready":
                     self._on_ready()
                 case "closed":
@@ -208,7 +211,7 @@ class Ipylab(HasApp, WidgetBase):
             self.log.exception("Message processing error", exc_info=e)
 
     def _on_ready(self):
-        self._ready_event.set()
+        self.ready.set()
         for cb in self._on_ready_callbacks:
             self.call_later(0, self._call_on_ready_callback, cb)
 
@@ -270,7 +273,7 @@ class Ipylab(HasApp, WidgetBase):
         if WAIT_READY:
             if self is not self.app:
                 await self.app.wait_ready()
-            await self._ready_event
+            await self.ready
             self._check_closed()
         return self
 
@@ -295,7 +298,7 @@ class Ipylab(HasApp, WidgetBase):
         """
         if not remove and callback not in self._on_ready_callbacks:
             self._on_ready_callbacks.append(callback)
-            if self._ready_event:
+            if self.ready:
                 self._call_on_ready_callback(callback)
         elif callback in self._on_ready_callbacks:
             self._on_ready_callbacks.remove(callback)

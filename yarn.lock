@@ -1242,7 +1242,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@jupyterlab/settingregistry@npm:^3.0.0 || ^4.0.0, @jupyterlab/settingregistry@npm:^4.2.5, @jupyterlab/settingregistry@npm:^4.4.9":
+"@jupyterlab/settingregistry@npm:^3.0.0 || ^4.0.0, @jupyterlab/settingregistry@npm:^4.4.9":
   version: 4.4.9
   resolution: "@jupyterlab/settingregistry@npm:4.4.9"
   dependencies:
@@ -4690,7 +4690,6 @@ __metadata:
     "@jupyterlab/observables": ^5.2.5
     "@jupyterlab/rendermime": ^4.2.5
     "@jupyterlab/services": ^7.4.9
-    "@jupyterlab/settingregistry": ^4.2.5
     "@jupyterlab/tooltip": ^4.3.3
     "@lumino/commands": ^2.3.1
     "@lumino/disposable": ^2.1.3

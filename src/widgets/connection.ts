@@ -199,11 +199,6 @@ export class ShellConnectionModel extends ConnectionModel {
     ) {
       const pending = new PromiseDelegate<null>();
       Private.pending.set(this.connection_id, pending);
-      IpylabModel.tracker.restored.then(() => {
-        if (!Private.connections.has(this.connection_id)) {
-          setTimeout(() => pending.resolve(null), 10000);
-        }
-      });
     }
     await Private.pending.get(this.connection_id)?.promise;
     return Private.connections.get(this.connection_id);

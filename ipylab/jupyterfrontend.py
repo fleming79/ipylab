@@ -12,7 +12,7 @@ from async_kernel import Caller, Kernel
 from async_kernel.common import Fixed
 from async_kernel.typing import KernelName
 from ipywidgets import Widget, register
-from traitlets import Bool, Unicode
+from traitlets import Unicode
 from typing_extensions import override
 
 from ipylab import Ipylab
@@ -44,7 +44,6 @@ class JupyterFrontEnd(Singular, Ipylab):
     ipylab_base = IpylabBase(Obj.IpylabModel, "app").tag(sync=True)
     version = Unicode(read_only=True).tag(sync=True)
     _vpath = Unicode(read_only=True).tag(sync=True)
-    per_kernel_widget_manager_detected = Bool(read_only=True).tag(sync=True)
 
     kernel = Fixed(Kernel)
     caller: Fixed[Self, Caller] = Fixed(lambda c: getattr(c["owner"].kernel, "caller", None) or Caller("MainThread"))

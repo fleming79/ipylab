@@ -4,11 +4,7 @@
 import { DOMWidgetModel, ICallbacks } from '@jupyter-widgets/base';
 import { KernelWidgetManager } from '@jupyter-widgets/jupyterlab-manager';
 import { JupyterFrontEnd, LabShell } from '@jupyterlab/application';
-import {
-  ICommandPalette,
-  Notification,
-  WidgetTracker
-} from '@jupyterlab/apputils';
+import { ICommandPalette, Notification } from '@jupyterlab/apputils';
 import { IEditorServices } from '@jupyterlab/codeeditor';
 import { IDefaultFileBrowser } from '@jupyterlab/filebrowser';
 import { ILauncher } from '@jupyterlab/launcher';
@@ -62,7 +58,7 @@ export class IpylabModel extends DOMWidgetModel {
     super.initialize(attributes, options);
     this.on('msg:custom', this.onCustomMessage, this);
     IpylabModel.onKernelLost(this.kernel, this.onKernelLost, this);
-    if (this.widget_manager.restoredStatus || !IpylabModel.PER_KERNEL_WM) {
+    if (this.widget_manager.restoredStatus) {
       this._startIpylabInit();
     } else {
       // Defer ipylabInit until widget restoration is finished.
@@ -654,18 +650,12 @@ export class IpylabModel extends DOMWidgetModel {
 
   /**
    * Will call `onKernelLost` when the kernel is dead or restarted.
-   * Only required for non PER_KERNEL_WM
    */
   static onKernelLost(
     kernel: IKernelConnection,
     onKernelLost: () => any,
     thisArg: object
   ) {
-    if (IpylabModel.PER_KERNEL_WM) {
-      // The model and view will now close as needed in ipywidgets.
-      return;
-    }
-
     if (!Private.kernelLostCallbacks.has(kernel)) {
       Private.kernelLostCallbacks.set(kernel, new Set());
       kernel.statusChanged.connect(_onKernelStatusChanged);
@@ -691,12 +681,10 @@ export class IpylabModel extends DOMWidgetModel {
   static mainMenu: IMainMenu;
   static editorServices: IEditorServices;
   static notebookTracker: INotebookTracker;
-  static tracker = new WidgetTracker<Widget>({ namespace: 'ipylab' });
   static JFEM: typeof JupyterFrontEndModel;
   static ConnectionModel: typeof ConnectionModel;
   static ShellModel: typeof ShellModel;
   static Notification = Notification;
-  static PER_KERNEL_WM = Boolean((KernelWidgetManager as any)?.getManager);
 }
 
 /**

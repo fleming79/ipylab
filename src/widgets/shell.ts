@@ -60,36 +60,10 @@ export class ShellModel extends IpylabModel {
   }
 
   /**
-   * Provided for IpylabModel.tracker for restoring widgets to the shell.
-   * @param args `ipylabSettings` in 'addToShell'
-   */
-  static async restoreToShell(args: any) {
-    const sessions = ShellModel.app.serviceManager.sessions;
-    if (!args.evaluate && !(await sessions.findByPath(args.vpath))) {
-      // Don't create a kernel if a model doesn't exist.
-      return;
-    }
-
-    await ShellModel.JFEM.getModelByVpath(args.vpath, args.preferredKernel);
-    await new Promise(resolve => {
-      setTimeout(resolve, 10000);
-      ShellModel.addToShell(args).then(resolve, e => {
-        resolve(null);
-        if (args.evaluate) {
-          throw e;
-        }
-      });
-    });
-  }
-
-  /**
    * Add a widget to the application shell.
    *
    * This function can handle ipywidgets and native Widgets and  be used to
    * move widgets about the shell.
-   *
-   * Ipywidgets are added to a tracker enabling restoration from a running
-   * kernel such as page refreshing and switching workspaces.
    *
    * Generative widget creation is supported with 'evaluate' using the same
    * code as 'evalute'. The evaluated code MUST return a widget with a view
@@ -136,18 +110,6 @@ export class ShellModel extends IpylabModel {
     // Close the launcher
     if (currentWidget?.id?.startsWith('launcher')) {
       currentWidget?.dispose();
-    }
-
-    // Register widgets originating from IpyWidgets
-    if (args.ipy_model) {
-      if (!ShellModel.tracker.has(widget)) {
-        (widget as any).ipylabSettings = args;
-        ShellModel.tracker.add(widget);
-      } else {
-        (widget as any).ipylabSettings.area = args.area;
-        (widget as any).ipylabSettings.options = args.options;
-        ShellModel.tracker.save(widget);
-      }
     }
     return widget;
   }

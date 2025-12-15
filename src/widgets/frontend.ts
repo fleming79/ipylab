@@ -29,7 +29,6 @@ export class JupyterFrontEndModel extends IpylabModel {
     const vpath = await JFEM.getVpath(this.kernelId);
     this.set(VPATH, vpath);
     this.set('version', JFEM.app.version);
-    this.set('per_kernel_widget_manager_detected', JFEM.PER_KERNEL_WM);
     await super.ipylabInit(base);
     if (!Private.vpathTojfem.has(vpath)) {
       Private.vpathTojfem.set(vpath, new PromiseDelegate());
@@ -105,34 +104,9 @@ export class JupyterFrontEndModel extends IpylabModel {
       throw new Error(`Invalid vpath ${vpath}`);
     }
     if (!Private.vpathTojfem.has(vpath)) {
-      if (!JFEM.PER_KERNEL_WM) {
-        throw new Error(
-          'A per-kernel KernelWidgetManager is required to start a new session!'
-        );
-      }
-      let kernel: Kernel.IKernelConnection;
-      Private.vpathTojfem.set(vpath, new PromiseDelegate());
-      await IpylabModel.sessionManager.refreshRunning();
-      const model = await IpylabModel.sessionManager.findByPath(vpath);
-      if (model) {
-        kernel = IpylabModel.app.serviceManager.kernels.connectTo({
-          model: model.kernel
-        });
-      } else {
-        const sessionContext = await JFEM.newSessionContext(
-          vpath,
-          preferredKernel
-        );
-        kernel = sessionContext.session.kernel;
-      }
-      Private.kernelIdToVpath.set(kernel.id, vpath);
-      // Relies on per-kernel widget manager.
-      const getManager = (KernelWidgetManager as any).getManager;
-      const widget_manager: KernelWidgetManager = await getManager(kernel);
-      const code = 'import ipylab;ipylab.JupyterFrontEnd()';
-      if (!Private.jfems.has(kernel.id)) {
-        widget_manager.kernel.requestExecute({ code }, true);
-      }
+      throw new Error(
+        'A per-kernel KernelWidgetManager is required to start a new session!'
+      );
     }
     return await new Promise((resolve, reject) => {
       const timeoutID = setTimeout(() => {
