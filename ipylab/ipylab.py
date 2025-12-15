@@ -273,8 +273,9 @@ class Ipylab(HasApp, WidgetBase):
         if WAIT_READY:
             if self is not self.app:
                 await self.app.wait_ready()
-            await self.ready
-            self._check_closed()
+            if not self.ready:
+                await self.ready
+                self._check_closed()
         return self
 
     def on_ready(self, callback: Callable[[Self], None | CoroutineType], remove=False) -> None:
