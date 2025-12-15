@@ -25,7 +25,6 @@ import {
   getNestedProperty,
   listProperties,
   setNestedProperty,
-  toFunction,
   toJSONsubstituteCylic,
   updateProperty,
   uniqueId
@@ -516,8 +515,6 @@ export class IpylabModel extends DOMWidgetModel {
    */
   private async transformObject(obj: any, args: string | any): Promise<any> {
     const transform = typeof args === 'string' ? args : args.transform;
-    let result, func;
-
     switch (transform) {
       case 'auto':
         if (obj?.dispose) {
@@ -541,23 +538,6 @@ export class IpylabModel extends DOMWidgetModel {
         return {
           connection_id: IpylabModel.ConnectionModel.get_id(obj, true)
         };
-      case 'advanced':
-        // expects args.mappings = {key:transform}
-        result = new Object();
-        for (const key of Object.keys(args.mappings)) {
-          const base = getNestedProperty({ obj, subpath: key });
-          (result as any)[key] = await this.transformObject(
-            base,
-            args.mappings[key]
-          );
-        }
-        return result as any;
-      case 'function':
-        func = toFunction(args.code).bind(this);
-        if (func.constructor.name === 'AsyncFunction') {
-          return await func(obj, args);
-        }
-        return func(obj);
       case 'object':
         // 'object' is used by the frontend only.
         if (obj) {

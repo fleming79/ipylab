@@ -340,10 +340,11 @@ class Ipylab(HasApp, WidgetBase):
         pen.metadata.update(content=content)
         self._ipylab_send(content)
         try:
-            return await Transform.transform_payload(transform=content["transform"], payload=await pen)
+            payload = await pen
         except Exception as e:
             self.log.exception("Operation error", exc_info=e)
             raise
+        return Transform.transform_payload(transform=content["transform"], payload=payload)
 
     async def execute_method(self, subpath: str, args: tuple = (), obj=Obj.base, **kwargs: Unpack[IpylabKwgs]) -> Any:
         """

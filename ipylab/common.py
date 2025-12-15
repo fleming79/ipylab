@@ -6,7 +6,6 @@ from __future__ import annotations
 import functools
 import inspect
 import textwrap
-import typing
 import weakref
 from enum import StrEnum
 from typing import (
@@ -193,46 +192,14 @@ class Transform(StrEnum):
     "Let the frontend decide (default)."
     null = "null"
     ""
-    function = "function"
-    """
-    JS code defining a function and the data to return.
-
-        The function must accept two args: obj, options.
-
-        ```python
-        transform = {
-            "transform": Transform.function,
-            "code": "function (obj, options) { return obj.id; }",
-        }
-
-        transform = {
-            "transform": Transform.connection,
-            "connection_id": "ID TO USE FOR CONNECTION",
-        }
-    """
     connection = "connection"
     "Return a connection to a disposable object in the frontend."
-    advanced = "advanced"
-    """
-    A mapping of keys to transformations to apply sequentially on the object.
-        ```python
-        transform = {
-        "transform": Transform.advanced,
-        "mappings":  {path: TransformType, ...}
-        }
-        ```
-    """
 
     @classmethod
     def validate(cls, transform: TransformType):
         """Return a valid copy of the transform."""
         if isinstance(transform, dict):
             match cls(transform["transform"]):
-                case cls.function:
-                    code = transform.get("code")
-                    if not isinstance(code, str) or not code.startswith("function"):
-                        raise TypeError
-                    return TransformDictFunction(transform=Transform.function, code=code)
                 case cls.connection:
                     connection_id = transform.get("connection_id")
                     if connection_id and not connection_id.startswith(ipylab.Connection._PREFIX):
@@ -241,60 +208,20 @@ class Transform(StrEnum):
                         )
                         raise ValueError(msg)
                     return TransformDictConnection(transform=Transform.connection, connection_id=connection_id)
-                case cls.advanced:
-                    mappings = {}
-                    transform_ = TransformDictAdvanced(transform=Transform.advanced, mappings=mappings)
-                    mappings_ = transform.get("mappings")
-                    if not isinstance(mappings_, dict):
-                        raise TypeError
-                    for pth, tfm in mappings_.items():
-                        mappings[pth] = cls.validate(tfm)
-                    return transform_
                 case _:
                     raise NotImplementedError
-        transform_ = Transform(transform)
-        if transform_ in [Transform.function, Transform.advanced]:
-            msg = "This type of transform should be passed as a dict to provide the additional arguments"
-            raise ValueError(msg)
-        return transform_
+        return Transform(transform)
 
     @classmethod
-    async def transform_payload(cls, transform: TransformType, payload: Any) -> Any:
+    def transform_payload(cls, transform: TransformType, payload: Any) -> Any:
         """Transform the payload according to the transform."""
         transform_ = transform["transform"] if isinstance(transform, dict) else transform
         match transform_:
-            case Transform.advanced:
-                mappings = typing.cast("TransformDictAdvanced", transform)["mappings"]
-                return {key: await cls.transform_payload(mappings[key], payload[key]) for key in mappings}
             case Transform.connection | Transform.auto if isinstance(payload, dict) and (
                 connection_id := payload.get("connection_id")
             ):
-                try:
-                    conn = ipylab.Connection.get_connection(connection_id)
-                except KeyError:
-                    if transform_ == Transform.connection:
-                        raise
-                else:
-                    return await conn.wait_ready()
+                return ipylab.Connection.get_connection(connection_id)
         return payload
-
-
-class TransformDictFunction(TypedDict):
-    ""
-
-    transform: Literal[Transform.function]
-    ""
-    code: str
-    ""
-
-
-class TransformDictAdvanced(TypedDict):
-    ""
-
-    transform: Literal[Transform.advanced]
-    ""
-    mappings: dict[str, TransformType]
-    ""
 
 
 class TransformDictConnection(TypedDict):
@@ -306,7 +233,7 @@ class TransformDictConnection(TypedDict):
     ""
 
 
-TransformType = Transform | TransformDictAdvanced | TransformDictFunction | TransformDictConnection
+TransformType = Transform | TransformDictConnection
 
 
 class SignalCallbackData(TypedDict, Generic[L_co]):

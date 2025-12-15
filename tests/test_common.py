@@ -8,14 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 import anyio
 import pytest
 from ipylab import Ipylab
-from ipylab.common import (
-    Singular,
-    Transform,
-    TransformDictAdvanced,
-    TransformDictConnection,
-    TransformDictFunction,
-    TransformType,
-)
+from ipylab.common import Singular, Transform, TransformDictConnection
 from ipylab.connection import Connection
 from traitlets import Unicode
 from typing_extensions import override
@@ -27,16 +20,6 @@ class CommonTestClass:
 
 
 class TestTransformValidate:
-    def test_validate_function_transform(self):
-        transform: TransformDictFunction = {
-            "transform": Transform.function,
-            "code": "function (obj, options) { return obj.id; }",
-        }
-        result = Transform.validate(transform)
-        assert isinstance(result, dict)
-        assert result["transform"] == Transform.function
-        assert result["code"] == "function (obj, options) { return obj.id; }"
-
     def test_validate_connection_transform(self):
         transform: TransformDictConnection = {
             "transform": Transform.connection,
@@ -46,34 +29,6 @@ class TestTransformValidate:
         assert isinstance(result, dict)
         assert result["transform"] == Transform.connection
         assert result.get("connection_id") == "ipylab-Connection"
-
-    def test_validate_advanced_transform(self):
-        transform: TransformDictAdvanced = {
-            "transform": Transform.advanced,
-            "mappings": {
-                "path1": {
-                    "transform": Transform.function,
-                    "code": "function (obj, options) { return obj.id; }",
-                },
-                "path2": {
-                    "transform": Transform.connection,
-                    "connection_id": "ipylab-Connection",
-                },
-            },
-        }
-        result = Transform.validate(transform)
-        assert isinstance(result, dict)
-        assert result["transform"] == Transform.advanced
-        assert "path1" in result["mappings"]
-        assert "path2" in result["mappings"]
-
-    def test_validate_invalid_function_transform(self):
-        transform: TransformType = {  # pyright: ignore[reportAssignmentType]
-            "transform": Transform.function,
-            "code": "invalid_code",
-        }
-        with pytest.raises(TypeError):
-            Transform.validate(transform)
 
     def test_validate_invalid_connection_transform(self):
         transform: TransformDictConnection = {
@@ -85,68 +40,32 @@ class TestTransformValidate:
         ):
             Transform.validate(transform)
 
-    def test_validate_invalid_advanced_transform(self):
-        transform: TransformType = {  # pyright: ignore[reportAssignmentType]
-            "transform": Transform.advanced,
-            "mappings": "invalid_mappings",
-        }
-        with pytest.raises(TypeError):
-            Transform.validate(transform)
-
     def test_validate_non_dict_transform(self):
         transform = Transform.auto
         result = Transform.validate(transform)
         assert result == Transform.auto
 
-    def test_validate_invalid_non_dict_transform(self):
-        transform = Transform.function
-        with pytest.raises(ValueError, match="This type of transform should be passed as a dict"):
-            Transform.validate(transform)
-
 
 class TestTransformPayload:
-    async def test_transform_payload_advanced(self, app):
-        transform: TransformDictAdvanced = {
-            "transform": Transform.advanced,
-            "mappings": {
-                "key1": {
-                    "transform": Transform.function,
-                    "code": "function (obj, options) { return obj.id; }",
-                },
-                "key2": {
-                    "transform": Transform.connection,
-                    "connection_id": "ipylab-Connection",
-                },
-            },
-        }
-        payload = {
-            "key1": {"id": "test_id"},
-            "key2": {"connection_id": "ipylab-Connection"},
-        }
-        result = await Transform.transform_payload(transform, payload)
-        assert isinstance(result, dict)
-        assert "key1" in result
-        assert "key2" in result
-
     async def test_transform_payload_connection(self, app):
         transform: TransformDictConnection = {
             "transform": Transform.connection,
             "connection_id": "ipylab-Connection",
         }
         payload = {"connection_id": "ipylab-Connection"}
-        result = await Transform.transform_payload(transform, payload)
+        result = Transform.transform_payload(transform, payload)
         assert isinstance(result, Connection)
 
     async def test_transform_payload_auto(self, app):
         transform = Transform.auto
         payload = {"connection_id": "ipylab-Connection"}
-        result = await Transform.transform_payload(transform, payload)
+        result = Transform.transform_payload(transform, payload)
         assert isinstance(result, Connection)
 
     async def test_transform_payload_no_transform(self, app):
         transform = Transform.null
         payload = {"key": "value"}
-        result = await Transform.transform_payload(transform, payload)
+        result = Transform.transform_payload(transform, payload)
         assert result == payload
 
 

@@ -68,7 +68,6 @@ improved the functionality.
 
 Example files can be downloaded directly from github [here](https://github.com/jtpio/ipylab/tree/main/examples).
 
-
 ## Under the hood
 
 `ipylab` can be seen as a proxy from Python to JupyterLab over Jupyter Widgets:

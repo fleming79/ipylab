@@ -96,15 +96,6 @@ export async function updateProperty({
   return Object.assign(obj, value);
 }
 
-/**
- * Convert a string definition of a function to a function object.
- * @param code The function as a string: eg. 'function (a, b) { return a + b; }'
- * @returns
- */
-export function toFunction(code: string) {
-  return new Function('return ' + code)();
-}
-
 function findAllProperties({
   obj: obj,
   items = [],
