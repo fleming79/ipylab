@@ -32,7 +32,6 @@ dependencies = [
   "jupyterlab>=4.5",
   'orjson',
   "typing_extensions",
-  "ipykernel>=7.0.1,<8.0",
   "traitlets @ https://github.com/fleming79/ipylab/releases/download/v2.0.1/traitlets-5.14.3-py3-none-any.whl#sha256:bcc8fc5a21d9b996de216eb01f360d717356779c864249ca376fc59f59d58377",
   "jupyter_client @ https://github.com/fleming79/ipylab/releases/download/v2.0.9/jupyter_client-8.7.1.dev0-py3-none-any.whl#sha256:2b3d008a7b96defc663e049867d798d526296c7644b53b8a62fbf2ef8aaacf1b",
   "widgetsnbextension @ https://github.com/fleming79/ipylab/releases/download/v2.0.9/widgetsnbextension-4.0.15-py3-none-any.whl#sha256:ba287f050d6c36535ec155e1150f6749cfc1160aa16745a6b68d5e2bb985c811",

@@ -110,7 +110,7 @@ wheels = [
 
 [[package]]
 name = "async-kernel"
-version = "0.10.0"
+version = "0.10.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiologic" },
@@ -123,9 +123,9 @@ dependencies = [
     { name = "traitlets", marker = "sys_platform != 'emscripten'" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/02/af/16e2cf85f8a0739125cfc9ba790b3a881e1a9684eb66751fbb0f112d5f7b/async_kernel-0.10.0.tar.gz", hash = "sha256:3079507e9c16e5689ab38ae4d215490ef1bdf0e6718f66b902380584622c702b", size = 269214, upload-time = "2025-12-11T06:17:23.811Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/63/8d/bf72df173f2dde60d4a7ea0e1363ee502737cfd29233f206d46d5adcec72/async_kernel-0.10.1.tar.gz", hash = "sha256:89bd3424bda6b93fe495d4ea6160f28eaf4b78655792d79f8584a2d6eabef4f8", size = 269302, upload-time = "2025-12-14T04:34:16.094Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/11/fa/8f3943eeea10ac49f24805cb6b1d79d5313d7f74e98ec2793d0e7b732cf5/async_kernel-0.10.0-py3-none-any.whl", hash = "sha256:2e8dde7f3b2457eeac501aca2751a1decefd6d8918929afedc84c9355cdb193e", size = 77702, upload-time = "2025-12-11T06:17:21.053Z" },
+    { url = "https://files.pythonhosted.org/packages/31/6f/baef3e31f50a71bc6f14d4646b9fb090819c1e4eac84507db1ea3f947540/async_kernel-0.10.1-py3-none-any.whl", hash = "sha256:dae64a6bd626c1f346005616d8dac44fe1c4f708fae64deeb44c06c05dbd99a7", size = 77684, upload-time = "2025-12-14T04:34:14.344Z" },
 ]
 
 [[package]]
@@ -900,7 +900,6 @@ name = "ipylab"
 source = { editable = "." }
 dependencies = [
     { name = "async-kernel" },
-    { name = "ipykernel" },
     { name = "ipywidgets" },
     { name = "jupyter-client" },
     { name = "jupyterlab" },
@@ -959,8 +958,7 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "async-kernel", specifier = ">=0.10.0,<0.11" },
-    { name = "ipykernel", specifier = ">=7.0.1,<8.0" },
+    { name = "async-kernel", specifier = ">=0.10.1,<0.11" },
     { name = "ipywidgets", url = "https://github.com/fleming79/ipylab/releases/download/v2.0.9/ipywidgets-8.1.8-py3-none-any.whl" },
     { name = "jupyter-client", url = "https://github.com/fleming79/ipylab/releases/download/v2.0.9/jupyter_client-8.7.1.dev0-py3-none-any.whl" },
     { name = "jupyterlab", specifier = ">=4.5" },
