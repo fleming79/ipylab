@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import inspect
 import os
-from typing import TYPE_CHECKING, Any, Literal, Self, Unpack, final
+from typing import TYPE_CHECKING, Any, Self, Unpack, final
 
 import async_kernel
 from async_kernel import Caller, Kernel
@@ -200,7 +200,7 @@ class JupyterFrontEnd(Singular, Ipylab):
         evaluate: str | inspect._SourceObjectType | Iterable[str | tuple[str, str | inspect._SourceObjectType]],
         *,
         vpath: str = "",
-        preferred_kernel: KernelName | Literal["python3"] | str = KernelName.asyncio,  # noqa: PYI051
+        preferred_kernel: KernelName | str = KernelName.asyncio,
         kwgs: None | dict = None,
         **kwargs: Unpack[IpylabKwgs],
     ) -> Any:

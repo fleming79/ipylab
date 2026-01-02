@@ -63,7 +63,7 @@ class Shell(Singular, Ipylab):
         ref: ShellConnection | None = None,
         options: dict | None = None,
         vpath: str | dict[Literal["title"], str] = "",
-        preferred_kernel: KernelName | Literal["python3"] | str = KernelName.asyncio,  # noqa: PYI051,
+        preferred_kernel: KernelName | str = KernelName.asyncio,
         **args,
     ) -> ShellConnection[W_co]:
         """
