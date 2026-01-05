@@ -25,7 +25,14 @@ Try it in your browser with Binder:
 
 Or with [JupyterLite](https://github.com/jupyterlite/jupyterlite):
 
-[![JupyterLite](https://jupyterlite.rtfd.io/en/latest/_static/badge-launch.svg)](https://ipylab.readthedocs.io/en/latest/lite/lab)
+<script>
+  if (document.URL.includes("readthedocs")) {
+      document.write(`<a href="${document.URL}/lite/lab/"><img src="https://jupyterlite.rtfd.io/en/latest/_static/badge-launch.svg"></a>`);
+      } else {
+          document.write('<a href="https://ipylab.readthedocs.io/en/latest/lite/lab"><img src="https://jupyterlite.rtfd.io/en/latest/_static/badge-launch.svg"></a>');
+  }
+</script>
+
 
 ## Examples
 
