@@ -117,6 +117,14 @@ jlpm lint:check
 
     [see also](https://discuss.python.org/t/add-os-junction-pathlib-path-junction-to/50394).
 
+### Serve Jupyterlite locally
+
+Install as per [instructions](#frontend-typescriptjavascript) then
+
+```bash
+jlpm jupyterlite:serve
+```
+
 ### Upgrade files
 
 === "Python files"

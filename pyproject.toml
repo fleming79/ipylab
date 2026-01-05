@@ -2,7 +2,7 @@
 requires = [
   "nodejs-wheel",
   "hatchling>=1.5.0",
-  "jupyterlab>=4.1.0,<5",
+  "jupyterlab>=4.5,<5",
   "hatch-nodejs-version>=0.3.2",
 ]
 build-backend = "hatchling.build"
@@ -28,8 +28,8 @@ classifiers = [
 ]
 
 dependencies = [
-  "async-kernel>=0.10.1,<0.11",
-  "jupyterlab>=4.5",
+  "async-kernel>=0.11,<0.12",
+  "jupyterlab>=4.5; sys_platform != 'emscripten'",
   "ipywidgets>=8.1.8",
   "jupyterlab_widgets>=3.0.11",
   "typing_extensions",
@@ -39,12 +39,13 @@ dynamic = ["version", "description", "authors", "urls", "keywords"]
 
 [dependency-groups]
 docs = [
-  "mkdocs-material",
-  "mike",
-  "mkdocstrings[python]",
-  "mkdocs-jupyter",
-  "mkdocs-open-in-new-tab",
-  "mkdocs-git-revision-date-localized-plugin",
+  "pip",
+  "jupyterlite_async_kernel @ git+https://github.com/fleming79/echo-kernel",
+  "bqplot",
+  "pydata-sphinx-theme",
+  "myst-parser",
+  'jupyterlite-sphinx',
+
 ]
 test = [
   "pytest",
@@ -52,13 +53,7 @@ test = [
   "pytest-cov",
   "pytest-timeout",
   "pytest-mock",
-  "pytest-retry",
   "pytest>=8.4,<9",
-  "trio",
-  "numpy",
-  "matplotlib",
-  "ipympl",
-  "bqplot",
 ]
 dev = [
   "nodejs-wheel",
@@ -67,7 +62,6 @@ dev = [
   "debugpy",
   { include-group = "test" },
 ]
-cov = ["coverage[toml]", "pytest-cov", "matplotlib", "trio"]
 
 [project.scripts]
 ipylab = "ipylab:plugin_manager.hook.launch_ipylab"

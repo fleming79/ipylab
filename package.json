@@ -46,10 +46,11 @@
         "build:lib:prod": "tsc",
         "build:prod": "jlpm clean && jlpm build:lib:prod && jlpm build:labextension",
         "clean": "jlpm clean:lib",
-        "clean:all": "jlpm clean:lib && jlpm clean:labextension && jlpm clean:lintcache",
+        "clean:all": "jlpm clean:lib && jlpm clean:labextension && jlpm clean:lintcache && jlpm jupyterlite:clean && jlpm clean:dist",
         "clean:labextension": "rimraf ipylab/labextension ipylab/_version.py",
         "clean:lib": "rimraf lib tsconfig.tsbuildinfo",
         "clean:lintcache": "rimraf .eslintcache .stylelintcache",
+        "clean:dist": "rimraf ./dist",
         "deduplicate": "jlpm dlx yarn-berry-deduplicate -s fewerHighest && jlpm install",
         "eslint": "jlpm eslint:check --fix",
         "eslint:check": "eslint . --cache --ext .ts,.tsx",
@@ -65,7 +66,15 @@
         "watch": "run-p watch:src watch:labextension",
         "watch:labextension": "jupyter labextension watch .",
         "watch:lib": "tsc -w",
-        "watch:src": "tsc -w --sourceMap"
+        "watch:src": "tsc -w --sourceMap",
+        "jupyterlite:clean": "rimraf ./docs/files && rimraf ./jupyterlite",
+        "jupyterlite:copy:examples": "cp -r ./examples/* ./docs/files/",
+        "jupyterlite:embed:ipylab-wheel": "uv build && cp -r ./dist/*.whl ./docs/files/wheels/",
+        "jupyterlite:embed-wheels": "uv pip install -r docs/embed-wheels.txt && uv run pip download --platform emscripten --only-binary=:all: --python-version=3.13 -r docs/embed-wheels.txt --dest docs/files/wheels --no-deps",
+        "jupyterlite:setup": "uv sync --group docs && jlpm jupyterlite:embed-wheels && jlpm jupyterlite:embed:ipylab-wheel && jlpm jupyterlite:copy:examples",
+        "develop": "jupyter labextension develop . --overwrite",
+        "jupyterlite:build": "jlpm jupyterlite:setup && uv run jupyter lite build --lite-dir docs --output-dir jupyterlite",
+        "jupyterlite:serve": "jlpm jupyterlite:setup && jlpm develop && uv run jupyter lite serve --lite-dir docs --output-dir jupyterlite --LiteBuildConfig.extra_http_headers=Cross-Origin-Embedder-Policy=require-corp --LiteBuildConfig.extra_http_headers=Cross-Origin-Opener-Policy=same-origin"
     },
     "husky": {
         "hooks": {
@@ -132,7 +141,6 @@
     "jupyterlab": {
         "extension": "lib/plugin",
         "outputDir": "ipylab/labextension",
-        "schemaDir": "schema",
         "sharedPackages": {
             "@jupyter-widgets/base": {
                 "bundled": false,
