@@ -7,7 +7,7 @@ import async_kernel
 import ipylab
 import ipylab.ipylab
 import pytest
-from async_kernel.typing import SocketID
+from async_kernel.typing import Channel
 
 if TYPE_CHECKING:
     from async_kernel.caller import Caller
@@ -43,7 +43,7 @@ async def app(kernel: async_kernel.Kernel, mocker) -> JupyterFrontEnd:
     mocker.patch.object(app, "wait_ready")
 
     job = {
-        "socket_id": SocketID.shell,
+        "socket_id": Channel.shell,
         "ident": [b"3e829a23-efc115ccfdfa9f2a9bb11e67"],
         "msg": {
             "header": {
