@@ -2,7 +2,7 @@
 requires = [
   "nodejs-wheel",
   "hatchling>=1.5.0",
-  "jupyterlab>=4.1.0,<5",
+  "jupyterlab>=4.5,<5",
   "hatch-nodejs-version>=0.3.2",
 ]
 build-backend = "hatchling.build"
@@ -28,27 +28,28 @@ classifiers = [
 ]
 
 dependencies = [
-  "async-kernel>=0.10.1,<0.11",
-  "jupyterlab>=4.5",
+  "async-kernel>=0.11,<0.12",
   'orjson',
+  "pluggy",
   "typing_extensions",
   "traitlets @ https://github.com/fleming79/ipylab/releases/download/v2.0.1/traitlets-5.14.3-py3-none-any.whl#sha256:bcc8fc5a21d9b996de216eb01f360d717356779c864249ca376fc59f59d58377",
-  "jupyter_client @ https://github.com/fleming79/ipylab/releases/download/v2.0.9/jupyter_client-8.7.1.dev0-py3-none-any.whl#sha256:2b3d008a7b96defc663e049867d798d526296c7644b53b8a62fbf2ef8aaacf1b",
-  "widgetsnbextension @ https://github.com/fleming79/ipylab/releases/download/v2.0.9/widgetsnbextension-4.0.15-py3-none-any.whl#sha256:ba287f050d6c36535ec155e1150f6749cfc1160aa16745a6b68d5e2bb985c811",
   "jupyterlab_widgets @ https://github.com/fleming79/ipylab/releases/download/v2.0.9/jupyterlab_widgets-3.0.16-py3-none-any.whl#sha256:f26f773da8f38938f74bbe7475b65b2c5c02677e6c4a0170b4676bc981f8b184",
-  "ipywidgets @ https://github.com/fleming79/ipylab/releases/download/v2.0.9/ipywidgets-8.1.8-py3-none-any.whl#sha256:ba287f050d6c36535ec155e1150f6749cfc1160aa16745a6b68d5e2bb985c811",
+  "ipywidgets @ https://github.com/fleming79/ipylab/releases/download/v2.0.8/ipywidgets-8.1.8-py3-none-any.whl#sha256:ff7ab3b64a7cbb46748316e29f5d254c6d88b6005e2e3946312ce51bcfd63b12",
+  "jupyterlab>=4.5; sys_platform != 'emscripten'",
+  "jupyter_client @ https://github.com/fleming79/ipylab/releases/download/v2.0.9/jupyter_client-8.7.1.dev0-py3-none-any.whl#sha256:2b3d008a7b96defc663e049867d798d526296c7644b53b8a62fbf2ef8aaacf1b ; sys_platform != 'emscripten'",
 ]
 dynamic = ["version", "description", "authors", "urls", "keywords"]
 
 
 [dependency-groups]
 docs = [
-  "mkdocs-material",
-  "mike",
-  "mkdocstrings[python]",
-  "mkdocs-jupyter",
-  "mkdocs-open-in-new-tab",
-  "mkdocs-git-revision-date-localized-plugin",
+  "pip",
+  "jupyterlite_async_kernel @ git+https://github.com/fleming79/echo-kernel",
+  "bqplot",
+  "pydata-sphinx-theme",
+  "myst-parser",
+  'jupyterlite-sphinx',
+
 ]
 test = [
   "pytest",
@@ -56,13 +57,7 @@ test = [
   "pytest-cov",
   "pytest-timeout",
   "pytest-mock",
-  "pytest-retry",
   "pytest>=8.4,<9",
-  "trio",
-  "numpy",
-  "matplotlib",
-  "ipympl",
-  "bqplot",
 ]
 dev = [
   "nodejs-wheel",
@@ -71,7 +66,6 @@ dev = [
   "debugpy",
   { include-group = "test" },
 ]
-cov = ["coverage[toml]", "pytest-cov", "matplotlib", "trio"]
 
 [project.scripts]
 ipylab = "ipylab:plugin_manager.hook.launch_ipylab"

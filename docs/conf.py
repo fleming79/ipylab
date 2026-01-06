@@ -2,7 +2,7 @@ extensions = ["myst_parser", "jupyterlite_sphinx"]
 
 jupyterlite_config = "jupyter_lite_config.json"
 jupyterlite_dir = "."
-jupyterlite_contents = "../examples"
+jupyterlite_contents = ["./files/"]
 
 master_doc = "index"
 source_suffix = ".md"
@@ -16,6 +16,3 @@ highlight_language = "python"
 pygments_style = "sphinx"
 
 html_theme = "pydata_sphinx_theme"
-html_static_path = ["_static"]
-
-html_css_files = ["custom.css"]

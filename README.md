@@ -25,7 +25,18 @@ Try it in your browser with Binder:
 
 Or with [JupyterLite](https://github.com/jupyterlite/jupyterlite):
 
-[![JupyterLite](https://jupyterlite.rtfd.io/en/latest/_static/badge-launch.svg)](https://ipylab.readthedocs.io/en/latest/lite/lab)
+<script>
+  if (document.URL.includes("readthedocs")) {
+    let n = document.URL.split('/').slice(-2,-1)[0];
+      if (n){
+        document.write(`<H2>Pull request ${n}</H2>`);
+      }
+      document.write(`<a href="${document.URL}lite/lab/"><img src="https://jupyterlite.rtfd.io/en/latest/_static/badge-launch.svg"></a>`);
+      } else {
+          document.write('<a href="https://ipylab.readthedocs.io/en/latest/lite/lab"><img src="https://jupyterlite.rtfd.io/en/latest/_static/badge-launch.svg"></a>');
+  }
+</script>
+
 
 ## Examples
 
@@ -125,6 +136,14 @@ jlpm lint:check
     If you're developing the fronted on Windows you need to [enable developer mode](https://learn.microsoft.com/en-us/windows/apps/get-started/enable-your-device-for-development#activate-developer-mode) for symlinks to work.
 
     [see also](https://discuss.python.org/t/add-os-junction-pathlib-path-junction-to/50394).
+
+### Serve Jupyterlite locally
+
+```bash
+uv sync
+jlpm
+jlpm jupyterlite:serve
+```
 
 ### Upgrade files
 

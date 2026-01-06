@@ -77,6 +77,9 @@ coverage.xml
 # Sphinx documentation
 docs/_build/
 
+jupyterlite/
+docs/files/
+
 # PyBuilder
 target/
 

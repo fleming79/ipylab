@@ -2,17 +2,16 @@ version: 2
 sphinx:
   configuration: docs/conf.py
 build:
-  os: ubuntu-20.04
+  os: ubuntu-22.04
   tools:
-    python: mambaforge-4.10
+    python: "3.13"
   jobs:
-    pre_build:
-      - jlpm
-      - jlpm build
-      - python -m build --wheel
-python:
-  install:
-  - method: pip
-    path: .
-conda:
-  environment: docs/environment.yml
+    pre_create_environment:
+      - asdf plugin add uv
+      - asdf install uv latest
+      - asdf global uv latest
+    create_environment:
+        - uv venv "${READTHEDOCS_VIRTUALENV_PATH}"
+    install:
+        - UV_PROJECT_ENVIRONMENT="${READTHEDOCS_VIRTUALENV_PATH}" uv sync
+        - UV_PROJECT_ENVIRONMENT="${READTHEDOCS_VIRTUALENV_PATH}" uv run jlpm jupyterlite:build
