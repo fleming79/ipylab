@@ -25,18 +25,7 @@ Try it in your browser with Binder:
 
 Or with [JupyterLite](https://github.com/jupyterlite/jupyterlite):
 
-<script>
-  if (document.URL.includes("readthedocs")) {
-    let n = document.URL.split('/').slice(-2,-1)[0];
-      if (n){
-        document.write(`<H2>Pull request ${n}</H2>`);
-      }
-      document.write(`<a href="${document.URL}lite/lab/"><img src="https://jupyterlite.rtfd.io/en/latest/_static/badge-launch.svg"></a>`);
-      } else {
-          document.write('<a href="https://ipylab.readthedocs.io/en/latest/lite/lab"><img src="https://jupyterlite.rtfd.io/en/latest/_static/badge-launch.svg"></a>');
-  }
-</script>
-
+[![JupyterLite](https://jupyterlite.rtfd.io/en/latest/_static/badge-launch.svg)](https://ipylab.readthedocs.io/en/latest/lite/lab)
 
 ## Examples
 
