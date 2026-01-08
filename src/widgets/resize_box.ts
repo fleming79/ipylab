@@ -33,7 +33,6 @@ export class ResizeBoxView extends BoxView {
     super.initialize(parameters);
     this.luminoWidget.removeClass('widget-box');
     this.luminoWidget.removeClass('jupyter-widgets');
-    this.luminoWidget.addClass('ipylab-ResizeBox');
     this.resize();
     this.sizeObserver = new ResizeObserver(() => {
       if (!this.model._resizing && !this._resizing) {

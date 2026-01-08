@@ -108,6 +108,12 @@ class ResizeBox(Box):
     When a view is resized the other views are also resized to the same width and height.
     The `size` trait of this object provides the size in pixels as (client width, client height).
 
+    The following class names can be added to the widget to add a handle to make the widget user resizeable.
+
+    - ipylab-ResizeBoth
+    - ipylab-ResizeVertical
+    - ipylab-ResizeHorizontal
+
     Reference:
         - [width](https://developer.mozilla.org/en-US/docs/Web/CSS/width)
         - [height](https://developer.mozilla.org/en-US/docs/Web/CSS/height)
@@ -125,3 +131,13 @@ class ResizeBox(Box):
     size: Container[tuple[int, int]] = Tuple(read_only=True, help="(clientWidth, clientHeight) in pixels").tag(
         sync=True
     )
+
+    def _to_dim(self, val: str | int):
+        try:
+            return f"{int(val)}px"
+        except Exception:
+            return val
+
+    def set_size(self, size: tuple[str | int, str | int]) -> None:
+        "Set the size of the box."
+        self.layout = {"width": self._to_dim(size[0]), "height": self._to_dim(size[1])}

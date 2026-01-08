@@ -27,7 +27,7 @@ export class IconView extends DOMWidgetView {
 }
 
 /**
- * The model for a title widget.
+ * The model for an icon widget.
  */
 export class IconModel extends DOMWidgetModel {
   /**

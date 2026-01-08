@@ -1,6 +1,6 @@
 [build-system]
 requires = [
-  "nodejs-wheel",
+  "nodejs-wheel-binaries",
   "hatchling>=1.5.0",
   "jupyterlab>=4.5,<5",
   "hatch-nodejs-version>=0.3.2",
@@ -48,8 +48,6 @@ docs = [
   "bqplot",
   "pydata-sphinx-theme",
   "myst-parser",
-  'jupyterlite-sphinx',
-
 ]
 test = [
   "pytest",
@@ -60,10 +58,14 @@ test = [
   "pytest>=8.4,<9",
 ]
 dev = [
-  "nodejs-wheel",
+  "nodejs-wheel-binaries",
   "basedpyright",
   "ruff",
   "debugpy",
+  'jupyterlite-sphinx',
+  "matplotlib",
+  "numpy",
+  "ipympl",
   { include-group = "test" },
 ]
 

@@ -41,9 +41,24 @@
   display: flex;
 }
 
-.ipylab-ResizeBox {
+.ipylab-ResizeBoth {
   box-sizing: border-box;
   display: inline-block;
   resize: both;
+  overflow: auto;
+}
+
+.ipylab-ResizeVertical {
+  box-sizing: border-box;
+  display: inline-block;
+  resize: vertical;
+  overflow: auto;
+
+}
+
+.ipylab-ResizeHorizontal {
+  box-sizing: border-box;
+  display: inline-block;
+  resize: horizontal;
   overflow: auto;
 }
