@@ -55,14 +55,13 @@ pip install ipylab
 
 ## Dependencies
 
-The following dependencies are provided as wheels in the pkg directory which include patches to
-improved the functionality.
+The following dependencies have patched versions specified in the `'pyproject.toml'` file to enable better functionality.
 
 | Name                                               | Pull request                                                                                                                        | Status                     | Modification                                                                                                                              |
 | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | traitlets                                          | [#918](https://github.com/ipython/traitlets/pull/918)                                                                               | Accepted - pending release | Improved type hints                                                                                                                       |
 | ipywidgets, jupyterlab-widgets, widgetsnbextension | [#3922](https://github.com/jupyter-widgets/ipywidgets/pull/3922) + [#3921](https://github.com/jupyter-widgets/ipywidgets/pull/3921) | Pending review             | Provides for widgets comms without needing a notebook or console to be open. Plus fixes for proper garbage collection and widget tooltips |
-| jupyter_client                                     | [#1064](https://github.com/jupyter/jupyter_client/pull/1064)                                                                        | Pending review             | Faster message serialization                                                                                                              |
+|                                                                                              |
 
 ## Examples
 

@@ -36,7 +36,6 @@ dependencies = [
   "jupyterlab_widgets @ https://github.com/fleming79/ipylab/releases/download/v2.0.9/jupyterlab_widgets-3.0.16-py3-none-any.whl#sha256:f26f773da8f38938f74bbe7475b65b2c5c02677e6c4a0170b4676bc981f8b184",
   "ipywidgets @ https://github.com/fleming79/ipylab/releases/download/v2.0.8/ipywidgets-8.1.8-py3-none-any.whl#sha256:ff7ab3b64a7cbb46748316e29f5d254c6d88b6005e2e3946312ce51bcfd63b12",
   "jupyterlab>=4.5; sys_platform != 'emscripten'",
-  "jupyter_client @ https://github.com/fleming79/ipylab/releases/download/v2.0.9/jupyter_client-8.7.1.dev0-py3-none-any.whl#sha256:2b3d008a7b96defc663e049867d798d526296c7644b53b8a62fbf2ef8aaacf1b ; sys_platform != 'emscripten'",
 ]
 dynamic = ["version", "description", "authors", "urls", "keywords"]
 
