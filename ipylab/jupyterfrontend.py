@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, Any, Literal, Self, Unpack, final
 import async_kernel
 from async_kernel import Caller, Kernel
 from async_kernel.common import Fixed
-from async_kernel.typing import KernelName
 from ipywidgets import Widget, register
 from traitlets import Unicode
 from typing_extensions import override
@@ -160,7 +159,7 @@ class JupyterFrontEnd(Singular, Ipylab):
         evaluate: str | inspect._SourceObjectType | Iterable[str | tuple[str, str | inspect._SourceObjectType]],
         *,
         vpath: str = "",
-        preferred_kernel: KernelName | Literal["python3"] | str = KernelName.asyncio,  # noqa: PYI051
+        preferred_kernel: Literal["async", "python3"] | str = "async",  # noqa: PYI051
         kwgs: None | dict = None,
         **kwargs: Unpack[IpylabKwgs],
     ) -> Any:
