@@ -58,7 +58,6 @@ test = [
 ]
 dev = [
   "nodejs-wheel-binaries",
-  "basedpyright",
   "ruff",
   "debugpy",
   'jupyterlite-sphinx',

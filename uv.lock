@@ -131,7 +131,7 @@ wheels = [
 
 [[package]]
 name = "async-kernel"
-version = "0.11.0"
+version = "0.12.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiologic" },
@@ -147,9 +147,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "wrapt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/76/87/af38cfe7f498452a666d1b01591bdb479e44b0c7cd69d221a37b8c722a09/async_kernel-0.11.0.tar.gz", hash = "sha256:4c37a9fd176f7307dc9450c07c129553ab26b6ee70bb2488d2ce3f17d140658f", size = 284528, upload-time = "2026-01-04T04:10:54.686Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/93/00/417c3f264a52ccbfbff32ed1244794632f107b9b8274cde83dda3668aa92/async_kernel-0.12.0.tar.gz", hash = "sha256:8d675bfb3ae27e3556446343636bda37c9e0061256953cdd63417dcf742519e0", size = 287653, upload-time = "2026-01-25T06:11:47.281Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/42/b3/801af68680f7cea8d7ad2c374892b68b59c697aee6286a1007e64cf1f8d3/async_kernel-0.11.0-py3-none-any.whl", hash = "sha256:994bd87b3c9f7da86ef10dc96782153aff5f17d190ac53cbc3c1e68cbb3f32ec", size = 93279, upload-time = "2026-01-04T04:10:53.117Z" },
+    { url = "https://files.pythonhosted.org/packages/2e/21/e3b7917fe9a8a4344a514473ce38ee50b5a74309f59cc356f21eea530e44/async_kernel-0.12.0-py3-none-any.whl", hash = "sha256:ec15ae2a309f748caaf3368bbead7e07ce97393cc06e8e2a5fe8f0ddc08a51e1", size = 94049, upload-time = "2026-01-25T06:11:46.116Z" },
 ]
 
 [[package]]
@@ -177,18 +177,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/7d/6b/d52e42361e1aa00709585ecc30b3f9684b3ab62530771402248b1b1d6240/babel-2.17.0.tar.gz", hash = "sha256:0c54cffb19f690cdcc52a3b50bcbf71e07a808d1c80d549f2459b9d2cf0afb9d", size = 9951852, upload-time = "2025-02-01T15:17:41.026Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b7/b8/3fe70c75fe32afc4bb507f75563d39bc5642255d1d94f1f23604725780bf/babel-2.17.0-py3-none-any.whl", hash = "sha256:4d0b53093fdfb4b21c92b5213dba5a1b23885afa8383709427046b21c366e5f2", size = 10182537, upload-time = "2025-02-01T15:17:37.39Z" },
-]
-
-[[package]]
-name = "basedpyright"
-version = "1.34.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "nodejs-wheel-binaries" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/a3/77/ded02ba2b400807b291fa2b9d29ac7f473e86a45d1f5212d8276e9029107/basedpyright-1.34.0.tar.gz", hash = "sha256:7ae3b06f644fac15fdd14a00d0d1f12f92a8205ae1609aabd5a0799b1a68be1d", size = 22803348, upload-time = "2025-11-19T14:48:16.38Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/2a/9e/ced31964ed49f06be6197bd530958b6ddca9a079a8d7ee0ee7429cae9e27/basedpyright-1.34.0-py3-none-any.whl", hash = "sha256:e76015c1ebb671d2c6d7fef8a12bc0f1b9d15d74e17847b7b95a3a66e187c70f", size = 11865958, upload-time = "2025-11-19T14:48:13.724Z" },
 ]
 
 [[package]]
@@ -892,7 +880,6 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "basedpyright" },
     { name = "debugpy" },
     { name = "ipympl" },
     { name = "jupyterlite-sphinx" },
@@ -923,7 +910,7 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "async-kernel", specifier = ">=0.11,<0.12" },
+    { name = "async-kernel", specifier = ">=0.12,<0.13" },
     { name = "ipywidgets", url = "https://github.com/fleming79/ipylab/releases/download/v2.0.8/ipywidgets-8.1.8-py3-none-any.whl" },
     { name = "jupyterlab", marker = "sys_platform != 'emscripten'", specifier = ">=4.5" },
     { name = "jupyterlab-widgets", url = "https://github.com/fleming79/ipylab/releases/download/v2.0.9/jupyterlab_widgets-3.0.16-py3-none-any.whl" },
@@ -935,7 +922,6 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "basedpyright" },
     { name = "debugpy" },
     { name = "ipympl" },
     { name = "jupyterlite-sphinx" },
