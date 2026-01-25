@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Literal, Unpack
 
 from aiologic import BinarySemaphore
 from async_kernel.common import Fixed
-from async_kernel.typing import KernelName
 from ipywidgets import DOMWidget, TypedTuple, Widget
 from traitlets import Container, Instance, Unicode
 
@@ -63,7 +62,7 @@ class Shell(Singular, Ipylab):
         ref: ShellConnection | None = None,
         options: dict | None = None,
         vpath: str | dict[Literal["title"], str] = "",
-        preferred_kernel: KernelName | str = KernelName.asyncio,
+        preferred_kernel: Literal["async", "python3"] | str = "async",  # noqa: PYI051
         **args,
     ) -> ShellConnection[W_co]:
         """
