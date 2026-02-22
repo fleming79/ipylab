@@ -195,9 +195,6 @@ class Ipylab(HasApp, WidgetBase):
                     self.call_later(0, self._do_operation_for_fe, **kwgs)
                 case {"error": msg}:
                     self.log.error(msg)
-                case "initializing":
-                    if self.ready.is_set():
-                        self.ready.clear()
                 case "ready":
                     self._on_ready()
                 case "closed":
