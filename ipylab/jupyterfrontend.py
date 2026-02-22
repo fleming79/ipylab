@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import inspect
 import os
-from typing import TYPE_CHECKING, Any, Self, Unpack, final
+from typing import TYPE_CHECKING, Any, Literal, Self, Unpack, final
 
 import async_kernel
 from async_kernel import Caller, Kernel
