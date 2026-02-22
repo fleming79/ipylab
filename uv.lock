@@ -131,7 +131,7 @@ wheels = [
 
 [[package]]
 name = "async-kernel"
-version = "0.12.0"
+version = "0.12.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiologic" },
@@ -142,14 +142,16 @@ dependencies = [
     { name = "jupyter-core" },
     { name = "matplotlib-inline" },
     { name = "orjson" },
+    { name = "outcome", marker = "sys_platform != 'emscripten'" },
     { name = "pyzmq", marker = "sys_platform != 'emscripten'" },
+    { name = "sniffio", marker = "sys_platform != 'emscripten'" },
     { name = "traitlets" },
     { name = "typing-extensions" },
     { name = "wrapt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/93/00/417c3f264a52ccbfbff32ed1244794632f107b9b8274cde83dda3668aa92/async_kernel-0.12.0.tar.gz", hash = "sha256:8d675bfb3ae27e3556446343636bda37c9e0061256953cdd63417dcf742519e0", size = 287653, upload-time = "2026-01-25T06:11:47.281Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/4d/6a/c30d1e4a3ca2fd1311d440574a00cb9b9a88772ed26edc4e6e7d9a880ed5/async_kernel-0.12.3.tar.gz", hash = "sha256:16973e72d8de40a26a83884deb8ec0cda746225ce53f427997db7382af2d3408", size = 304560, upload-time = "2026-02-18T05:26:18.187Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2e/21/e3b7917fe9a8a4344a514473ce38ee50b5a74309f59cc356f21eea530e44/async_kernel-0.12.0-py3-none-any.whl", hash = "sha256:ec15ae2a309f748caaf3368bbead7e07ce97393cc06e8e2a5fe8f0ddc08a51e1", size = 94049, upload-time = "2026-01-25T06:11:46.116Z" },
+    { url = "https://files.pythonhosted.org/packages/3c/d6/fa8b591bc2677be87979a736423080aba4082899eb9b981eb7c8ce578f2e/async_kernel-0.12.3-py3-none-any.whl", hash = "sha256:18ac33f23ae315a4c1ead845366a3c1ebc26d2dea40382dd87b0ef736c886622", size = 105944, upload-time = "2026-02-18T05:26:16.568Z" },
 ]
 
 [[package]]
@@ -910,7 +912,7 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "async-kernel", specifier = ">=0.12,<0.13" },
+    { name = "async-kernel", specifier = ">=0.12.3,<0.13" },
     { name = "ipywidgets", url = "https://github.com/fleming79/ipylab/releases/download/v2.0.8/ipywidgets-8.1.8-py3-none-any.whl" },
     { name = "jupyterlab", marker = "sys_platform != 'emscripten'", specifier = ">=4.5" },
     { name = "jupyterlab-widgets", url = "https://github.com/fleming79/ipylab/releases/download/v2.0.9/jupyterlab_widgets-3.0.16-py3-none-any.whl" },
@@ -1897,6 +1899,18 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/88/86/cdecb0140a05e1a477b81f24739da93b25070ee01ce7f7242f44a6437594/orjson-3.11.5-cp314-cp314-win32.whl", hash = "sha256:9cc1e55c884921434a84a0c3dd2699eb9f92e7b441d7f53f3941079ec6ce7499", size = 135278, upload-time = "2025-12-06T15:55:17.202Z" },
     { url = "https://files.pythonhosted.org/packages/e4/97/b638d69b1e947d24f6109216997e38922d54dcdcdb1b11c18d7efd2d3c59/orjson-3.11.5-cp314-cp314-win_amd64.whl", hash = "sha256:a4f3cb2d874e03bc7767c8f88adaa1a9a05cecea3712649c3b58589ec7317310", size = 133170, upload-time = "2025-12-06T15:55:18.468Z" },
     { url = "https://files.pythonhosted.org/packages/8f/dd/f4fff4a6fe601b4f8f3ba3aa6da8ac33d17d124491a3b804c662a70e1636/orjson-3.11.5-cp314-cp314-win_arm64.whl", hash = "sha256:38b22f476c351f9a1c43e5b07d8b5a02eb24a6ab8e75f700f7d479d4568346a5", size = 126713, upload-time = "2025-12-06T15:55:19.738Z" },
+]
+
+[[package]]
+name = "outcome"
+version = "1.3.0.post0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "attrs" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/98/df/77698abfac98571e65ffeb0c1fba8ffd692ab8458d617a0eed7d9a8d38f2/outcome-1.3.0.post0.tar.gz", hash = "sha256:9dcf02e65f2971b80047b377468e72a268e15c0af3cf1238e6ff14f7f91143b8", size = 21060, upload-time = "2023-10-26T04:26:04.361Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/55/8b/5ab7257531a5d830fc8000c476e63c935488d74609b50f9384a643ec0a62/outcome-1.3.0.post0-py2.py3-none-any.whl", hash = "sha256:e771c5ce06d1415e356078d3bdd68523f284b4ce5419828922b6871e65eda82b", size = 10692, upload-time = "2023-10-26T04:26:02.532Z" },
 ]
 
 [[package]]
