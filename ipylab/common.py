@@ -429,9 +429,10 @@ class Singular(HasTraits):
     closed = Bool(read_only=True)
     singular: ClassVar[_SingularInstances[Self]]
 
-    def __init_subclass__(cls) -> None:
+    def __init_subclass__(cls, **kwargs) -> None:
         cls._singular_instances = {}
         cls.singular = _SingularInstances()
+        super().__init_subclass__(**kwargs)
 
     @classmethod
     def get_single_key(cls, *args, **kwgs) -> Hashable:  # noqa: ARG003
