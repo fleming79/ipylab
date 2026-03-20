@@ -23,6 +23,18 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 
+__all__ = [
+    "AddToShellType",
+    "Icon",
+    "KeyboardCapture",
+    "KeyboardEventType",
+    "Panel",
+    "ResizeBox",
+    "SplitPanel",
+    "Title",
+]
+
+
 class AddToShellType(TypedDict):
     area: NotRequired[Area]
     activate: NotRequired[bool]
@@ -30,6 +42,7 @@ class AddToShellType(TypedDict):
     rank: NotRequired[int | None]
     ref: NotRequired[ShellConnection | None]
     options: NotRequired[dict | None]
+
 
 class KeyboardEventType(TypedDict):
     "Keyboard events handled by KeyboardCapture."
