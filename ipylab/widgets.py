@@ -3,19 +3,24 @@
 
 from __future__ import annotations
 
-from typing import ClassVar, NotRequired, Self, TypedDict, Unpack
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, NotRequired, Self, TypedDict, Unpack
 from uuid import uuid4
 
 import anyio
 from async_kernel import Caller
+from async_kernel.common import Fixed
 from ipywidgets import Box, DOMWidget, Layout, TypedTuple, Widget, register, widget_serialization
 from ipywidgets.widgets.trait_types import InstanceDict
-from traitlets import Container, Dict, Instance, Tuple, Unicode, observe
+from traitlets import Bool, Container, Dict, Instance, Tuple, Unicode, observe
+from typing_extensions import override
 
 import ipylab._frontend as _fe
 from ipylab.common import Area, HasApp, InsertMode
 from ipylab.connection import Connection, ShellConnection
 from ipylab.ipylab import WidgetBase
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class AddToShellType(TypedDict):
@@ -25,6 +30,16 @@ class AddToShellType(TypedDict):
     rank: NotRequired[int | None]
     ref: NotRequired[ShellConnection | None]
     options: NotRequired[dict | None]
+
+class KeyboardEventType(TypedDict):
+    "Keyboard events handled by KeyboardCapture."
+
+    event: Literal["keyup", "keydown"]
+    keyCode: str
+    repeat: bool
+    shiftKey: bool
+    ctrlKey: bool
+    altKey: bool
 
 
 @register
@@ -141,3 +156,54 @@ class ResizeBox(Box):
     def set_size(self, size: tuple[str | int, str | int]) -> None:
         "Set the size of the box."
         self.layout = {"width": self._to_dim(size[0]), "height": self._to_dim(size[1])}
+
+
+@register
+class KeyboardCapture(HasApp, DOMWidget):
+    """
+    A widget that captures all keystrokes while it is has the focus.
+
+    Use 'register' method to add a handler.
+
+    'keyDown' and 'keyUp' messages are captured.
+    """
+
+    _model_name = Unicode("KeyboardCaptureModel").tag(sync=True)
+    _view_name = Unicode("KeyboardCaptureView").tag(sync=True)
+    _model_module = Unicode(_fe.module_name, read_only=True).tag(sync=True)
+    _model_module_version = Unicode(_fe.module_version, read_only=True).tag(sync=True)
+    _view_module = Unicode(_fe.module_name, read_only=True).tag(sync=True)
+    _view_module_version = Unicode(_fe.module_version, read_only=True).tag(sync=True)
+
+    _handlers: Fixed[Any, set[Callable[[KeyboardEventType], Any]]] = Fixed(set)
+
+    description = Unicode(help="Button label.").tag(sync=True)
+    disabled = Bool(False, help="Enable or disable user changes.").tag(sync=True)
+    icon = Unicode("", help="Font-awesome icon names, without the 'fa-' prefix.").tag(sync=True)
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.on_msg(self._keyboardcapture_on_msg)
+
+    def _keyboardcapture_on_msg(self, _, content: KeyboardEventType, buffers: list) -> None:
+        if content.get("event"):
+            for handler in self._handlers:
+                self.app.caller.queue_call(handler, content)
+
+    def register(self, func: Callable[[KeyboardEventType], Any]) -> None:
+        """
+        Register a handler.
+
+        The handler can be a standard callable or coroutine function. As the messages are received the handler call is
+        queued using Caller.queue_call.
+        """
+        self._handlers.add(func)
+
+    def deregister(self, func: Callable[[KeyboardEventType], Any]) -> None:
+        "Deregister a handler"
+        self._handlers.discard(func)
+
+    @override
+    def close(self) -> None:
+        super().close()
+        self._handlers.clear()

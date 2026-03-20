@@ -62,3 +62,9 @@
   resize: horizontal;
   overflow: auto;
 }
+
+.ipylab-KeyboardCapture {
+  display: flex;
+  height: auto;
+    width: auto;
+}

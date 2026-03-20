@@ -10,6 +10,10 @@ import { DialogModel } from './widgets/dialog';
 import { JupyterFrontEndModel } from './widgets/frontend';
 import { IconModel, IconView } from './widgets/icon';
 import { IpylabModel } from './widgets/ipylab';
+import {
+  KeyboardCaptureModel,
+  KeyboardCaptureView
+} from './widgets/keyboard_capture';
 import { NotificationManagerModel } from './widgets/notification';
 import { PanelModel, PanelView } from './widgets/panel';
 import { ResizeBoxModel, ResizeBoxView } from './widgets/resize_box';
@@ -33,6 +37,8 @@ export {
   IconView,
   IpylabModel,
   JupyterFrontEndModel,
+  KeyboardCaptureModel,
+  KeyboardCaptureView,
   NotificationManagerModel,
   PanelModel,
   PanelView,
