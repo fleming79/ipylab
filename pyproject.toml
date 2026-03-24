@@ -28,7 +28,7 @@ classifiers = [
 ]
 
 dependencies = [
-  "async-kernel>=0.13,<0.14",
+  "async-kernel>=0.14,<0.15",
   'orjson',
   "pluggy",
   "typing_extensions",
