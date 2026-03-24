@@ -120,9 +120,9 @@ class CodeEditor(Ipylab, HasSubshell, _String):
         with async_kernel.utils.subshell_context(self.subshell_id):
             match operation:
                 case "requestComplete":
-                    return await self.app.kernel.shell.do_complete_request(**payload)
+                    return await self.app.kernel.do_complete(**payload)
                 case "requestInspect":
-                    return await self.app.kernel.shell.inspect_request(**payload)
+                    return await self.app.kernel.do_inspect(**payload)
                 case "evaluateCode":
                     return await self.evaluate(payload["code"])
                     return True
@@ -152,7 +152,7 @@ class CodeEditor(Ipylab, HasSubshell, _String):
                 cc = await self.app.shell.open_console(subshell_id=self.subshell_id)
                 await cc.inject(code or self.value)
             else:
-                await self.app.kernel.shell.execute_request(code=code or self.value, silent=True)
+                await self.app.kernel.do_execute(code=code or self.value, silent=True)
 
     async def clear_undo_history(self) -> None:
         ""
