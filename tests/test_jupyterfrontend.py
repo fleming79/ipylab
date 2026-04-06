@@ -25,8 +25,8 @@ async def example_async_callable(c):
     ("kw", "expected"),
     [
         ({"evaluate": "'🐑'"}, "🐑"),
-        ({"evaluate": ["a='🌈'", ("b", example_callable), "payload=b"]}, "🌈"),
-        ({"evaluate": [("b", example_callable), ("payload", "None"), "b"], "kwgs": {"a": "⛵"}}, "⛵"),
+        ({"evaluate": ["a='🌈'", ("b", example_callable), "b"]}, "🌈"),
+        ({"evaluate": [("b", example_callable), "b"], "kwgs": {"a": "⛵"}}, "⛵"),
         ({"evaluate": ["a='👽'", ("b", example_callable), "b"]}, "👽"),
         ({"evaluate": example_callable, "kwgs": {"a": "👿"}}, "👿"),
         ({"evaluate": example_async_callable, "kwgs": {"c": "🔨"}}, "🔨"),
