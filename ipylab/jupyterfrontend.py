@@ -118,7 +118,18 @@ class JupyterFrontEnd(Singular, Ipylab):
         Evaluate code for `evaluate`.
 
         A call to this method should originate from a call to `evaluate` from
-        app in another kernel. The call is sent as a message via the frontend."""
+        app in another kernel. The call is sent as a message via the frontend.
+        """
+
+        class CatchResult(dict):
+            def __setitem__(self, key, value) -> None:
+                # set the result as values are written to the namespace
+                nonlocal result
+                user_ns.__setitem__(key, value)
+                result = value
+
+            def __getitem__(self, key):
+                return user_ns.__getitem__(key)
 
         evaluate = payload["evaluate"]
         subshell_id = payload.get("subshell_id")
@@ -126,20 +137,18 @@ class JupyterFrontEnd(Singular, Ipylab):
             shell = self.kernel.shell
             user_ns = shell.user_ns
             user_global_ns = shell.user_global_ns
+            result = None
             if isinstance(evaluate, str):
                 evaluate = (evaluate,)
             for row in evaluate:
-                name, expression = ("payload", row) if isinstance(row, str) else row
+                name, expression = ("", row) if isinstance(row, str) else row
                 try:
                     source = compile(expression, "-- Evaluate --", "eval")
                 except SyntaxError:
                     source = compile(expression, "-- Expression --", "exec")
-                    exec(source, user_global_ns, user_ns)
-                    result = next(reversed(user_ns.values()))  # Requires: LastUpdatedDict
+                    exec(source, user_global_ns, CatchResult(shell.user_ns))
                 else:
                     result = eval(source, user_global_ns, user_ns)
-                if not name:
-                    continue
                 if callable(result):
                     result = await execute_using_shells_namespace(
                         result, shell, payload, connection_id=payload.get("connection_id")
@@ -148,11 +157,11 @@ class JupyterFrontEnd(Singular, Ipylab):
                     result = await result
                 if name:
                     user_ns[name] = result
-        payload = user_ns.pop("payload", None)
-        if payload is not None:
-            user_ns["_call_count"] = name = user_ns.get("_call_count", 0) + 1
-            user_ns[f"payload_{name}"] = payload
-        return {"payload": payload}
+
+        if result is not None and payload.get("strong_ref"):
+            user_ns["_ipylab_evaluate_count"] = cnt = user_ns.get("_ipylab_evaluate_count", 0) + 1
+            user_ns[f"_ipylab_evaluate_{cnt}"] = result
+        return {"payload": result}
 
     async def evaluate(
         self,
@@ -161,6 +170,7 @@ class JupyterFrontEnd(Singular, Ipylab):
         vpath: str = "",
         preferred_kernel: Literal["async", "python3"] | str = "async",  # noqa: PYI051
         kwgs: None | dict = None,
+        strong_ref=True,
         **kwargs: Unpack[IpylabKwgs],
     ) -> Any:
         """
@@ -174,40 +184,43 @@ class JupyterFrontEnd(Singular, Ipylab):
         Args:
             evaluate:
                 An expression or list of expressions to evaluate.
-
-                The following combinations are acceptable:
-                1. code    # Shorthand version                  -> payload = code
-                2. [("payload", code)]                          -> payload = code
-                3. [("payload", code1), ("", code2), code3]     -> payload = code3
-
-                * Code is handled as a list of mappings of `symbol name` to expressions.
-                [(symbol name, expression), ...]
-                * The shorthand version is changed to a single element list automatically.
-                * `code` is changed to ("payload", code) automatically.
-                * The latest defined `"payload"` is the return value from evaluation.
-
-                Each expression will be evaluated and if a syntax error occurs in evaluation
-                it will instead be executed. The latest set symbol is taken as the execution
-                result.
-
-                If the result is callable or awaitable it will be called or await recursively
-                until the result or awaitable is no longer callable or awaitable. To prevent this
-                make the symbol name an empty string.
-
-                References
-                ----------
-                * eval: https://docs.python.org/3/library/functions.html#eval
-                * exec: https://docs.python.org/3/library/functions.html#exec
-
-                Once evaluation is complete, the symbols named `payload` and `buffers`
-                will be returned.
             vpath:
                 The path of kernel session where the evaluation should take place.
             preferred_kernel:
                 The name of the kernel to use if a new kernel is started.
+            strong_ref:
+                Keep a reference to the result to avoid garbage collection
             kwgs: dict | None
                 Specify kwgs that may be used when calling a callable.
                 Note:The namespace is also searched.
+
+
+        The following `evaluate` argument combinations are acceptable:
+        1. code    # Shorthand version                  -> payload = code
+        2. [("payload", code)]                          -> payload = code
+        3. [("payload", code1), ("", code2), code3]     -> payload = code3
+
+        * Code is handled as a list of mappings of `symbol name` to expressions.
+        [(symbol name, expression), ...]
+        * The shorthand version is changed to a single element list automatically.
+        * `code` is changed to ("payload", code) automatically.
+        * The latest defined `"payload"` is the return value from evaluation.
+
+        Each expression will be evaluated and if a syntax error occurs in evaluation
+        it will instead be executed. The latest set symbol is taken as the execution
+        result.
+
+        If the result is callable or awaitable it will be called or await recursively
+        until the result or awaitable is no longer callable or awaitable. To prevent this
+        make the symbol name an empty string.
+
+        References
+        ----------
+        * eval: https://docs.python.org/3/library/functions.html#eval
+        * exec: https://docs.python.org/3/library/functions.html#exec
+
+        Once evaluation is complete, the symbols named `payload` and `buffers`
+        will be returned.
 
         Examples:
 
@@ -243,6 +256,7 @@ class JupyterFrontEnd(Singular, Ipylab):
             "evaluate": evaluate,
             "vpath": vpath or self.vpath,
             "preferredKernel": preferred_kernel,
+            "strong_ref": strong_ref,
         }
         if vpath == self.vpath:
             return await self._evaluate(kwgs)
