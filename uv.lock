@@ -131,7 +131,7 @@ wheels = [
 
 [[package]]
 name = "async-kernel"
-version = "0.16.0"
+version = "0.17.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiologic" },
@@ -150,9 +150,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "wrapt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/be/34/c2703b5d1ee670b38c61e7f00ef912644a61ac226a1f6c08c22bee212886/async_kernel-0.16.0.tar.gz", hash = "sha256:7a284044315297bdd2fc51339f26123f61925d85a02ee43d42ba873399868ecd", size = 308078, upload-time = "2026-04-06T01:33:32.612Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/52/4b/1c1b702832059cbdfbb628fd6d54e4f32ee34a8c5dc68d30f69dbd80df27/async_kernel-0.17.0.tar.gz", hash = "sha256:0df3ad1ae58bf0f4a28ece1a44de3267df8993d63362badb254046aca7063eec", size = 310431, upload-time = "2026-04-22T00:56:13.592Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/92/7f/f9a92d4ccc84e413688f4387fc52ca017c8c9ff3b6d75489bf7b9ce2cf35/async_kernel-0.16.0-py3-none-any.whl", hash = "sha256:1e6a662042f21ca5f2c769448b6e589776cea442d15399cdd6b8a83c2a44857a", size = 108596, upload-time = "2026-04-06T01:33:31.085Z" },
+    { url = "https://files.pythonhosted.org/packages/bb/f0/c4e96670e7f85985c55cdfd8f1fc1d8834ffbefb89e33df0208c02ed884d/async_kernel-0.17.0-py3-none-any.whl", hash = "sha256:401bc7aca75bec229582c13e634e9792ec8f1a63ece8bd9d50bbb0a380e8ff9f", size = 109827, upload-time = "2026-04-22T00:56:11.648Z" },
 ]
 
 [[package]]
@@ -916,7 +916,7 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "async-kernel", specifier = ">=0.16,<0.17" },
+    { name = "async-kernel", specifier = ">=0.17,<0.18" },
     { name = "ipywidgets", url = "https://github.com/fleming79/ipylab/releases/download/v2.0.8/ipywidgets-8.1.8-py3-none-any.whl" },
     { name = "jupyterlab", marker = "sys_platform != 'emscripten'", specifier = ">=4.5" },
     { name = "jupyterlab-widgets", url = "https://github.com/fleming79/ipylab/releases/download/v2.0.9/jupyterlab_widgets-3.0.16-py3-none-any.whl" },

@@ -28,7 +28,7 @@ classifiers = [
 ]
 
 dependencies = [
-  "async-kernel>=0.16,<0.17",
+  "async-kernel>=0.17,<0.18",
   "pluggy",
   "typing_extensions",
   "traitlets @ https://github.com/fleming79/ipylab/releases/download/v2.0.1/traitlets-5.14.3-py3-none-any.whl#sha256:bcc8fc5a21d9b996de216eb01f360d717356779c864249ca376fc59f59d58377",
