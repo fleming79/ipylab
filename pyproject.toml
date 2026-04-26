@@ -28,7 +28,7 @@ classifiers = [
 ]
 
 dependencies = [
-  "async-kernel>=0.17,<0.18",
+  "async-kernel>=0.18,<0.19",
   "jupyterlab>=4.5; sys_platform != 'emscripten'",
   "ipywidgets>=8.1.8",
   "jupyterlab_widgets>=3.0.11",
