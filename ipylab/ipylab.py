@@ -103,8 +103,9 @@ class Ipylab(HasApp, WidgetBase):
         super().__init__()
         self._ipylab_init_complete = True
 
+    @override
     def __repr__(self) -> str:
-        if not self._repr_mimebundle_:
+        if not self._repr_mimebundle_:  # pyright: ignore[reportUnnecessaryComparison]
             status = "CLOSED"
         elif not self.ready:
             status = "Not ready"
@@ -159,8 +160,11 @@ class Ipylab(HasApp, WidgetBase):
         **kwargs: P.kwargs,
     ) -> Pending[T]:
         "Schedule `func` to be called in the event loop of the main thread with a `delay`."
-        pen = self.app.caller.call_later(delay, func, *args, **kwargs)
-        pen.add_done_callback(self.on_done_log)
+        if delay:
+            pen = Caller("MainThread").call_later(delay, func, *args, **kwargs)
+        else:
+            pen = Caller("MainThread").call_soon(func, *args, **kwargs)
+        pen.add_done_callback(functools.partial(self.on_done_log))
         return pen
 
     def on_done_log(self, pen: Pending):
@@ -190,8 +194,9 @@ class Ipylab(HasApp, WidgetBase):
                 case {"ipylab_PY": str(key), **rest}:
                     self._set_result(key=key, error=None, payload=rest.get("payload"))
                 case {"ipylab_FE": str(key), "operation": operation, "payload": payload}:
-                    kwgs = {"key": key, "operation": operation, "payload": payload, "buffers": buffers}
-                    self.call_later(0, self._do_operation_for_fe, **kwgs)
+                    self.call_later(
+                        0, self._do_operation_for_fe, key=key, operation=operation, payload=payload, buffers=buffers
+                    )
                 case {"error": msg}:
                     self.log.error(msg)
                 case "ready":
@@ -322,11 +327,11 @@ class Ipylab(HasApp, WidgetBase):
                 to performing the operation.
         """
         await self.wait_ready()
-        if not operation or not isinstance(operation, str):
+        if not operation or not isinstance(operation, str):  # pyright: ignore[reportUnnecessaryIsInstance]
             msg = f"Invalid {operation=}"
             raise ValueError(msg)
         ipylab_PY = str(uuid.uuid4())
-        content = {
+        content: dict[str, Any] = {
             "ipylab_PY": ipylab_PY,
             "operation": operation,
             "kwgs": dict(kwgs) if kwgs else {},

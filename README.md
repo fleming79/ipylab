@@ -149,7 +149,7 @@ jlpm jupyterlite:serve
 Type checking is performed using [basedpyright](https://docs.basedpyright.com/).
 
 ```bash
-basedpyright
+uvx basedpyright@1.39.6
 ```
 
 ### VS code debugging

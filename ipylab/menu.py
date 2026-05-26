@@ -11,9 +11,9 @@ from traitlets import Container, Instance, Union
 from typing_extensions import override
 
 from ipylab.commands import APP_COMMANDS_NAME, CommandConnection, CommandRegistry
-from ipylab.common import Obj, Singular
+from ipylab.common import Obj, Singular, Transform
 from ipylab.connection import InfoConnection
-from ipylab.ipylab import Ipylab, IpylabBase, Transform
+from ipylab.ipylab import Ipylab, IpylabBase
 
 if TYPE_CHECKING:
     from typing import Literal
@@ -85,25 +85,25 @@ class RankedMenu(Ipylab):
                     raise TypeError(msg)
                 info["submenu"] = submenu
                 to_object = ["args[0].submenu"]
-            case _:
-                msg = f"Invalid type {type}"
+            case _:  # pyright: ignore[reportUnnecessaryComparison]
+                msg = f"Invalid type {type}"  # pyright: ignore[reportUnreachable]
                 raise ValueError(msg)
 
-        mic: MenuItemConnection = await self.execute_method(
+        connection: MenuItemConnection = await self.execute_method(
             subpath="addItem",
             args=(info,),
             transform={"transform": Transform.connection, "connection_id": MenuItemConnection.to_id()},
             toObject=to_object,
         )
-        self.close_with_self(mic)
+        self.close_with_self(connection)
         if isinstance(command, CommandConnection):
-            command.close_with_self(mic)
+            command.close_with_self(connection)
         if submenu:
-            submenu.close_with_self(mic)
-        mic.info = info
-        mic.menu = self
-        mic.add_to_tuple(self, "connections")
-        return mic
+            submenu.close_with_self(connection)
+        connection.info = info
+        connection.menu = self
+        connection.add_to_tuple(self, "connections")
+        return connection
 
     async def activate(self) -> None:
         "Open this menu assuming it is in the main menu."

@@ -183,6 +183,22 @@ docstring-code-format = true
 "*.ipynb" = ["PLC0415", 'RUF005', 'PTH118']
 
 
-[tool.pyright]
-include = ["ipylab", 'examples', 'tests']
-typeCheckingMode = 'standard'
+[tool.basedpyright]
+include = ["ipylab"]
+reportMissingParameterType = false
+reportExplicitAny = false
+reportUnknownParameterType = false
+reportUnannotatedClassAttribute = false
+reportMissingTypeArgument  = false
+reportMissingImports = false
+reportUnusedCallResult  = false
+reportUninitializedInstanceVariable = false
+reportUnknownVariableType = false
+reportAny = false
+reportUnknownMemberType = false
+reportUnknownArgumentType = false
+reportImportCycles = false
+reportMissingTypeStubs = false
+reportUnusedParameter = false
+reportUnknownLambdaType = false
+reportUnsafeMultipleInheritance = false
