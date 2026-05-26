@@ -24,7 +24,7 @@ from ipylab.shell import Shell
 from ipylab.toolbar import CustomToolbar
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Callable, Iterable
     from typing import ClassVar
 
 
@@ -60,11 +60,8 @@ class JupyterFrontEnd(Singular, Ipylab):
         if force:
             super().close()
 
-    def _autostart_callback(self, result) -> None:
-        if inspect.iscoroutine(result):
-            self.call_later(0, lambda: result)
-
     @property
+    @override
     def repr_info(self) -> dict[str, str]:
         return {"vpath": self._vpath, "session name": self.session_name}
 
@@ -102,8 +99,8 @@ class JupyterFrontEnd(Singular, Ipylab):
                     msg = f"Expected an Widget but got {type(widget)}"
                     raise TypeError(msg)
                 return await self.shell.add(widget, **payload)
-
-        return await super()._do_operation_for_frontend(operation, payload, buffers)
+            case _:
+                return await super()._do_operation_for_frontend(operation, payload, buffers)
 
     async def shutdown_kernel(self, vpath: str | None = None) -> None:
         "Shutdown the kernel."
@@ -122,13 +119,13 @@ class JupyterFrontEnd(Singular, Ipylab):
         """
 
         class CatchResult(dict):
-            def __setitem__(self, key, value) -> None:
+            def __setitem__(self, key, value) -> None:  # pyright: ignore[reportImplicitOverride]
                 # set the result as values are written to the namespace
                 nonlocal result
                 user_ns.__setitem__(key, value)
                 result = value
 
-            def __getitem__(self, key):
+            def __getitem__(self, key):  # pyright: ignore[reportImplicitOverride]
                 return user_ns.__getitem__(key)
 
         evaluate = payload["evaluate"]
@@ -165,7 +162,7 @@ class JupyterFrontEnd(Singular, Ipylab):
 
     async def evaluate(
         self,
-        evaluate: str | inspect._SourceObjectType | Iterable[str | tuple[str, str | inspect._SourceObjectType]],
+        evaluate: str | Callable | Iterable[str | tuple[str, str | Callable]],
         *,
         vpath: str = "",
         preferred_kernel: Literal["async", "python3"] | str = "async",  # noqa: PYI051

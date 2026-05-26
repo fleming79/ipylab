@@ -78,7 +78,8 @@ class Connection(Singular, Ipylab):
             raise NameError(msg)
         super().__init__(connection_id=connection_id, **kwgs)
 
-    def __str__(self):
+    @override
+    def __str__(self) -> str:
         return self.connection_id
 
     @classmethod
@@ -121,7 +122,7 @@ class Connection(Singular, Ipylab):
         return cls_(connection_id)
 
 
-Connection._CLASS_DEFINITIONS[Connection.prefix.strip(Connection._SEP)] = Connection
+Connection._CLASS_DEFINITIONS[Connection.prefix.strip(Connection._SEP)] = Connection  # pyright: ignore[reportPrivateUsage]
 
 
 class InfoConnection(Connection):
@@ -139,6 +140,7 @@ class ShellConnection(Connection, Generic[W_co]):
 
     widget: Instance[W_co] = Instance(Widget, allow_none=True, default_value=None, help="The widget that has the view")  # pyright: ignore[reportAssignmentType]
 
+    @override
     def __del__(self) -> None:
         """Object disposal"""
         # Losing strong references doesn't mean the widget should be closed.

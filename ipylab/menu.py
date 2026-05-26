@@ -11,9 +11,9 @@ from traitlets import Container, Instance, Union
 from typing_extensions import override
 
 from ipylab.commands import APP_COMMANDS_NAME, CommandConnection, CommandRegistry
-from ipylab.common import Obj, Singular
+from ipylab.common import Obj, Singular, Transform
 from ipylab.connection import InfoConnection
-from ipylab.ipylab import Ipylab, IpylabBase, Transform
+from ipylab.ipylab import Ipylab, IpylabBase
 
 if TYPE_CHECKING:
     from typing import Literal
@@ -85,8 +85,8 @@ class RankedMenu(Ipylab):
                     raise TypeError(msg)
                 info["submenu"] = submenu
                 to_object = ["args[0].submenu"]
-            case _:
-                msg = f"Invalid type {type}"
+            case _:  # pyright: ignore[reportUnnecessaryComparison]
+                msg = f"Invalid type {type}"  # pyright: ignore[reportUnreachable]
                 raise ValueError(msg)
 
         mic: MenuItemConnection = await self.execute_method(

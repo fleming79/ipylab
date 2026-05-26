@@ -80,7 +80,7 @@ def pack(obj: Widget | FunctionType):
         return widget_serialization["to_json"](obj, None)
     if inspect.isfunction(obj) or inspect.ismodule(obj):
         return textwrap.dedent(inspect.getsource(obj))
-    msg = f"Unable pack this type of object {type(obj)}: {obj!r}"
+    msg = f"Unable pack this type of object {type(obj)}: {obj!r}"  # pyright: ignore[reportUnreachable]
     raise TypeError(msg)
 
 
@@ -197,9 +197,9 @@ class Transform(StrEnum):
             match cls(transform["transform"]):
                 case cls.connection:
                     connection_id = transform.get("connection_id")
-                    if connection_id and not connection_id.startswith(ipylab.Connection._PREFIX):
+                    if connection_id and not connection_id.startswith(ipylab.Connection._PREFIX):  # pyright: ignore[reportPrivateUsage]
                         msg = (
-                            f"'connection_id' should start with '{ipylab.Connection._PREFIX}' but got {connection_id=}"
+                            f"'connection_id' should start with '{ipylab.Connection._PREFIX}' but got {connection_id=}"  # pyright: ignore[reportPrivateUsage]
                         )
                         raise ValueError(msg)
                     return TransformDictConnection(transform=Transform.connection, connection_id=connection_id)
@@ -216,7 +216,8 @@ class Transform(StrEnum):
                 connection_id := payload.get("connection_id")
             ):
                 return ipylab.Connection.get_connection(connection_id)
-        return payload
+            case _:
+                return payload
 
 
 class TransformDictConnection(TypedDict):

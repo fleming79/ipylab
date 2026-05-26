@@ -10,14 +10,15 @@ import async_kernel
 from aiologic import Lock
 from async_kernel.common import Fixed
 from ipywidgets import TypedTuple
+from ipywidgets.widgets.widget import register
 from traitlets import Callable as CallableTrait
 from traitlets import Container, Dict, Instance, Tuple, Unicode
 from typing_extensions import override
 
 import ipylab
-from ipylab.common import IpylabKwgs, Obj, Singular, TransformType, execute_using_shells_namespace, pack
+from ipylab.common import IpylabKwgs, Obj, Singular, Transform, TransformType, execute_using_shells_namespace, pack
 from ipylab.connection import InfoConnection
-from ipylab.ipylab import Ipylab, IpylabBase, Transform, register
+from ipylab.ipylab import Ipylab, IpylabBase
 from ipylab.widgets import Icon
 
 if TYPE_CHECKING:
@@ -171,6 +172,7 @@ class CommandRegistry(Singular, Ipylab):
         return name
 
     @property
+    @override
     def repr_info(self):
         return {"name": self.name}
 
@@ -191,6 +193,8 @@ class CommandRegistry(Singular, Ipylab):
                     return await execute_using_shells_namespace(
                         conn.python_command, self.app.kernel.shell, options, connection_id=payload.get("connection_id")
                     )
+            case _:
+                pass
 
         return await super()._do_operation_for_frontend(operation, payload, buffers)
 
