@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Self
 
+from IPython.core.interactiveshell import InteractiveShell
 from ipywidgets import DOMWidget, Widget, register, widget_serialization
 from traitlets import Bool, Callable, Enum, Instance, Int, Unicode, default, observe
 
@@ -36,7 +37,7 @@ class SimpleOutput(Ipylab, DOMWidget):
     @default("format")
     def _default_format(self) -> Any | None:
         try:
-            return self.comm.kernel.shell.display_formatter.format  # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
+            return InteractiveShell.instance().display_formatter.format  # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
         except AttributeError:
             return None
 
