@@ -79,10 +79,11 @@ class IpylabLoggerAdapter(logging.LoggerAdapter):
     def __init__(self, name: str, owner: Any) -> None:
         logger = logging.getLogger(name)
         if handler := self.app.logging_handler:
-            handler._add_logger(logger)
+            handler.add_logger(logger)
         super().__init__(logger)
         self.owner_ref = weakref.ref(owner)
 
+    @override
     def process(self, msg: Any, kwargs: MutableMapping[str, Any]) -> tuple[Any, MutableMapping[str, Any]]:
         obj = kwargs.pop("obj", None)
         kwargs["extra"] = {"owner": self.owner_ref, "obj": obj}
@@ -97,7 +98,7 @@ class IpylabLogHandler(logging.Handler):
         super().__init__(level)
         self._callbacks = CallbackDispatcher()
 
-    def _add_logger(self, logger: logging.Logger):
+    def add_logger(self, logger: logging.Logger) -> None:
         if logger not in self._loggers:
             logger.setLevel(self.level)
             self._loggers.add(logger)
@@ -110,6 +111,7 @@ class IpylabLogHandler(logging.Handler):
         for logger in self._loggers:
             logger.setLevel(level)
 
+    @override
     def emit(self, record) -> None:
         std_ = "stderr" if record.levelno >= LogLevel.ERROR else "stdout"
         record.output = {"output_type": "stream", "name": std_, "text": self.format(record)}

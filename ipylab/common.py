@@ -29,6 +29,7 @@ from async_kernel.common import Fixed
 from ipywidgets import TypedTuple, Widget, widget_serialization
 from traitlets import Any as AnyTrait
 from traitlets import Bool, Container, HasTraits, Instance, TraitError, Unicode, default, observe, validate
+from typing_extensions import override
 
 import ipylab
 
@@ -357,7 +358,7 @@ class HasSubshell(HasApp):
         ...
     """
 
-    _subshell: AsyncInteractiveSubshell | None = None
+    _subshell: BaseShell | None = None
 
     subshell_id = Unicode(None, allow_none=True)
     """
@@ -379,7 +380,7 @@ class HasSubshell(HasApp):
     def _validate_subshell_id(self, proposal: dict) -> str | None:
         if proposal["value"] is None:
             return None
-        if proposal["value"] in self.app.kernel.subshell_manager.subshells:
+        if proposal["value"] in self.app.kernel.subshells:
             return proposal["value"]
         msg = f"Not a valid subshell id {proposal['value']}"
         raise TraitError(msg)
@@ -392,7 +393,7 @@ class HasSubshell(HasApp):
     def _observe_has_subshell(self, change: dict) -> None:
         if self.has_subshell:
             if not self._subshell:
-                self._subshell = self.app.kernel.subshell_manager.create_subshell(protected=True)
+                self._subshell = self.app.kernel.create_subshell(protected=True)
                 self.subshell_id = self._subshell.subshell_id
         else:
             if subshell := self._subshell:
@@ -401,6 +402,7 @@ class HasSubshell(HasApp):
                 if self.subshell_id == subshell.subshell_id:
                     self.subshell_id = None
 
+    @override
     def close(self) -> None:
         super().close()
         self.has_subshell = False

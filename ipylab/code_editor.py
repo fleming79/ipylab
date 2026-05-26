@@ -11,7 +11,7 @@ import traitlets
 from ipywidgets import Layout, register, widget_serialization
 from ipywidgets.widgets.trait_types import InstanceDict
 from ipywidgets.widgets.widget_description import DescriptionStyle
-from ipywidgets.widgets.widget_string import _String
+from ipywidgets.widgets.widget_string import _String  # pyright: ignore[reportPrivateUsage]
 from traitlets import Dict, Int, TraitType, Unicode, default, observe
 from typing_extensions import override
 
@@ -125,7 +125,6 @@ class CodeEditor(Ipylab, HasSubshell, _String):
                     return await self.app.kernel.do_inspect(**payload)
                 case "evaluateCode":
                     return await self.evaluate(payload["code"])
-                    return True
                 case "setValue":
                     # Only set the value when a valid sync is provided
                     # sync is done
@@ -136,8 +135,8 @@ class CodeEditor(Ipylab, HasSubshell, _String):
                         finally:
                             self._setting_value = False
                     return self.value == payload["value"]
-
-        return await super()._do_operation_for_frontend(operation, payload, buffers)
+                case _:
+                    return await super()._do_operation_for_frontend(operation, payload, buffers)
 
     def load_value(self, value) -> None:
         "Load the value - overload as required."

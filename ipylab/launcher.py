@@ -7,8 +7,8 @@ from ipywidgets import TypedTuple
 from traitlets import Container, Instance
 
 from ipylab.commands import CommandConnection, CommandPalletItemConnection
-from ipylab.common import Obj, Singular, TransformType
-from ipylab.ipylab import Ipylab, IpylabBase, Transform
+from ipylab.common import Obj, Singular, Transform, TransformType
+from ipylab.ipylab import Ipylab, IpylabBase
 
 __all__ = ["LauncherConnection"]
 

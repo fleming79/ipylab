@@ -5,10 +5,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Self
 
-from ipywidgets import DOMWidget, Widget, register
-from traitlets import Bool, Callable, Enum, Int, Unicode, default
+from ipywidgets import DOMWidget, Widget, register, widget_serialization
+from traitlets import Bool, Callable, Enum, Instance, Int, Unicode, default, observe
 
-from ipylab.ipylab import Ipylab
+from ipylab.ipylab import Ipylab, WidgetBase
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -17,15 +17,6 @@ if TYPE_CHECKING:
     from IPython.display import TextDisplayObject
 
     from ipylab.common import IpylabKwgs
-from typing import TYPE_CHECKING
-
-from ipywidgets import widget_serialization
-from traitlets import Instance, observe
-
-from ipylab.ipylab import WidgetBase
-
-if TYPE_CHECKING:
-    from typing import Unpack
 
 
 @register
@@ -40,7 +31,7 @@ class SimpleOutput(Ipylab, DOMWidget):
     max_outputs = Int(100, help="The maximum number of individual widgets").tag(sync=True)
     max_continuous_streams = Int(100, help="Max streams to put in same output").tag(sync=True)
     length = Int(read_only=True, help="The current length of the output area").tag(sync=True)
-    format = Callable(allow_none=True, default_value=None)
+    format: Callable | None = Callable(allow_none=True, default_value=None)
 
     @default("format")
     def _default_format(self) -> Any | None:

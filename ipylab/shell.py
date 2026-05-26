@@ -128,7 +128,7 @@ class Shell(Singular, Ipylab):
                         break
             args["ipy_model"] = obj.model_id
         else:
-            args["evaluate"] = pack(obj)  # pyright: ignore[reportArgumentType]
+            args["evaluate"] = pack(obj)
         if isinstance(obj, DOMWidget):
             obj.add_class(self.app.selector.removeprefix("."))
         if "evaluate" in args and isinstance(vpath, dict):

@@ -13,9 +13,11 @@ from ipylab.connection import Connection
 from traitlets import Unicode
 from typing_extensions import override
 
+# pyright: reportPrivateUsage=false
+
 
 class CommonTestClass:
-    def __init__(self, value=1):
+    def __init__(self, value=1) -> None:  # pyright: ignore[reportMissingSuperCall]
         self.value = value
 
 

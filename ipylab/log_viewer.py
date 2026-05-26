@@ -69,8 +69,8 @@ class LogViewer(Panel):
         lambda _: Button(
             description="📪",
             tooltip="Send the record to the console.\n"
-            "The record has the properties 'owner' and 'obj'attached "
-            "which may be of interest for debugging purposes.",
+            + "The record has the properties 'owner' and 'obj'attached "
+            + "which may be of interest for debugging purposes.",
             layout={"width": "auto", "flex": "0 0 auto"},
         ),
         created=lambda c: c["obj"].on_click(c["owner"]._button_on_click),
@@ -129,8 +129,8 @@ class LogViewer(Panel):
     def _observe_connections(self, _) -> None:
         if self.connections and len(self.connections) == 1:
             self.output.push(*(rec.output for rec in self._records), clear=True)
-        self.info.value = f"<b>Vpath: {self.app._vpath}</b>"
-        self.title.label = f"Log: {self.app._vpath}"
+        self.info.value = f"<b>Vpath: {self.app._vpath}</b>"  # pyright: ignore[reportPrivateUsage]
+        self.title.label = f"Log: {self.app._vpath}"  # pyright: ignore[reportPrivateUsage]
 
     def _add_record(self, record: logging.LogRecord):
         self._records.append(record)

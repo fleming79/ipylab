@@ -83,9 +83,9 @@ class JupyterFrontEnd(Singular, Ipylab):
     async def _set_ready(self) -> None:
         await super()._set_ready()
         assert self._vpath, "'_vpath' must be set first."
-        ipylab.plugin_manager.hook.autostart._call_history.clear()  # pyright: ignore[reportOptionalMemberAccess]
+        ipylab.plugin_manager.hook.autostart._call_history.clear()  # pyright: ignore[reportPrivateUsage, reportOptionalMemberAccess]
         try:
-            if not ipylab.plugin_manager.hook.autostart_once._call_history:
+            if not ipylab.plugin_manager.hook.autostart_once._call_history:  # pyright: ignore[reportPrivateUsage]
                 ipylab.plugin_manager.hook.autostart_once.call_historic(
                     kwargs={"app": self}, result_callback=self._autostart_callback
                 )

@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any
 import anyio
 import traitlets
 from aiologic import Event
-from async_kernel import Pending
+from async_kernel import Caller, Pending
 from async_kernel.caller import truncated_rep
 from async_kernel.common import Fixed
 from IPython import get_ipython  # pyright: ignore[reportPrivateImportUsage]
@@ -164,10 +164,10 @@ class Ipylab(HasApp, WidgetBase):
             pen = Caller("MainThread").call_later(delay, func, *args, **kwargs)
         else:
             pen = Caller("MainThread").call_soon(func, *args, **kwargs)
-        pen.add_done_callback(functools.partial(self.on_done_log))
+        pen.add_done_callback(self._on_done_log)
         return pen
 
-    def on_done_log(self, pen: Pending):
+    def _on_done_log(self, pen: Pending):
         "A done callback used by `Ipylab.call_later`"
         if pen.cancelled():
             self.log.debug("Cancelled %s", pen)
