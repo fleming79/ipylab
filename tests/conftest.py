@@ -32,7 +32,7 @@ async def kernel(anyio_backend):
 
     handlers = await async_kernel.interface.start_kernel_callable_interface(send=send, stopped=lambda: None)
     try:
-        yield async_kernel.Kernel()
+        yield async_kernel.utils.get_kernel()
     finally:
         handlers["stop"]()
 

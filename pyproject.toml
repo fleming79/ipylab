@@ -28,7 +28,7 @@ classifiers = [
 ]
 
 dependencies = [
-  "async-kernel>=0.18,<0.19",
+  "async-kernel>=0.19,<0.20",
   "pluggy",
   "typing_extensions",
   "traitlets>=5.15",
