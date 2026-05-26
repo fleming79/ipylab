@@ -89,21 +89,21 @@ class RankedMenu(Ipylab):
                 msg = f"Invalid type {type}"  # pyright: ignore[reportUnreachable]
                 raise ValueError(msg)
 
-        mic: MenuItemConnection = await self.execute_method(
+        connection: MenuItemConnection = await self.execute_method(
             subpath="addItem",
             args=(info,),
             transform={"transform": Transform.connection, "connection_id": MenuItemConnection.to_id()},
             toObject=to_object,
         )
-        self.close_with_self(mic)
+        self.close_with_self(connection)
         if isinstance(command, CommandConnection):
-            command.close_with_self(mic)
+            command.close_with_self(connection)
         if submenu:
-            submenu.close_with_self(mic)
-        mic.info = info
-        mic.menu = self
-        mic.add_to_tuple(self, "connections")
-        return mic
+            submenu.close_with_self(connection)
+        connection.info = info
+        connection.menu = self
+        connection.add_to_tuple(self, "connections")
+        return connection
 
     async def activate(self) -> None:
         "Open this menu assuming it is in the main menu."
