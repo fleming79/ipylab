@@ -8,7 +8,7 @@ import os
 from typing import TYPE_CHECKING, Any, Literal, Self, Unpack, final
 
 import async_kernel
-from async_kernel import Caller, Kernel
+from async_kernel import Caller, Kernel, utils
 from async_kernel.common import Fixed
 from ipywidgets import Widget, register
 from traitlets import Unicode
@@ -44,7 +44,7 @@ class JupyterFrontEnd(Singular, Ipylab):
     version = Unicode(read_only=True).tag(sync=True)
     _vpath = Unicode(read_only=True).tag(sync=True)
 
-    kernel = Fixed(Kernel)
+    kernel: Fixed[Self, Kernel] = Fixed(utils.get_kernel)
     caller: Fixed[Self, Caller] = Fixed(lambda c: getattr(c["owner"].kernel, "caller", None) or Caller("MainThread"))
 
     shell = Fixed(Shell)

@@ -131,7 +131,7 @@ wheels = [
 
 [[package]]
 name = "async-kernel"
-version = "0.18.1"
+version = "0.19.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiologic" },
@@ -149,9 +149,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "wrapt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ea/1c/5b55d3cfa148f43fa1a6deb7440d0299ef865abbf1a4f9d550ca85cb4c21/async_kernel-0.18.1.tar.gz", hash = "sha256:33e397bb072f4f5944edcb6be84b278c012eee606a8a7b40bbaedb6bda91727e", size = 311963, upload-time = "2026-04-26T08:57:08.297Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/68/57/832e3e387a31aee1ab15fbe4bc0ef023f73e39fba0b98589d031ddd8e75a/async_kernel-0.19.0.tar.gz", hash = "sha256:1d3544f823cdb0ba762d21fea33e5902f86feef3cbc4568457b13b9c5a752448", size = 321419, upload-time = "2026-05-26T01:33:20.776Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9d/a2/a7bcfcb413c07e2b3dfd30fc7d8b66a113e1a8a05109dd1f7272074bb364/async_kernel-0.18.1-py3-none-any.whl", hash = "sha256:1ab686b2324ae76c0c894e35dafa4b5a045503a03d77f70de867956da541338b", size = 110781, upload-time = "2026-04-26T08:57:06.864Z" },
+    { url = "https://files.pythonhosted.org/packages/1f/d7/135d2da7368c4b753f6fc055d36d989c8e3a4306076281751d0f0d078b61/async_kernel-0.19.0-py3-none-any.whl", hash = "sha256:ca5cd2d05032f3a27fce4b6c8e88b96e5f3ba6e162872b361ebe81806c127b2a", size = 118818, upload-time = "2026-05-26T01:33:19.044Z" },
 ]
 
 [[package]]
@@ -782,7 +782,7 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "async-kernel", specifier = ">=0.18,<0.19" },
+    { name = "async-kernel", specifier = ">=0.19,<0.20" },
     { name = "ipywidgets", specifier = ">=8.1.8" },
     { name = "jupyterlab", marker = "sys_platform != 'emscripten'", specifier = ">=4.5" },
     { name = "jupyterlab-widgets", specifier = ">=3.0.11" },

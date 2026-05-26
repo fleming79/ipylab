@@ -170,7 +170,7 @@ class Shell(Singular, Ipylab):
         app = await self.app.wait_ready()
         if subshell_id:
             # Validate the subshell_id.
-            self.app.kernel.subshell_manager.get_shell(subshell_id)
+            self.app.kernel.get_shell(subshell_id)
         with self._lock:
             ref_ = ref or self.current_widget_id
             if not isinstance(ref_, ShellConnection):

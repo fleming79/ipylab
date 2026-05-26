@@ -36,7 +36,7 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Hashable
     from types import CoroutineType, FunctionType
 
-    from async_kernel.asyncshell import AsyncInteractiveShell, AsyncInteractiveSubshell
+    from async_kernel.shell import BaseShell
 
     from ipylab.ipylab import Ipylab
 
@@ -104,7 +104,7 @@ def to_selector(*args, prefix="ipylab"):
 
 async def execute_using_shells_namespace(
     func: Callable[..., T | CoroutineType[Any, Any, T]],
-    shell: AsyncInteractiveShell | AsyncInteractiveSubshell,
+    shell: BaseShell,
     options: dict,
     *,
     connection_id: str | None = None,
