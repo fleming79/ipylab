@@ -55,12 +55,7 @@ test = [
   "pytest-mock",
   "pytest>=8.4,<9",
 ]
-dev = [
-  "nodejs-wheel", 
-  "ruff",
-  "debugpy",
-  { include-group = "test" },
-]
+dev = ["nodejs-wheel", "ruff", "debugpy", { include-group = "test" }]
 
 [project.scripts]
 ipylab = "ipylab:plugin_manager.hook.launch_ipylab"
@@ -185,9 +180,9 @@ reportMissingParameterType = false
 reportExplicitAny = false
 reportUnknownParameterType = false
 reportUnannotatedClassAttribute = false
-reportMissingTypeArgument  = false
+reportMissingTypeArgument = false
 reportMissingImports = false
-reportUnusedCallResult  = false
+reportUnusedCallResult = false
 reportUninitializedInstanceVariable = false
 reportUnknownVariableType = false
 reportAny = false
