@@ -705,7 +705,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@jupyter/ydoc@npm:^3.0.2, @jupyter/ydoc@npm:^3.1.0":
+"@jupyter/ydoc@npm:^3.1.0":
   version: 3.3.2
   resolution: "@jupyter/ydoc@npm:3.3.2"
   dependencies:
@@ -5588,7 +5588,6 @@ __metadata:
     "@jupyter-widgets/base": ^6.0.10
     "@jupyter-widgets/controls": ^5.0.11
     "@jupyter-widgets/jupyterlab-manager": ^5.0.13
-    "@jupyter/ydoc": ^3.0.2
     "@jupyterlab/application": ^4.2.5
     "@jupyterlab/apputils": ^4.4.1
     "@jupyterlab/builder": ^4.0.0
