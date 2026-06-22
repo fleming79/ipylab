@@ -17,6 +17,7 @@ from aiologic import Event
 from async_kernel import Caller, Pending
 from async_kernel.caller import truncated_rep
 from async_kernel.common import Fixed
+from async_kernel.compat.json import pack_json_str
 from IPython import get_ipython  # pyright: ignore[reportPrivateImportUsage]
 from ipywidgets import TypedTuple, Widget, register
 from traitlets import Container, Dict, Int, List, TraitType, Unicode, observe
@@ -141,7 +142,7 @@ class Ipylab(HasApp, WidgetBase):
         try:
             self.send(
                 {
-                    "ipylab": json.dumps(content, default=pack),
+                    "ipylab": pack_json_str(content, default=pack),
                 },
                 buffers,
             )
