@@ -27,16 +27,16 @@ wheels = [
 
 [[package]]
 name = "aiologic"
-version = "0.16.0"
+version = "0.17.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "sniffio" },
     { name = "typing-extensions", marker = "python_full_version < '3.13'" },
     { name = "wrapt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a8/13/50b91a3ea6b030d280d2654be97c48b6ed81753a50286ee43c646ba36d3c/aiologic-0.16.0.tar.gz", hash = "sha256:c267ccbd3ff417ec93e78d28d4d577ccca115d5797cdbd16785a551d9658858f", size = 225952, upload-time = "2025-11-27T23:48:41.195Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/53/a7/809482759f40079f4c4328c7318bf569ae25d457f5017aad30a1b9aafedc/aiologic-0.17.0.tar.gz", hash = "sha256:65aa058e858c94cd208badb188e7f00b54dcabb3ba85b34f794db98074d108b9", size = 251625, upload-time = "2026-06-14T12:24:35.367Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f6/27/206615942005471499f6fbc36621582e24d0686f33c74b2d018fcfd4fe67/aiologic-0.16.0-py3-none-any.whl", hash = "sha256:e00ce5f68c5607c864d26aec99c0a33a83bdf8237aa7312ffbb96805af67d8b6", size = 135193, upload-time = "2025-11-27T23:48:40.099Z" },
+    { url = "https://files.pythonhosted.org/packages/9e/6b/5f75d6194b597ac32bbdbb7b524a28fb1fa98bd0ddcefce94b313a818cc0/aiologic-0.17.0-py3-none-any.whl", hash = "sha256:1bf4d3e4314df2bcb06a9e696417204e206ab50e10ec98d28d157e2e57634f74", size = 161084, upload-time = "2026-06-14T12:24:34.146Z" },
 ]
 
 [[package]]
@@ -137,14 +137,14 @@ wheels = [
 
 [[package]]
 name = "async-kernel"
-version = "0.19.0"
+version = "0.20.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiologic" },
     { name = "anyio" },
     { name = "comm" },
     { name = "ipython" },
-    { name = "jupyter-client", marker = "sys_platform != 'emscripten'" },
+    { name = "jupyter-client", version = "8.9.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'emscripten'" },
     { name = "jupyter-core" },
     { name = "matplotlib-inline" },
     { name = "orjson", marker = "sys_platform == 'emscripten'" },
@@ -155,9 +155,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "wrapt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/68/57/832e3e387a31aee1ab15fbe4bc0ef023f73e39fba0b98589d031ddd8e75a/async_kernel-0.19.0.tar.gz", hash = "sha256:1d3544f823cdb0ba762d21fea33e5902f86feef3cbc4568457b13b9c5a752448", size = 321419, upload-time = "2026-05-26T01:33:20.776Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9a/e3/895b4bedb14344698834a6077a1194cc98a42bf4cbaff8eb7e34da77b03a/async_kernel-0.20.0.tar.gz", hash = "sha256:9676fb7e3ec561011ef64e70c18bfc7d7aee4a86f4b3acb7a2b2d154b1a83f9c", size = 328872, upload-time = "2026-06-22T04:14:52.07Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1f/d7/135d2da7368c4b753f6fc055d36d989c8e3a4306076281751d0f0d078b61/async_kernel-0.19.0-py3-none-any.whl", hash = "sha256:ca5cd2d05032f3a27fce4b6c8e88b96e5f3ba6e162872b361ebe81806c127b2a", size = 118818, upload-time = "2026-05-26T01:33:19.044Z" },
+    { url = "https://files.pythonhosted.org/packages/dc/e8/c6a9a7d77903475574fcbbfbbba89998e579fdf2ce68a2de17ef82c7313a/async_kernel-0.20.0-py3-none-any.whl", hash = "sha256:9aa06f6743f64676470f35bc1e857e0a757532420b1c584d0f3b1029560f867a", size = 119347, upload-time = "2026-06-22T04:14:50.699Z" },
 ]
 
 [[package]]
@@ -876,7 +876,7 @@ dependencies = [
     { name = "comm", marker = "sys_platform != 'emscripten'" },
     { name = "debugpy", marker = "sys_platform != 'emscripten'" },
     { name = "ipython", marker = "sys_platform != 'emscripten'" },
-    { name = "jupyter-client", marker = "sys_platform != 'emscripten'" },
+    { name = "jupyter-client", version = "8.9.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'emscripten'" },
     { name = "jupyter-core", marker = "sys_platform != 'emscripten'" },
     { name = "matplotlib-inline", marker = "sys_platform != 'emscripten'" },
     { name = "nest-asyncio", marker = "sys_platform != 'emscripten'" },
@@ -936,7 +936,7 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "async-kernel", specifier = ">=0.19,<0.20" },
+    { name = "async-kernel", specifier = ">=0.20,<0.21" },
     { name = "ipywidgets", url = "https://github.com/fleming79/ipylab/releases/download/v2.0.18/ipywidgets-8.1.8-py3-none-any.whl" },
     { name = "jupyterlab", marker = "sys_platform != 'emscripten'", specifier = ">=4.5" },
     { name = "jupyterlab-widgets", url = "https://github.com/fleming79/ipylab/releases/download/v2.0.9/jupyterlab_widgets-3.0.16-py3-none-any.whl" },
@@ -1156,16 +1156,46 @@ wheels = [
 name = "jupyter-client"
 version = "8.8.0"
 source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten'",
+    "python_full_version < '3.12' and sys_platform == 'emscripten'",
+]
 dependencies = [
-    { name = "jupyter-core" },
-    { name = "python-dateutil" },
-    { name = "pyzmq" },
-    { name = "tornado" },
-    { name = "traitlets" },
+    { name = "jupyter-core", marker = "sys_platform == 'emscripten'" },
+    { name = "python-dateutil", marker = "sys_platform == 'emscripten'" },
+    { name = "pyzmq", marker = "sys_platform == 'emscripten'" },
+    { name = "tornado", marker = "sys_platform == 'emscripten'" },
+    { name = "traitlets", marker = "sys_platform == 'emscripten'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/05/e4/ba649102a3bc3fbca54e7239fb924fd434c766f855693d86de0b1f2bec81/jupyter_client-8.8.0.tar.gz", hash = "sha256:d556811419a4f2d96c869af34e854e3f059b7cc2d6d01a9cd9c85c267691be3e", size = 348020, upload-time = "2026-01-08T13:55:47.938Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/2d/0b/ceb7694d864abc0a047649aec263878acb9f792e1fec3e676f22dc9015e3/jupyter_client-8.8.0-py3-none-any.whl", hash = "sha256:f93a5b99c5e23a507b773d3a1136bd6e16c67883ccdbd9a829b0bbdb98cd7d7a", size = 107371, upload-time = "2026-01-08T13:55:45.562Z" },
+]
+
+[[package]]
+name = "jupyter-client"
+version = "8.9.1"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.14' and sys_platform == 'win32'",
+    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'win32'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version < '3.12' and sys_platform == 'win32'",
+    "python_full_version < '3.12' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+]
+dependencies = [
+    { name = "jupyter-core", marker = "sys_platform != 'emscripten'" },
+    { name = "python-dateutil", marker = "sys_platform != 'emscripten'" },
+    { name = "pyzmq", marker = "sys_platform != 'emscripten'" },
+    { name = "tornado", marker = "sys_platform != 'emscripten'" },
+    { name = "traitlets", marker = "sys_platform != 'emscripten'" },
+    { name = "typing-extensions", marker = "sys_platform != 'emscripten'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/7d/dc/5512503b088997c2250b8bf18258fba9d9ce5ead641183700960d3c9d342/jupyter_client-8.9.1.tar.gz", hash = "sha256:a58f730dd9e728ba16ba1d62ebccf7ffe1ebbdbce4e95cfae941b7321ae1f4fa", size = 359256, upload-time = "2026-06-09T13:15:01.033Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3f/6f/56d39bf385c5c27988aebaf0c18a2a17e960575740100973511018bd904e/jupyter_client-8.9.1-py3-none-any.whl", hash = "sha256:0b7a295bc46e8751e9adae84781f726c851c1d911bd793edc4a3bde942e3da81", size = 109828, upload-time = "2026-06-09T13:14:58.835Z" },
 ]
 
 [[package]]
@@ -1220,7 +1250,8 @@ dependencies = [
     { name = "anyio" },
     { name = "argon2-cffi" },
     { name = "jinja2" },
-    { name = "jupyter-client" },
+    { name = "jupyter-client", version = "8.8.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'emscripten'" },
+    { name = "jupyter-client", version = "8.9.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'emscripten'" },
     { name = "jupyter-core" },
     { name = "jupyter-events" },
     { name = "jupyter-server-terminals" },
@@ -1698,7 +1729,8 @@ name = "nbclient"
 version = "0.10.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "jupyter-client" },
+    { name = "jupyter-client", version = "8.8.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'emscripten'" },
+    { name = "jupyter-client", version = "8.9.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'emscripten'" },
     { name = "jupyter-core" },
     { name = "nbformat" },
     { name = "traitlets" },

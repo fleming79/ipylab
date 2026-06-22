@@ -7,6 +7,7 @@ import json
 from typing import TYPE_CHECKING, Any
 
 import pytest
+from async_kernel.compat.json import pack_json_str
 from ipylab.common import json_default
 
 if TYPE_CHECKING:
@@ -34,6 +35,6 @@ async def example_async_callable(c):
 )
 async def test_app_evaluate(app: ipylab.JupyterFrontEnd, kw: dict[str, Any], expected, mocker):
     "Tests for app.evaluate"
-    kw = json.loads(json.dumps(kw, default=json_default))
+    kw = json.loads(pack_json_str(kw, default=json_default))
     result = await app.evaluate(**kw, vpath=app.vpath)
     assert result["payload"] == expected
