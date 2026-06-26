@@ -126,7 +126,6 @@ jlpm lint:check
 
 ### Serve Jupyterlite locally
 
-
 ```bash
 # Load python packages (do once)
 uv sync --group docs
