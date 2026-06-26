@@ -3,7 +3,7 @@
     "declaration": true,
     "esModuleInterop": true,
     "module": "esnext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "noEmitOnError": true,
     "noUnusedLocals": true,
     "outDir": "lib",
@@ -14,7 +14,7 @@
     "strict": true,
     "strictNullChecks": false,
     "strictPropertyInitialization": false,
-    "target": "ES2018"
+    "target": "ES2019"
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"]
 }
