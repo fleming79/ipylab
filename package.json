@@ -40,8 +40,8 @@
     },
     "scripts": {
         "build": "jlpm build:lib && jlpm build:labextension:dev",
-        "build:labextension": "jupyter labextension build .",
-        "build:labextension:dev": "jupyter labextension build --development True .",
+        "build:labextension": "jupyter-builder build .",
+        "build:labextension:dev": "jupyter-builder build --development True .",
         "build:lib": "tsc --sourceMap",
         "build:lib:prod": "tsc",
         "build:prod": "jlpm clean && jlpm build:lib:prod && jlpm build:labextension",
@@ -72,7 +72,7 @@
         "jupyterlite:embed:ipylab-wheel": "uv build && cp -r ./dist/*.whl ./docs/files/wheels/",
         "jupyterlite:embed-wheels": "uv pip install -r docs/embed-wheels.txt && uv run pip download --platform emscripten --only-binary=:all: --python-version=3.13 -r docs/embed-wheels.txt --dest docs/files/wheels --no-deps",
         "jupyterlite:setup": "uv sync --group docs && jlpm jupyterlite:embed-wheels && jlpm jupyterlite:embed:ipylab-wheel && jlpm jupyterlite:copy:examples",
-        "develop": "jupyter labextension develop . --overwrite",
+        "develop": "jupyter-builder develop . --overwrite",
         "jupyterlite:build": "jlpm jupyterlite:setup && uv run jupyter lite build --lite-dir docs --output-dir jupyterlite",
         "jupyterlite:serve": "jlpm jupyterlite:setup && jlpm develop && uv run jupyter lite serve --lite-dir docs --output-dir jupyterlite --LiteBuildConfig.extra_http_headers=Cross-Origin-Embedder-Policy=require-corp --LiteBuildConfig.extra_http_headers=Cross-Origin-Opener-Policy=same-origin"
     },
@@ -111,7 +111,7 @@
         "@lumino/widgets": "^2.5.0"
     },
     "devDependencies": {
-        "@jupyterlab/builder": "^4.0.0",
+        "@jupyter/builder": "^1.0.2",
         "@types/expect.js": "^0.3.29",
         "@types/json-schema": "^7.0.11",
         "@types/node": "^22.15.29",

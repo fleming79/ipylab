@@ -91,7 +91,7 @@ jlpm clean
 jlpm build
 
 # **Frontend/typescript development only** link the extension files
-jupyter labextension develop . --overwrite
+jupyter-builder develop . --overwrite
 
 # At this point you can run and debug. vscode configs are provided for Firefox and Chrome.
 # "Debug Ipylab with Firefox | Chrome"
