@@ -119,9 +119,17 @@ jlpm lint:check
 
 ### Serve Jupyterlite locally
 
-Install as per [instructions](#frontend-typescriptjavascript) then
 
 ```bash
+# Load python packages (do once)
+uv sync --group docs
+
+# Load node packages (do once)
+jlpm
+
+# Clean if required
+jlpm clean:all
+
 jlpm jupyterlite:serve
 ```
 
