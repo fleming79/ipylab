@@ -2,7 +2,7 @@
 requires = [
   "nodejs-wheel",
   "hatchling>=1.5.0",
-  "jupyterlab>=4.5,<5",
+  "jupyter_builder>=1.0.2",
   "hatch-nodejs-version>=0.3.2",
 ]
 build-backend = "hatchling.build"
@@ -56,7 +56,13 @@ test = [
   "pytest-mock",
   "pytest>=8.4,<9",
 ]
-dev = ["nodejs-wheel", "ruff", "debugpy", { include-group = "test" }]
+dev = [
+    "nodejs-wheel",
+    "ruff",
+    "debugpy",
+    "jupyter-builder>=1.0.2",
+    { include-group = "test" },
+]
 
 [project.scripts]
 ipylab = "ipylab:plugin_manager.hook.launch_ipylab"
