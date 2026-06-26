@@ -57,11 +57,11 @@ test = [
   "pytest>=8.4,<9",
 ]
 dev = [
-    "nodejs-wheel",
-    "ruff",
-    "debugpy",
-    "jupyter-builder>=1.0.2",
-    { include-group = "test" },
+  "nodejs-wheel",
+  "ruff",
+  "debugpy",
+  "jupyter-builder>=1.0.2",
+  { include-group = "test" },
 ]
 
 [project.scripts]
