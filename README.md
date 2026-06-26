@@ -127,7 +127,7 @@ jlpm lint:check
 ### Serve Jupyterlite locally
 
 ```bash
-uv sync
+uv sync --group docs
 jlpm
 jlpm jupyterlite:serve
 ```

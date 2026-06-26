@@ -898,7 +898,7 @@ dev = [
     { name = "ipympl" },
     { name = "jupyterlite-sphinx" },
     { name = "matplotlib" },
-    { name = "nodejs-wheel-binaries" },
+    { name = "nodejs-wheel" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "numpy", version = "2.5.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "pre-commit" },
@@ -940,7 +940,7 @@ dev = [
     { name = "ipympl" },
     { name = "jupyterlite-sphinx" },
     { name = "matplotlib" },
-    { name = "nodejs-wheel-binaries" },
+    { name = "nodejs-wheel" },
     { name = "numpy" },
     { name = "pre-commit" },
     { name = "pytest" },
@@ -1769,6 +1769,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/24/bf/d1bda4f6168e0b2e9e5958945e01910052158313224ada5ce1fb2e1113b8/nodeenv-1.10.0.tar.gz", hash = "sha256:996c191ad80897d076bdfba80a41994c2b47c68e224c542b48feba42ba00f8bb", size = 55611, upload-time = "2025-12-20T14:08:54.006Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/88/b2/d0896bdcdc8d28a7fc5717c305f1a861c26e18c05047949fb371034d98bd/nodeenv-1.10.0-py2.py3-none-any.whl", hash = "sha256:5bb13e3eed2923615535339b3c620e76779af4cb4c6a90deccc9e36b274d3827", size = 23438, upload-time = "2025-12-20T14:08:52.782Z" },
+]
+
+[[package]]
+name = "nodejs-wheel"
+version = "24.16.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "nodejs-wheel-binaries" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/02/ea/69c332dde5ea3596492afe35748cdd07437a7d1f5cb251f61868193df539/nodejs_wheel-24.16.0.tar.gz", hash = "sha256:23c75d52ad1c3274c15045e80b1a898c1f5b13ac66d09d15514939125869fb41", size = 2966, upload-time = "2026-05-30T16:52:08.875Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/00/d1/e595c9e360c216ea1422e7b701caf4c7e841d91349c146f92d2bc885ab8a/nodejs_wheel-24.16.0-py3-none-any.whl", hash = "sha256:0d20f5651d0c93bb951a013c31de4f58901be53287010438bb9757cdec198529", size = 3986, upload-time = "2026-05-30T16:51:37.837Z" },
 ]
 
 [[package]]
