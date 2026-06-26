@@ -4,4 +4,4 @@ set -e
 
 jlpm && jlpm run build
 python -m pip install -e .
-jupyter labextension develop . --overwrite
+jupyter-builder develop . --overwrite
