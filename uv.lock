@@ -796,8 +796,8 @@ name = "httpcore"
 version = "1.0.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "certifi" },
-    { name = "h11" },
+    { name = "certifi", marker = "sys_platform != 'emscripten'" },
+    { name = "h11", marker = "sys_platform != 'emscripten'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/06/94/82699a10bca87a5556c9c59b5963f2d039dbd239f25bc2a63907a05a14cb/httpcore-1.0.9.tar.gz", hash = "sha256:6e34463af53fd2ab5d807f399a9b45ea31c3dfa2276f15a2c3f00afff6e176e8", size = 85484, upload-time = "2025-04-24T22:06:22.219Z" }
 wheels = [
@@ -809,10 +809,10 @@ name = "httpx"
 version = "0.28.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "anyio" },
-    { name = "certifi" },
-    { name = "httpcore" },
-    { name = "idna" },
+    { name = "anyio", marker = "sys_platform != 'emscripten'" },
+    { name = "certifi", marker = "sys_platform != 'emscripten'" },
+    { name = "httpcore", marker = "sys_platform != 'emscripten'" },
+    { name = "idna", marker = "sys_platform != 'emscripten'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/b1/df/48c586a5fe32a0f01324ee087459e112ebb7224f646c0b5023f5e79e9956/httpx-0.28.1.tar.gz", hash = "sha256:75e98c5f16b0f35b567856f597f06ff2270a374470a5c2392242528e3e3e42fc", size = 141406, upload-time = "2024-12-06T15:37:23.222Z" }
 wheels = [
@@ -861,18 +861,18 @@ version = "7.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "appnope", marker = "sys_platform == 'darwin'" },
-    { name = "comm" },
-    { name = "debugpy" },
-    { name = "ipython" },
-    { name = "jupyter-client" },
-    { name = "jupyter-core" },
-    { name = "matplotlib-inline" },
-    { name = "nest-asyncio2" },
-    { name = "packaging" },
-    { name = "psutil" },
-    { name = "pyzmq" },
-    { name = "tornado" },
-    { name = "traitlets" },
+    { name = "comm", marker = "sys_platform != 'emscripten'" },
+    { name = "debugpy", marker = "sys_platform != 'emscripten'" },
+    { name = "ipython", marker = "sys_platform != 'emscripten'" },
+    { name = "jupyter-client", marker = "sys_platform != 'emscripten'" },
+    { name = "jupyter-core", marker = "sys_platform != 'emscripten'" },
+    { name = "matplotlib-inline", marker = "sys_platform != 'emscripten'" },
+    { name = "nest-asyncio2", marker = "sys_platform != 'emscripten'" },
+    { name = "packaging", marker = "sys_platform != 'emscripten'" },
+    { name = "psutil", marker = "sys_platform != 'emscripten'" },
+    { name = "pyzmq", marker = "sys_platform != 'emscripten'" },
+    { name = "tornado", marker = "sys_platform != 'emscripten'" },
+    { name = "traitlets", marker = "sys_platform != 'emscripten'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/3d/c4/e4a38f579de4225a561305666f7541cdabb30075def2aa1ac17bd73c1fb5/ipykernel-7.3.0.tar.gz", hash = "sha256:9acaaaf97d16355166e4085afe9d225bfbdf2b7ef520f9df3be8f2b248275e09", size = 184899, upload-time = "2026-06-10T08:41:25.481Z" }
 wheels = [
@@ -910,7 +910,9 @@ dev = [
 ]
 docs = [
     { name = "bqplot" },
+    { name = "jupyterlite" },
     { name = "jupyterlite-async-kernel" },
+    { name = "jupyterlite-sphinx" },
     { name = "myst-parser" },
     { name = "pip" },
     { name = "pydata-sphinx-theme" },
@@ -931,6 +933,7 @@ requires-dist = [
     { name = "jupyterlab-widgets", url = "https://github.com/fleming79/ipylab/releases/download/v2.0.9/jupyterlab_widgets-3.0.16-py3-none-any.whl" },
     { name = "pluggy" },
     { name = "traitlets", specifier = ">=5.15" },
+    { name = "traitlets", specifier = ">=5.15.1" },
     { name = "typing-extensions" },
 ]
 
@@ -952,7 +955,9 @@ dev = [
 ]
 docs = [
     { name = "bqplot" },
+    { name = "jupyterlite", specifier = ">=0.8.0" },
     { name = "jupyterlite-async-kernel", git = "https://github.com/fleming79/echo-kernel" },
+    { name = "jupyterlite-sphinx" },
     { name = "myst-parser" },
     { name = "pip" },
     { name = "pydata-sphinx-theme" },
@@ -1147,8 +1152,8 @@ name = "jupyter-builder"
 version = "1.0.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "jupyter-core" },
-    { name = "traitlets" },
+    { name = "jupyter-core", marker = "sys_platform != 'emscripten'" },
+    { name = "traitlets", marker = "sys_platform != 'emscripten'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/fb/45/d0df8b43c10a61529c0f4a8af5e19ebe108f0c3af8f57e0fc358969907af/jupyter_builder-1.0.2.tar.gz", hash = "sha256:6155d78a5325010532a6419ffcba89eac643fd1aa56ea83115e661924d6f6aab", size = 968638, upload-time = "2026-06-12T02:33:25.767Z" }
 wheels = [
@@ -1209,7 +1214,7 @@ name = "jupyter-lsp"
 version = "2.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "jupyter-server" },
+    { name = "jupyter-server", marker = "sys_platform != 'emscripten'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/36/ff/1e4a61f5170a9a1d978f3ac3872449de6c01fc71eaf89657824c878b1549/jupyter_lsp-2.3.1.tar.gz", hash = "sha256:fdf8a4aa7d85813976d6e29e95e6a2c8f752701f926f2715305249a3829805a6", size = 55677, upload-time = "2026-04-02T08:10:06.749Z" }
 wheels = [
@@ -1264,19 +1269,19 @@ name = "jupyterlab"
 version = "4.6.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "async-lru" },
-    { name = "httpx" },
-    { name = "ipykernel" },
-    { name = "jinja2" },
-    { name = "jupyter-builder" },
-    { name = "jupyter-core" },
-    { name = "jupyter-lsp" },
-    { name = "jupyter-server" },
-    { name = "jupyterlab-server" },
-    { name = "notebook-shim" },
-    { name = "packaging" },
-    { name = "tornado" },
-    { name = "traitlets" },
+    { name = "async-lru", marker = "sys_platform != 'emscripten'" },
+    { name = "httpx", marker = "sys_platform != 'emscripten'" },
+    { name = "ipykernel", marker = "sys_platform != 'emscripten'" },
+    { name = "jinja2", marker = "sys_platform != 'emscripten'" },
+    { name = "jupyter-builder", marker = "sys_platform != 'emscripten'" },
+    { name = "jupyter-core", marker = "sys_platform != 'emscripten'" },
+    { name = "jupyter-lsp", marker = "sys_platform != 'emscripten'" },
+    { name = "jupyter-server", marker = "sys_platform != 'emscripten'" },
+    { name = "jupyterlab-server", marker = "sys_platform != 'emscripten'" },
+    { name = "notebook-shim", marker = "sys_platform != 'emscripten'" },
+    { name = "packaging", marker = "sys_platform != 'emscripten'" },
+    { name = "tornado", marker = "sys_platform != 'emscripten'" },
+    { name = "traitlets", marker = "sys_platform != 'emscripten'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/f8/3c/1ebd737b860cdbe61eed71536d06aab4e1781fbdcf07ecd5a1afe05b8adf/jupyterlab-4.6.0.tar.gz", hash = "sha256:6a8b88f2aae7ed4d012c634fc957c1a27f3aa217c32f0ced0175fac9ee17f9e5", size = 28181861, upload-time = "2026-06-18T13:52:56.039Z" }
 wheels = [
@@ -1319,57 +1324,51 @@ wheels = [
 ]
 
 [[package]]
+name = "jupyterlite"
+version = "0.8.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "jupyterlite-core" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/de/33/39a0db84d10fbdd71ac2c6acb0e6c5e8de55a7c8a9cc9c15868d0271c837/jupyterlite-0.8.0.tar.gz", hash = "sha256:1c04077e271925ac228ee4f1b552c1a1650635d5825ec8d49026d69ee5cac280", size = 6071, upload-time = "2026-06-23T14:05:54.52Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/16/65/a6728789581207ce738d7e1dea6b8251a884488c1776ce8cbe0c03cf9a60/jupyterlite-0.8.0-py3-none-any.whl", hash = "sha256:45c8a458a63e80fa6ab6b9c00b9b6707bec76fb4832eeb5b3a541023a5da379b", size = 6686, upload-time = "2026-06-23T14:05:52.78Z" },
+]
+
+[[package]]
 name = "jupyterlite-async-kernel"
 version = "0.1.0"
 source = { git = "https://github.com/fleming79/echo-kernel#a630579a6b0a953d4d60ac7f38b4978dc4b0cec6" }
 
 [[package]]
 name = "jupyterlite-core"
-version = "0.7.6"
+version = "0.8.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "doit" },
     { name = "jupyter-core" },
     { name = "pycparser", marker = "platform_python_implementation == 'PyPy'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c3/6f/42d15a20bf89ba1b07e835f2c4aa2d6d2b6d55f2b39c379b4a303d1abe5b/jupyterlite_core-0.7.6.tar.gz", hash = "sha256:bc2393d2218dbd666a2854c669b59503de207110511baa80b0025facb7f0c9e0", size = 16320112, upload-time = "2026-05-07T06:10:21.808Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ef/cf/d615b769843dbedcde89f61e59e588d440937308ac9483225078c80438f1/jupyterlite_core-0.8.0.tar.gz", hash = "sha256:051dbb45d401336400a894d9eb8021968bf52645b23ce31a0dfc2914ebcb2faa", size = 15869315, upload-time = "2026-06-23T14:07:15.116Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d3/61/4a04631711b050e9e912dd5076122f2b85914fb4f2dba75751f757efe496/jupyterlite_core-0.7.6-py3-none-any.whl", hash = "sha256:549071b6d037b5545bfc8a3733a7bfc1faa4d0c42dbe87faed0f49d29591f58f", size = 16332653, upload-time = "2026-05-07T06:10:18.366Z" },
+    { url = "https://files.pythonhosted.org/packages/39/2a/75c6d53cfb26136b099ddfea281bc5bc345084faf2968dea2baca820cae7/jupyterlite_core-0.8.0-py3-none-any.whl", hash = "sha256:81234b918bf93c15228b31edc87dac07c92b26bb13148826ced9144407b06daa", size = 15880902, upload-time = "2026-06-23T14:07:11.776Z" },
 ]
 
 [[package]]
 name = "jupyterlite-sphinx"
-version = "0.22.1"
+version = "0.9.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "docutils" },
     { name = "jupyter-server" },
     { name = "jupyterlab-server" },
     { name = "jupyterlite-core" },
-    { name = "jupytext" },
-    { name = "nbformat" },
     { name = "sphinx", version = "9.0.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "sphinx", version = "9.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7b/a7/d19333c46caf0abc5ce8a46eccbbada615b54ceef8d220569444cf115e6f/jupyterlite_sphinx-0.22.1.tar.gz", hash = "sha256:e13682884deaecdb88dc81917df8a7275291f17575c3d1707b791e4a876a8556", size = 19628, upload-time = "2026-02-16T17:29:31.844Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/8a/31/8f81aced7d93f852132da1b8ad178d80c0155e3dc0be892113ecef2d5300/jupyterlite_sphinx-0.9.3.tar.gz", hash = "sha256:9be4ac99e98b03f125b9ae5b63a137a6d1d7ba0bdf61dd1aedbf83ae77fe0716", size = 6655, upload-time = "2023-09-13T07:27:56.345Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/13/42/54c91e905bd484566dd8249cc9bb69c5e97dded21169490abde535ea0f59/jupyterlite_sphinx-0.22.1-py3-none-any.whl", hash = "sha256:eb00be3a39cecd08307cae86f605705af1af5f95e678b8a2be55eccd66de284b", size = 22178, upload-time = "2026-02-16T17:29:29.482Z" },
-]
-
-[[package]]
-name = "jupytext"
-version = "1.19.4"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "markdown-it-py" },
-    { name = "mdit-py-plugins" },
-    { name = "nbformat" },
-    { name = "packaging" },
-    { name = "pyyaml" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/3b/52/e014296ac8f40ca783aeb73dae52e65edbb0eaae0dcdc1ea41bfaa8aebf7/jupytext-1.19.4.tar.gz", hash = "sha256:739bcd4bc12aa4fe298a38017cdb5ae27b08a6ba3a5470728d2fe9e04b155db1", size = 4581977, upload-time = "2026-06-21T21:48:58.32Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/6e/e9/e2ae007456069dbe01865c69a4203a7ada6f7e337b78fc2f12e51bd3fae7/jupytext-1.19.4-py3-none-any.whl", hash = "sha256:032d4ef4bd2e96addcac780b9b1d6b5a266ca39beceaaca95bfb4f06e0b77029", size = 170889, upload-time = "2026-06-21T21:48:56.352Z" },
+    { url = "https://files.pythonhosted.org/packages/38/c9/5f1142c005cf8d75830b10029e53f074324bc85cfca1f1d0f22a207b771c/jupyterlite_sphinx-0.9.3-py3-none-any.whl", hash = "sha256:be6332d16490ea2fa90b78187a2c5e1c357195966a25741d60b1790346571041", size = 8611, upload-time = "2023-09-13T07:27:54.189Z" },
 ]
 
 [[package]]
@@ -1804,7 +1803,7 @@ name = "notebook-shim"
 version = "0.2.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "jupyter-server" },
+    { name = "jupyter-server", marker = "sys_platform != 'emscripten'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/54/d2/92fa3243712b9a3e8bafaf60aac366da1cada3639ca767ff4b5b3654ec28/notebook_shim-0.2.4.tar.gz", hash = "sha256:b4b2cfa1b65d98307ca24361f5b30fe785b53c3fd07b7a47e89acb5e6ac638cb", size = 13167, upload-time = "2024-02-14T23:35:18.353Z" }
 wheels = [
@@ -1965,7 +1964,7 @@ name = "outcome"
 version = "1.3.0.post0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "attrs" },
+    { name = "attrs", marker = "sys_platform != 'emscripten'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/98/df/77698abfac98571e65ffeb0c1fba8ffd692ab8458d617a0eed7d9a8d38f2/outcome-1.3.0.post0.tar.gz", hash = "sha256:9dcf02e65f2971b80047b377468e72a268e15c0af3cf1238e6ff14f7f91143b8", size = 21060, upload-time = "2023-10-26T04:26:04.361Z" }
 wheels = [
@@ -2074,7 +2073,7 @@ name = "pexpect"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ptyprocess" },
+    { name = "ptyprocess", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f", size = 166450, upload-time = "2023-11-25T09:07:26.339Z" }
 wheels = [

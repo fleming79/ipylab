@@ -35,6 +35,7 @@ dependencies = [
   "jupyterlab_widgets @ https://github.com/fleming79/ipylab/releases/download/v2.0.9/jupyterlab_widgets-3.0.16-py3-none-any.whl#sha256:f26f773da8f38938f74bbe7475b65b2c5c02677e6c4a0170b4676bc981f8b184",
   "ipywidgets @ https://github.com/fleming79/ipylab/releases/download/v2.0.18/ipywidgets-8.1.8-py3-none-any.whl#sha256:a49bf5df7d3e80f5114ba6bbe2d84053bb833c3ea3efe4be89437b703662e3b2",
   "jupyterlab>=4.5; sys_platform != 'emscripten'",
+  "traitlets>=5.15.1",
 ]
 dynamic = ["version", "description", "authors", "urls", "keywords"]
 
@@ -46,6 +47,8 @@ docs = [
   "bqplot",
   "pydata-sphinx-theme",
   "myst-parser",
+  'jupyterlite-sphinx',
+  "jupyterlite>=0.8.0",
 ]
 test = [
   "pytest",
