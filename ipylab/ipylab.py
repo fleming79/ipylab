@@ -314,6 +314,7 @@ class Ipylab(HasApp, WidgetBase):
         transform: TransformType = Transform.auto,
         toLuminoWidget: list[str] | None = None,
         toObject: list[str] | None = None,
+        buffers=(),
     ) -> Any:
         """
         Perform an operation in the frontend.
@@ -326,6 +327,7 @@ class Ipylab(HasApp, WidgetBase):
                 prior to performing the operation.
             toObject: A list of item name mappings to convert to objects in the frontend prior
                 to performing the operation.
+            buffers: A list of buffers to send.
         """
         await self.wait_ready()
         if not operation or not isinstance(operation, str):  # pyright: ignore[reportUnnecessaryIsInstance]
@@ -345,7 +347,7 @@ class Ipylab(HasApp, WidgetBase):
 
         self._pending_operations[ipylab_PY] = pen = Pending()
         pen.metadata.update(content=content)
-        self._ipylab_send(content)
+        self._ipylab_send(content, buffers)
         try:
             payload = await pen
         except Exception as e:

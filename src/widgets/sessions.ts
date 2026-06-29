@@ -16,7 +16,11 @@ export class SessionManagerModel extends IpylabModel {
     return { ...super.defaults(), _model_name: SessionManagerModel };
   }
 
-  async operation(op: string, payload: any): Promise<any> {
+  async operation(
+    op: string,
+    payload: any,
+    buffers?: ArrayBuffer[] | ArrayBufferView[]
+  ): Promise<any> {
     switch (op) {
       case 'getCurrentSession':
         return await SessionManagerModel.ConnectionModel.getSession(
@@ -28,7 +32,7 @@ export class SessionManagerModel extends IpylabModel {
         }
         return Array.from(IpylabModel.sessionManager.running());
       default:
-        return await super.operation(op, payload);
+        return await super.operation(op, payload, buffers);
     }
   }
 }

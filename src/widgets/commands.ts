@@ -47,14 +47,18 @@ export class CommandRegistryModel extends IpylabModel {
     return super.close(comm_closed);
   }
 
-  async operation(op: string, payload: any): Promise<any> {
+  async operation(
+    op: string,
+    payload: any,
+    buffers?: ArrayBuffer[] | ArrayBufferView[]
+  ): Promise<any> {
     switch (op) {
       case 'execute':
         return await this.base.execute(payload.id, payload.args);
       case 'addCommand':
         return await this.addCommand(payload);
       default:
-        return await super.operation(op, payload);
+        return await super.operation(op, payload, buffers);
     }
   }
 
