@@ -204,14 +204,18 @@ export class ShellConnectionModel extends ConnectionModel {
     return Private.connections.get(this.connection_id);
   }
 
-  async operation(op: string, payload: any): Promise<any> {
+  async operation(
+    op: string,
+    payload: any,
+    buffers?: ArrayBuffer[] | ArrayBufferView[]
+  ): Promise<any> {
     switch (op) {
       case 'activate':
         return IpylabModel.app.shell.activateById(this.base.id);
       case 'getSession':
         return ShellConnectionModel.getSession(this.base);
       default:
-        return await super.operation(op, payload);
+        return await super.operation(op, payload, buffers);
     }
   }
 }

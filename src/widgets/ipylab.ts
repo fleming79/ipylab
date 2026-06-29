@@ -247,14 +247,15 @@ export class IpylabModel extends DOMWidgetModel {
   async scheduleOperation(
     operation: string,
     payload: JSONValue,
-    transform: any
+    transform: any,
+    buffers?: ArrayBuffer[] | ArrayBufferView[]
   ): Promise<any> {
     const ipylab_FE = UUID.uuid4();
     // Create callbacks to be resolved when a custom message is received
     // with the key `ipylab_FE`.
     const opDone = new PromiseDelegate();
     this._pendingOperations.set(ipylab_FE, opDone);
-    this.ipylabSend({ ipylab_FE, operation, payload });
+    this.ipylabSend({ ipylab_FE, operation, payload, buffers });
     const result: any = await opDone.promise;
     return await this.transformObject(result, transform);
   }
@@ -268,10 +269,14 @@ export class IpylabModel extends DOMWidgetModel {
    * @param payload Options relevant to the operation.
    * @returns Raw result of the operation.
    */
-  async operation(op: string, payload: any): Promise<any> {
+  async operation(
+    op: string,
+    payload: any,
+    buffers?: ArrayBuffer[] | ArrayBufferView[]
+  ): Promise<any> {
     switch (op) {
       case 'genericOperation':
-        return await this.genericOperation(payload);
+        return await this.genericOperation(payload, buffers);
       default:
         // Each failed operation should throw an error if it is un-handled
         throw new Error(`genericOperation "${op}" not implemented!`);
@@ -281,7 +286,10 @@ export class IpylabModel extends DOMWidgetModel {
   /**
    * Perform a generic operation and return the result.
    */
-  async genericOperation(payload: any): Promise<any> {
+  async genericOperation(
+    payload: any,
+    buffers?: ArrayBuffer[] | ArrayBufferView[]
+  ): Promise<any> {
     payload.obj = await this.getBase(payload.basename);
     switch (payload.genericOperation) {
       case 'executeMethod':
@@ -305,9 +313,12 @@ export class IpylabModel extends DOMWidgetModel {
    *
    * @param msg The message received from the backend.
    */
-  protected onCustomMessage(msg: any) {
+  protected onCustomMessage(
+    msg: any,
+    buffers?: ArrayBuffer[] | ArrayBufferView[]
+  ) {
     if (msg.ipylab) {
-      this._onBackendMessage(JSON.parse(msg.ipylab));
+      this._onBackendMessage(JSON.parse(msg.ipylab), buffers);
     }
   }
 
@@ -333,7 +344,10 @@ export class IpylabModel extends DOMWidgetModel {
    * If `content.close` is present:
    *   - Closes the widget.
    */
-  private async _onBackendMessage(content: any) {
+  private async _onBackendMessage(
+    content: any,
+    buffers?: ArrayBuffer[] | ArrayBufferView[]
+  ) {
     if (content.ipylab_FE) {
       // Result of an operation request sent to Python.
       const op = this._pendingOperations.get(content.ipylab_FE);
@@ -352,7 +366,7 @@ export class IpylabModel extends DOMWidgetModel {
         }
       }
     } else if (content.ipylab_PY) {
-      this.doOperationForPython(content);
+      this.doOperationForPython(content, buffers);
     } else if (content === 'close') {
       this.close(true);
     } else if (content === 'checkReady') {
@@ -391,13 +405,16 @@ export class IpylabModel extends DOMWidgetModel {
    * 6. If an error occurs during any of these steps, it sends an error message
    *    back to the Python environment and logs the error to the console.
    */
-  private async doOperationForPython(content: any) {
+  private async doOperationForPython(
+    content: any,
+    buffers?: ArrayBuffer[] | ArrayBufferView[]
+  ) {
     const { operation, ipylab_PY, transform } = content;
     const { kwgs, toLuminoWidget, toObject } = content;
     try {
       await this.replaceParts(kwgs, toLuminoWidget, toObject);
-      let obj, buffers;
-      obj = await this.operation(operation, kwgs);
+      let obj;
+      obj = await this.operation(operation, kwgs, buffers);
       if (obj?.payload) {
         buffers = obj.buffers;
         obj = obj.payload;

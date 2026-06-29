@@ -43,7 +43,11 @@ export class ShellModel extends IpylabModel {
     return super.close(comm_closed);
   }
 
-  async operation(op: string, payload: any): Promise<any> {
+  async operation(
+    op: string,
+    payload: any,
+    buffers?: ArrayBuffer[] | ArrayBufferView[]
+  ): Promise<any> {
     switch (op) {
       case 'addToShell':
         return await ShellModel.addToShell(payload.args);
@@ -55,7 +59,7 @@ export class ShellModel extends IpylabModel {
       case 'getWidgetIds':
         return ShellModel.listWidgetIds();
       default:
-        return await super.operation(op, payload);
+        return await super.operation(op, payload, buffers);
     }
   }
 

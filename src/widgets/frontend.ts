@@ -42,7 +42,11 @@ export class JupyterFrontEndModel extends IpylabModel {
     return super.close(comm_closed);
   }
 
-  async operation(op: string, payload: any): Promise<any> {
+  async operation(
+    op: string,
+    payload: any,
+    buffers?: ArrayBuffer[] | ArrayBufferView[]
+  ): Promise<any> {
     switch (op) {
       case 'evaluate':
         return await JFEM.getModelByVpath(
@@ -63,7 +67,7 @@ export class JupyterFrontEndModel extends IpylabModel {
         }
         return null;
       default:
-        return await super.operation(op, payload);
+        return await super.operation(op, payload, buffers);
     }
   }
 
