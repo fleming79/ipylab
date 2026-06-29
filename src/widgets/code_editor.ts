@@ -94,7 +94,11 @@ export class CodeEditorModel extends IpylabModel {
     );
   }
 
-  async operation(op: string, payload: any): Promise<any> {
+  async operation(
+    op: string,
+    payload: any,
+    buffers?: ArrayBuffer[] | ArrayBufferView[]
+  ): Promise<any> {
     switch (op) {
       case 'clearUndoHistory':
         return this.editorModel.sharedModel.clearUndoHistory();
@@ -104,7 +108,7 @@ export class CodeEditorModel extends IpylabModel {
         this._syncRequired = false;
         return true;
       default:
-        return await super.operation(op, payload);
+        return await super.operation(op, payload, buffers);
     }
   }
 

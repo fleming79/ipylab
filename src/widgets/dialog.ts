@@ -17,7 +17,11 @@ export class DialogModel extends IpylabModel {
     return { ...super.defaults(), _model_name: 'DialogModel' };
   }
 
-  async operation(op: string, payload: any): Promise<any> {
+  async operation(
+    op: string,
+    payload: any,
+    buffers?: ArrayBuffer[] | ArrayBufferView[]
+  ): Promise<any> {
     function _get_result(result: any): any {
       if (result.value === null) {
         throw new Error('Cancelled');
@@ -52,7 +56,7 @@ export class DialogModel extends IpylabModel {
         payload.manager = IpylabModel.defaultBrowser.model.manager;
         return await FileDialog.getExistingDirectory(payload).then(_get_result);
       default:
-        return await super.operation(op, payload);
+        return await super.operation(op, payload, buffers);
     }
   }
 }

@@ -18,7 +18,11 @@ export class NotificationManagerModel extends IpylabModel {
     };
   }
 
-  async operation(op: string, payload: any): Promise<any> {
+  async operation(
+    op: string,
+    payload: any,
+    buffers?: ArrayBuffer[] | ArrayBufferView[]
+  ): Promise<any> {
     switch (op) {
       case 'update':
         return this.base.update(payload.args);
@@ -27,7 +31,7 @@ export class NotificationManagerModel extends IpylabModel {
       case 'createAction':
         return this.createAction(payload);
       default:
-        return await super.operation(op, payload);
+        return await super.operation(op, payload, buffers);
     }
   }
 
