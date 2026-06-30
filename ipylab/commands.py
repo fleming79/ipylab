@@ -7,7 +7,7 @@ import uuid
 from typing import TYPE_CHECKING, Any, ClassVar, NotRequired, TypedDict, Unpack
 
 import async_kernel
-from aiologic import Lock
+from aiologic import BinarySemaphore
 from async_kernel.common import Fixed
 from ipywidgets import TypedTuple
 from ipywidgets.widgets.widget import register
@@ -164,7 +164,7 @@ class CommandRegistry(Singular, Ipylab):
     name = Unicode(APP_COMMANDS_NAME, read_only=True).tag(sync=True)
     all_commands = Tuple(read_only=True).tag(sync=True)
     connections: Container[tuple[InfoConnection, ...]] = TypedTuple(trait=Instance(InfoConnection))
-    _lock = Fixed(Lock)
+    _lock = Fixed(BinarySemaphore)
 
     @classmethod
     @override
