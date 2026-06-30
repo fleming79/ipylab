@@ -96,7 +96,7 @@ class JupyterFrontEnd(Singular, Ipylab):
             self.log.exception("Error with autostart", exc_info=e)
 
     def _autostart_callback(self, result) -> None:
-        if inspect.iscoroutine(result):
+        if iscoroutinelike(result):
             self.call_later(0, lambda: result)
 
     @property

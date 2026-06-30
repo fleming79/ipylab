@@ -3,10 +3,10 @@
 
 from __future__ import annotations
 
-import inspect
 from typing import TYPE_CHECKING, Literal, Unpack
 
 from aiologic import BinarySemaphore
+from aiologic.meta import iscoroutinelike
 from async_kernel.common import Fixed
 from ipywidgets import DOMWidget, TypedTuple, Widget
 from traitlets import Container, Instance, Unicode
@@ -133,7 +133,7 @@ class Shell(Singular, Ipylab):
             obj.add_class(self.app.selector.removeprefix("."))
         if "evaluate" in args and isinstance(vpath, dict):
             val = ipylab.plugin_manager.hook.vpath_getter(app=self.app, kwgs=vpath)
-            if inspect.iscoroutine(val):
+            if iscoroutinelike(val):
                 val = await val
             vpath = val
         args["vpath"] = vpath
