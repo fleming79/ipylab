@@ -3,11 +3,11 @@
 
 from __future__ import annotations
 
-import inspect
 import os
 from typing import TYPE_CHECKING, Any, Literal, Self, Unpack, final
 
 import async_kernel
+from aiologic.meta import iscoroutinelike
 from async_kernel import Caller, Kernel, utils
 from async_kernel.common import Fixed
 from ipywidgets import Widget, register
@@ -150,7 +150,7 @@ class JupyterFrontEnd(Singular, Ipylab):
                     result = await execute_using_shells_namespace(
                         result, shell, payload, connection_id=payload.get("connection_id")
                     )
-                if inspect.iscoroutine(result):
+                if iscoroutinelike(result):
                     result = await result
                 if name:
                     user_ns[name] = result
