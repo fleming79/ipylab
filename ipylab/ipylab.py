@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-import inspect
 import json
 import uuid
 from types import CoroutineType
@@ -13,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 import anyio
 import traitlets
 from aiologic import Event
+from aiologic.meta import iscoroutinelike
 from async_kernel import Caller, Pending
 from async_kernel.caller import truncated_rep
 from async_kernel.common import Fixed
@@ -254,7 +254,7 @@ class Ipylab(HasApp, WidgetBase):
             for callback in callbacks:
                 try:
                     result: CoroutineType[Any, Any, Any] | None = callback(data)
-                    if inspect.iscoroutine(result):
+                    if iscoroutinelike(result):
                         await result
                 except Exception as e:
                     self.log.exception("Signal callback", obj={"callback": callback, "data": data}, exc_info=e)

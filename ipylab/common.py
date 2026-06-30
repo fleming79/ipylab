@@ -25,6 +25,7 @@ from typing import (
 import anyio
 import pluggy
 import traitlets
+from aiologic.meta import iscoroutinelike
 from async_kernel.common import Fixed
 from ipywidgets import TypedTuple, Widget, widget_serialization
 from traitlets import Any as AnyTrait
@@ -69,17 +70,12 @@ SVGSTR_TEST_TUBE = '<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/200
 
 
 def pack(obj: Widget | FunctionType):
-    """Pack obj in a format usable in the frontend.
+    """
+    Pack obj to be json serializable.
 
-    Only widgets and source are packed, all other objects are passed without
-    modification.
-
-    Normally it is unnecessary to pack widgets or code because this is done
-    automatically. However it may be necessary include the specific `toObject` or `toLuminoWidget`.
-    to specify the frontend to extract a parameter in the frontend.
-
-    !!! tip
-        See `app.shell.add` for an example of where pack is used.
+    Supports:
+        - Widget: Uses widget_serialization.
+        - source code: Uses inspect.getsource.
     """
 
     if isinstance(obj, Widget):
@@ -116,7 +112,16 @@ async def execute_using_shells_namespace(
     connection_id: str | None = None,
 ) -> T:
     """
-    Execute func loading the arguments from kwgs, shells user_ns and use_global_ns.
+    Execute func using `shell.user_ns` and `shell.user_global_ns`.
+
+    If func returns a coroutine it will be awaited.
+
+    Args:
+        shell: The shell providing the user_ns and user_gloabal_ns.
+        options: A dict of func keyword arguments to use.
+        connection_id: If provided it will be used to get a connection object which
+            is used as a keyword argument 'ref'.
+
     """
     kwgs = {}
     for arg, param in inspect.signature(func).parameters.items():
@@ -138,7 +143,7 @@ async def execute_using_shells_namespace(
     shell.user_ns["ipylab_call"] = functools.partial(func, **kwgs)
     source = compile("ipylab_call()", "-- Result call --", "eval")
     result = eval(source, shell.user_global_ns, shell.user_ns)
-    if inspect.iscoroutine(result):
+    if iscoroutinelike(result):
         return await result
     return result
 
