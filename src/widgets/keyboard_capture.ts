@@ -1,10 +1,8 @@
 // Copyright (c) ipylab contributors
 // Distributed under the terms of the Modified BSD License.
 
-
 import { DOMWidgetView, DOMWidgetModel } from '@jupyter-widgets/base';
 import { MODULE_NAME, MODULE_VERSION } from '../version';
-
 
 export class KeyboardCaptureModel extends DOMWidgetModel {
   defaults(): Backbone.ObjectHash {

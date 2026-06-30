@@ -53,7 +53,6 @@
   display: inline-block;
   resize: vertical;
   overflow: auto;
-
 }
 
 .ipylab-ResizeHorizontal {
@@ -66,5 +65,5 @@
 .ipylab-KeyboardCapture {
   display: flex;
   height: auto;
-    width: auto;
+  width: auto;
 }

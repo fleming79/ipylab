@@ -57,10 +57,10 @@ pip install ipylab
 
 The following dependencies have patched versions specified in the `'pyproject.toml'` file to enable better functionality.
 
-| Name                                               | Pull request                                                                                                                        | Status                     | Modification                                                                                                                              |
-| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| ipywidgets, jupyterlab-widgets | [#3922](https://github.com/jupyter-widgets/ipywidgets/pull/3922) + [#3921](https://github.com/jupyter-widgets/ipywidgets/pull/3921) | Pending review             | Provides for widgets comms without needing a notebook or console to be open. Plus fixes for proper garbage collection and widget tooltips |
-|                                                                                              |
+| Name                           | Pull request                                                                                                                        | Status         | Modification                                                                                                                              |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| ipywidgets, jupyterlab-widgets | [#3922](https://github.com/jupyter-widgets/ipywidgets/pull/3922) + [#3921](https://github.com/jupyter-widgets/ipywidgets/pull/3921) | Pending review | Provides for widgets comms without needing a notebook or console to be open. Plus fixes for proper garbage collection and widget tooltips |
+|                                |
 
 ## Examples
 
