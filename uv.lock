@@ -1168,7 +1168,7 @@ wheels = [
 [[package]]
 name = "jupyterlite-async-kernel"
 version = "0.1.0"
-source = { git = "https://github.com/fleming79/echo-kernel#42a06e5d50f878ac6803bd178bf5345b30fce5f9" }
+source = { git = "https://github.com/fleming79/echo-kernel#fd00d0e82097149fddb8c60c7b097b2df838ef23" }
 
 [[package]]
 name = "jupyterlite-core"
