@@ -28,7 +28,7 @@ classifiers = [
 ]
 
 dependencies = [
-  "async-kernel>=0.20,<0.21",
+  "async-kernel>=0.21,<0.22",
   "pluggy",
   "typing_extensions",
   "jupyterlab_widgets @ https://github.com/fleming79/ipylab/releases/download/v2.0.9/jupyterlab_widgets-3.0.16-py3-none-any.whl#sha256:f26f773da8f38938f74bbe7475b65b2c5c02677e6c4a0170b4676bc981f8b184",
@@ -49,14 +49,7 @@ docs = [
   'jupyterlite-sphinx',
   "jupyterlite>=0.8.0",
 ]
-test = [
-  "pytest",
-  "pre-commit",
-  "pytest-cov",
-  "pytest-timeout",
-  "pytest-mock",
-  "pytest>=8.4,<9",
-]
+test = ["pytest", "pre-commit", "pytest-cov", "pytest-timeout", "pytest-mock"]
 dev = [
   "nodejs-wheel",
   "ruff",
@@ -120,6 +113,19 @@ before-build-python = ["jlpm clean:all"]
 
 [tool.check-wheel-contents]
 ignore = ["W002"]
+
+
+[tool.pytest]
+minversion = "9.0"
+xfail_strict = true
+log_cli_level = "INFO"
+log_level = "INFO"
+addopts = ["--color=yes", "--strict-markers", "--strict-config", "--capture=no"]
+testpaths = ["tests"]
+
+[tool.uv]
+required-version = ">=0.11.29"
+
 
 [tool.ruff]
 target-version = "py311"
