@@ -48,14 +48,7 @@ docs = [
   'jupyterlite-sphinx',
   "jupyterlite>=0.8.0",
 ]
-test = [
-  "pytest",
-  "pre-commit",
-  "pytest-cov",
-  "pytest-timeout",
-  "pytest-mock",
-  "pytest>=8.4,<9",
-]
+test = ["pytest", "pre-commit", "pytest-cov", "pytest-timeout", "pytest-mock"]
 dev = [
   "nodejs-wheel",
   "ruff",
@@ -116,6 +109,16 @@ before-build-python = ["jlpm clean:all"]
 
 [tool.check-wheel-contents]
 ignore = ["W002"]
+
+
+[tool.pytest]
+minversion = "9.0"
+xfail_strict = true
+log_cli_level = "INFO"
+log_level = "INFO"
+addopts = ["--color=yes", "--strict-markers", "--strict-config", "--capture=no"]
+testpaths = ["tests"]
+
 
 [tool.ruff]
 target-version = "py311"
