@@ -129,23 +129,10 @@ jlpm
 # Clean if required
 jlpm clean:all
 
+# Start the server (this builds an ipylab wheel and copies it)
 jlpm jupyterlite:serve
 ```
 
-### Serve Jupyterlite locally
-
-```bash
-# Load python packages (do once)
-uv sync --group docs
-
-# Load node packages (do once)
-jlpm
-
-# Clean if required
-jlpm clean:all
-
-jlpm jupyterlite:serve
-```
 
 ### Upgrade files
 
