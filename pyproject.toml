@@ -31,7 +31,7 @@ dependencies = [
   "async-kernel>=0.23,<0.24",
   "pluggy",
   "typing_extensions",
-  "jupyterlab_widgets @ https://github.com/fleming79/ipylab/releases/download/v2.0.23/jupyterlab_widgets-3.0.17-py3-none-any.whl#sha256:f25757c09d3b87a89d5e91552b55ca8bf3884ea2d0af0ad9dab1b0bf07425071",
+  "jupyterlab_widgets @ https://github.com/fleming79/ipylab/releases/download/v2.0.23/jupyterlab_widgets-3.0.17-py3-none-any.whl#sha256:a6dd0de7287debacb2e400d5aefb9631f174730c3eba7fa2264e556e484ed6ad",
   "ipywidgets @ https://github.com/fleming79/ipylab/releases/download/v2.0.23/ipywidgets-8.1.9-py3-none-any.whl#sha256:f30a7f5e37aa95ea60d250e4ea736538d96b85070e972a30c412c364ac2aa52e",
   "jupyterlab>=4.5; sys_platform != 'emscripten'",
   "traitlets>=5.15.1",
