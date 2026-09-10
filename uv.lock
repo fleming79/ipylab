@@ -1067,9 +1067,9 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "async-kernel", specifier = ">=0.23,<0.24" },
-    { name = "ipywidgets", url = "https://github.com/fleming79/ipylab/releases/download/v2.0.20/ipywidgets-8.1.8-py3-none-any.whl" },
+    { name = "ipywidgets", url = "https://github.com/fleming79/ipylab/releases/download/v2.0.23/ipywidgets-8.1.9-py3-none-any.whl" },
     { name = "jupyterlab", marker = "sys_platform != 'emscripten'", specifier = ">=4.5" },
-    { name = "jupyterlab-widgets", url = "https://github.com/fleming79/ipylab/releases/download/v2.0.9/jupyterlab_widgets-3.0.16-py3-none-any.whl" },
+    { name = "jupyterlab-widgets", url = "https://github.com/fleming79/ipylab/releases/download/v2.0.23/jupyterlab_widgets-3.0.17-py3-none-any.whl" },
     { name = "pluggy" },
     { name = "traitlets", specifier = ">=5.15.1" },
     { name = "typing-extensions" },
@@ -1161,8 +1161,8 @@ wheels = [
 
 [[package]]
 name = "ipywidgets"
-version = "8.1.8"
-source = { url = "https://github.com/fleming79/ipylab/releases/download/v2.0.20/ipywidgets-8.1.8-py3-none-any.whl" }
+version = "8.1.9"
+source = { url = "https://github.com/fleming79/ipylab/releases/download/v2.0.23/ipywidgets-8.1.9-py3-none-any.whl" }
 dependencies = [
     { name = "comm" },
     { name = "ipython" },
@@ -1170,7 +1170,7 @@ dependencies = [
     { name = "traitlets" },
 ]
 wheels = [
-    { url = "https://github.com/fleming79/ipylab/releases/download/v2.0.20/ipywidgets-8.1.8-py3-none-any.whl", hash = "sha256:5e4a8735b43b60a3ee4e324f7beed4dd858543cd7fe47f543e71bb26efb5df6e" },
+    { url = "https://github.com/fleming79/ipylab/releases/download/v2.0.23/ipywidgets-8.1.9-py3-none-any.whl", hash = "sha256:f30a7f5e37aa95ea60d250e4ea736538d96b85070e972a30c412c364ac2aa52e" },
 ]
 
 [package.metadata]
@@ -1179,12 +1179,12 @@ requires-dist = [
     { name = "ipykernel", marker = "extra == 'test'" },
     { name = "ipython", specifier = ">=6.1.0" },
     { name = "jsonschema", marker = "extra == 'test'" },
-    { name = "jupyterlab-widgets", specifier = "~=3.0.15" },
+    { name = "jupyterlab-widgets", specifier = "~=3.0.17" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=3.6.0" },
     { name = "pytest-cov", marker = "extra == 'test'" },
     { name = "pytest-mock", marker = "extra == 'test'" },
     { name = "pytz", marker = "extra == 'test'" },
-    { name = "traitlets", specifier = ">=5.15.1" },
+    { name = "traitlets", specifier = ">=4.3.1" },
 ]
 provides-extras = ["test"]
 
@@ -1453,10 +1453,10 @@ wheels = [
 
 [[package]]
 name = "jupyterlab-widgets"
-version = "3.0.16"
-source = { url = "https://github.com/fleming79/ipylab/releases/download/v2.0.9/jupyterlab_widgets-3.0.16-py3-none-any.whl" }
+version = "3.0.17"
+source = { url = "https://github.com/fleming79/ipylab/releases/download/v2.0.23/jupyterlab_widgets-3.0.17-py3-none-any.whl" }
 wheels = [
-    { url = "https://github.com/fleming79/ipylab/releases/download/v2.0.9/jupyterlab_widgets-3.0.16-py3-none-any.whl", hash = "sha256:f26f773da8f38938f74bbe7475b65b2c5c02677e6c4a0170b4676bc981f8b184" },
+    { url = "https://github.com/fleming79/ipylab/releases/download/v2.0.23/jupyterlab_widgets-3.0.17-py3-none-any.whl", hash = "sha256:f25757c09d3b87a89d5e91552b55ca8bf3884ea2d0af0ad9dab1b0bf07425071" },
 ]
 
 [[package]]
